@@ -17,6 +17,11 @@ type eiaResponse struct {
 		} `json:"data"`
 	} `json:"response"`
 }
+type BrentResult struct {
+	PriceUSD    float64 `json:"price_usd"`
+	DeltaDayPct float64 `json:"delta_day_pct"`
+	Error       string  `json:"error,omitempty"`
+}
 
 // fetchOilDeltaPct returns the day-over-day % change in Brent crude.
 // This is the heaviest signal in the shock scorer (50% weight).
