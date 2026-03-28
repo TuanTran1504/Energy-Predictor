@@ -9,7 +9,7 @@ const fmt = (n, decimals = 2) =>
   n == null ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 const fmtVND = (n) =>
-  n == null ? "—" : Number(n).toLocaleString("vi-VN");
+  n == null ? "—" : Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 })
 
 const change = (n) => {
   if (n == null) return null;

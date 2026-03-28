@@ -43,15 +43,7 @@ CREATE TABLE IF NOT EXISTS forecasts (
     PRIMARY KEY (id, created_at)
 );
 
-CREATE TABLE IF NOT EXISTS shock_events (
-    id               BIGSERIAL       PRIMARY KEY,
-    started_at       TIMESTAMPTZ     NOT NULL,
-    ended_at         TIMESTAMPTZ,
-    peak_score       FLOAT,
-    peak_oil_delta   FLOAT,
-    trigger_headline TEXT,
-    notes            TEXT
-);
+
 
 CREATE TABLE IF NOT EXISTS model_runs (
     id              BIGSERIAL       PRIMARY KEY,
@@ -67,12 +59,38 @@ CREATE TABLE IF NOT EXISTS model_runs (
     notes           TEXT
 );
 
-INSERT INTO shock_events (started_at, peak_score, peak_oil_delta, trigger_headline, notes)
-VALUES (
-    '2026-02-28 06:00:00+00',
-    0.94,
-    10.2,
-    'US and Israel launch strikes against Iran nuclear facilities',
-    'Start of 2026 Iran-US conflict'
-)
-ON CONFLICT DO NOTHING;
+CREATE TABLE IF NOT EXISTS vnd_rates (
+    id          BIGSERIAL PRIMARY KEY,
+    fetched_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    usd_to_vnd  FLOAT NOT NULL
+);
+
+CREATE INDEX idx_vnd_rates_fetched_at 
+ON vnd_rates (fetched_at DESC);
+
+CREATE TABLE IF NOT EXISTS macro_events (
+    id           BIGSERIAL PRIMARY KEY,
+    event_date   TIMESTAMPTZ NOT NULL,
+    event_type   TEXT NOT NULL,  -- 'FED_RATE', 'CPI', 'NFP', 'HALVING'
+    description  TEXT,
+    expected     TEXT,           -- market consensus before event
+    actual       TEXT,           -- filled in after event
+    impact_pct   FLOAT,          -- actual BTC move within 24h
+    CONSTRAINT macro_events_date_type_unique UNIQUE (event_date, event_type)
+);
+
+DROP TABLE shock_events;
+
+CREATE TABLE shock_events (
+    id              BIGSERIAL PRIMARY KEY,
+    event_date      TIMESTAMPTZ NOT NULL,
+    description     TEXT NOT NULL,
+    severity        TEXT NOT NULL CHECK (severity IN ('LOW', 'ELEVATED', 'HIGH')),
+    oil_impact      FLOAT DEFAULT 0,
+    trigger_headline TEXT,
+    peak_score      FLOAT,
+    notes           TEXT,
+    CONSTRAINT shock_events_date_unique UNIQUE (event_date)
+);
+
+CREATE INDEX idx_shock_events_date ON shock_events (event_date DESC);
