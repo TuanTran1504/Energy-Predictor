@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TuanTran1504/Energy-Predictor/handlers"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -23,7 +24,13 @@ func main() {
 	go startVNDRateSaver()
 
 	r := gin.Default()
-
+	// Add this before routes
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:    []string{"http://localhost:5173"},
+		AllowMethods:    []string{"GET", "POST"},
+		AllowHeaders:    []string{"*"},
+		AllowWebSockets: true,
+	}))
 	r.GET("/health", handleHealth)
 	r.GET("/signals", handlers.Signals)
 	r.GET("/vnd/status", handlers.VNDStatus)
