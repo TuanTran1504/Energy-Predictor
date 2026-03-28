@@ -4,7 +4,7 @@ import mlflow
 import mlflow.sklearn
 import os
 
-app = FastAPI(title="Energy Forecaster ML Service")
+app = FastAPI(title="ML Service")
 
 app.add_middleware(
     CORSMiddleware,
