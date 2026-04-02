@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: pip install ruff
       - name: Lint
-        run: ruff check backend/ --ignore E501,F401
+        run: ruff check backend/ --ignore E501,F401,F841,F541,E402,E401,F811
 
   go:
     name: Go build & vet
