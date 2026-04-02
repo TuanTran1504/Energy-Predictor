@@ -4,13 +4,22 @@ import (
 	"database/sql"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
 func getDB() (*sql.DB, error) {
-	return sql.Open("postgres", os.Getenv("DATABASE_URL")+"?sslmode=require")
+	dsn := os.Getenv("DATABASE_URL")
+	if !strings.Contains(dsn, "sslmode") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&sslmode=require"
+		} else {
+			dsn += "?sslmode=require"
+		}
+	}
+	return sql.Open("postgres", dsn)
 }
 
 func TradingStatus(c *gin.Context) {
