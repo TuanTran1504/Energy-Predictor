@@ -1195,9 +1195,8 @@ async def trade_execute(request: Request):
     try:
         from engine import (
             get_client, get_conn, save_trade, calc_quantity,
-            LEVERAGE, get_open_trades
+            LEVERAGE,
         )
-        from binance.um_futures import UMFutures
 
         client = get_client()
         symbol = order["symbol"].upper()
