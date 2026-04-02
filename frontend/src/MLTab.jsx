@@ -8,7 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const API_URL = "http://localhost:8080";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
 const fmt = (n, d = 2) =>
   n == null ? "—" : Number(n).toLocaleString("en-US", {

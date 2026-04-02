@@ -5,8 +5,9 @@ import MLTab from "./MLTab";
 import AITab from "./AITab";
 import TradingTab from "./TradingTab";
 
-const WS_URL  = "ws://localhost:8080/ws/live";
-const API_URL = "http://localhost:8080";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+const WS_URL  = import.meta.env.VITE_WS_URL ||
+  `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws/live`;
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 const fmt = (n, decimals = 2) =>
