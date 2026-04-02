@@ -2,4 +2,4 @@ python-dotenv==1.0.1
 psycopg2-binary==2.9.9
 redis==5.0.4
 openai==1.30.0
-binance-futures-connector==3.7.0
+binance-futures-connector==4.1.0
