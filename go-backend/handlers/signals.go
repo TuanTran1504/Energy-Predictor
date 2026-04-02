@@ -9,14 +9,12 @@ import (
 
 type SignalsResponse struct {
 	BrentCrude BrentResult   `json:"brent_crude"`
-	USDVND     VNDResult     `json:"usd_vnd"`
 	Crypto     CryptoSignals `json:"crypto"`
 	FetchedAt  string        `json:"fetched_at"`
 }
 
 func Signals(c *gin.Context) {
 	brentCh := make(chan *BrentResult, 1)
-	vndCh := make(chan *VNDResult, 1)
 	cryptoCh := make(chan *CryptoSignals, 1)
 
 	go func() {
@@ -29,17 +27,7 @@ func Signals(c *gin.Context) {
 	}()
 
 	go func() {
-		result, err := FetchVNDRate()
-		if err != nil {
-			vndCh <- &VNDResult{USDToVND: 26251}
-			return
-		}
-		vndCh <- result
-	}()
-
-	go func() {
-		// Use cached VND rate — don't depend on vndCh goroutine
-		signals, err := FetchCryptoSignals(26251.0)
+		signals, err := FetchCryptoSignals()
 		if err != nil {
 			cryptoCh <- &CryptoSignals{}
 			return
@@ -48,12 +36,10 @@ func Signals(c *gin.Context) {
 	}()
 
 	brent := <-brentCh
-	vnd := <-vndCh
 	crypto := <-cryptoCh
 
 	c.JSON(http.StatusOK, SignalsResponse{
 		BrentCrude: *brent,
-		USDVND:     *vnd,
 		Crypto:     *crypto,
 		FetchedAt:  time.Now().UTC().Format(time.RFC3339),
 	})

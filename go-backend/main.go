@@ -20,22 +20,28 @@ func main() {
 	// Start broadcast scheduler — pushes signals every 60 seconds
 	go startBroadcastScheduler()
 
-	// Start VND rate saver
-	go startVNDRateSaver()
-
 	r := gin.Default()
 	// Add this before routes
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:    []string{"http://localhost:5173"},
-		AllowMethods:    []string{"GET", "POST"},
-		AllowHeaders:    []string{"*"},
-		AllowWebSockets: true,
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:5174", "http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		AllowWebSockets:  true,
+		AllowCredentials: true,
 	}))
 	r.GET("/health", handleHealth)
 	r.GET("/signals", handlers.Signals)
-	r.GET("/vnd/status", handlers.VNDStatus)
 	r.GET("/shock/status", handlers.ShockStatus)
 	r.GET("/crypto/status", handlers.CryptoStatus)
+	r.GET("/crypto/history", handlers.CryptoHistory)
+	r.GET("/ml/backtest", handlers.MLBacktest)
+	r.GET("/ml/market-signals", handlers.MLMarketSignals)
+	r.POST("/ml/analyze", handlers.MLAnalyze)
+	r.POST("/ml/trade/chat", handlers.MLTradeChat)
+	r.POST("/ml/trade/execute", handlers.MLTradeExecute)
+	r.GET("/trading/status", handlers.TradingStatus)
+	r.GET("/trading/history", handlers.TradingHistory)
+	r.GET("/trading/positions/sync", handlers.TradingPositionsSync)
 	r.GET("/ws/live", handlers.LiveFeed)
 
 	port := os.Getenv("PORT")
@@ -66,23 +72,4 @@ func handleHealth(c *gin.Context) {
 		"status":  "ok",
 		"service": "energy-forecaster-go",
 	})
-}
-
-func startVNDRateSaver() {
-	saveVNDRateOnce()
-	for {
-		now := time.Now().UTC()
-		next := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
-		time.Sleep(time.Until(next))
-		saveVNDRateOnce()
-	}
-}
-
-func saveVNDRateOnce() {
-	result, err := handlers.FetchVNDRate()
-	if err != nil {
-		log.Printf("VND save failed: %v", err)
-		return
-	}
-	log.Printf("VND rate saved: %.2f", result.USDToVND)
 }

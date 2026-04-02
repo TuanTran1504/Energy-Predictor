@@ -9,3 +9,6 @@ dist/
 mlruns/
 go-backend/energy-forecaster.exe
 go-backend/energy-forecaster
+# MLflow artifact cache
+backend/training/models/
+test_payload.json

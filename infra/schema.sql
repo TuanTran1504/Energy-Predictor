@@ -94,3 +94,47 @@ CREATE TABLE shock_events (
 );
 
 CREATE INDEX idx_shock_events_date ON shock_events (event_date DESC);
+
+CREATE TABLE IF NOT EXISTS crypto_prices (
+    id              BIGSERIAL,
+    symbol          TEXT            NOT NULL,
+    fetched_at      TIMESTAMPTZ     NOT NULL,
+    open_usd        FLOAT           NOT NULL,
+    high_usd        FLOAT           NOT NULL,
+    low_usd         FLOAT           NOT NULL,
+    close_usd       FLOAT           NOT NULL,
+    volume_usd      FLOAT           NOT NULL,
+    change_pct      FLOAT,
+    source          TEXT            DEFAULT 'binance',
+    interval_minutes INTEGER        DEFAULT 1440,  -- 1440 minutes = 1 day
+    PRIMARY KEY (id, fetched_at)
+);
+CREATE TABLE crypto_prices (
+    id BIGSERIAL PRIMARY KEY,
+    symbol TEXT,
+    fetched_at TIMESTAMPTZ,
+    open_usd FLOAT,
+    high_usd FLOAT,
+    low_usd FLOAT,
+    close_usd FLOAT,
+    volume_usd FLOAT,
+    change_pct FLOAT,
+    source TEXT DEFAULT 'binance',
+    interval_minutes INTEGER DEFAULT 1440,  -- 30, 60, 240, 1440, etc.
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_crypto_prices_symbol_time ON crypto_prices (symbol, fetched_at DESC);
+CREATE INDEX idx_crypto_prices_interval ON crypto_prices (interval_minutes);
+
+CREATE TABLE IF NOT EXISTS fear_greed_index (
+    date        DATE        PRIMARY KEY,
+    value       FLOAT       NOT NULL,  -- 0-100 raw value
+    fetched_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS funding_rates (
+    symbol      TEXT        NOT NULL,
+    date        DATE        NOT NULL,
+    rate_avg    FLOAT       NOT NULL,  -- daily average of 3 readings
+    fetched_at  TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (symbol, date)
+);

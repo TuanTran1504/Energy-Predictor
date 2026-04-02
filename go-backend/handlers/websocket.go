@@ -60,7 +60,15 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				// Safe close — recover from panic if channel already closed
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							fmt.Printf("Recovered from close on closed channel: %v\n", r)
+						}
+					}()
+					close(client.send)
+				}()
 			}
 			h.mu.Unlock()
 			fmt.Printf("Client disconnected. Total: %d\n", len(h.clients))
@@ -70,10 +78,12 @@ func (h *Hub) Run() {
 			for client := range h.clients {
 				select {
 				case client.send <- message:
+					// Successfully sent
 				default:
-					// Client's send buffer is full — drop and disconnect
-					close(client.send)
-					delete(h.clients, client)
+					// Client's send buffer is full — disconnect
+					h.mu.RUnlock()
+					h.unregister <- client
+					h.mu.RLock()
 				}
 			}
 			h.mu.RUnlock()
@@ -160,9 +170,20 @@ func LiveFeed(c *gin.Context) {
 	// Send current signals immediately on connect
 	// so the dashboard has data before the next broadcast
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Printf("Recovered from panic in initial send: %v\n", r)
+			}
+		}()
+
 		payload := buildSignalPayload()
 		if data, err := json.Marshal(payload); err == nil {
-			client.send <- data
+			select {
+			case client.send <- data:
+				// Successfully sent
+			default:
+				// Channel buffer full or closed — skip
+			}
 		}
 	}()
 
@@ -185,17 +206,17 @@ func BroadcastSignals() {
 
 // WebSocketMessage is the shape of every message sent to the dashboard
 type WebSocketMessage struct {
-	Type        string          `json:"type"`
-	Timestamp   string          `json:"timestamp"`
-	Signals     SignalsResponse `json:"signals"`
-	ClientCount int             `json:"client_count"`
+	Type          string                   `json:"type"`
+	Timestamp     string                   `json:"timestamp"`
+	Signals       SignalsResponse          `json:"signals"`
+	ClientCount   int                      `json:"client_count"`
+	MLPredictions map[string]*MLPrediction `json:"ml_predictions,omitempty"`
 }
 
 func buildSignalPayload() WebSocketMessage {
-	// Fetch all signals
 	brentCh := make(chan *BrentResult, 1)
-	vndCh := make(chan *VNDResult, 1)
 	cryptoCh := make(chan *CryptoSignals, 1)
+	mlCh := make(chan map[string]*MLPrediction, 1)
 
 	go func() {
 		delta, err := fetchOilDeltaPct()
@@ -207,16 +228,7 @@ func buildSignalPayload() WebSocketMessage {
 	}()
 
 	go func() {
-		result, err := FetchVNDRate()
-		if err != nil {
-			vndCh <- &VNDResult{USDToVND: 26251}
-			return
-		}
-		vndCh <- result
-	}()
-
-	go func() {
-		signals, err := FetchCryptoSignals(26251.0)
+		signals, err := FetchCryptoSignals()
 		if err != nil {
 			cryptoCh <- &CryptoSignals{}
 			return
@@ -224,9 +236,13 @@ func buildSignalPayload() WebSocketMessage {
 		cryptoCh <- signals
 	}()
 
+	go func() {
+		mlCh <- FetchMLPredictions()
+	}()
+
 	brent := <-brentCh
-	vnd := <-vndCh
 	crypto := <-cryptoCh
+	mlPreds := <-mlCh
 
 	hub.mu.RLock()
 	clientCount := len(hub.clients)
@@ -237,10 +253,10 @@ func buildSignalPayload() WebSocketMessage {
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Signals: SignalsResponse{
 			BrentCrude: *brent,
-			USDVND:     *vnd,
 			Crypto:     *crypto,
 			FetchedAt:  time.Now().UTC().Format(time.RFC3339),
 		},
-		ClientCount: clientCount,
+		ClientCount:   clientCount,
+		MLPredictions: mlPreds,
 	}
 }

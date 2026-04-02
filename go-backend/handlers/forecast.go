@@ -28,19 +28,18 @@ type ForecastRequest struct {
 // PythonPredictRequest is what Go sends to the Python service
 // It includes everything ForecastRequest has PLUS the live shock signals
 type PythonPredictRequest struct {
-	CurrentLoadMw      float64 `json:"current_load_mw"`
-	TemperatureC       float64 `json:"temperature_c"`
-	WindSpeedMs        float64 `json:"wind_speed_ms"`
-	Hour               int     `json:"hour"`
-	Weekday            int     `json:"weekday"`
-	IsHoliday          bool    `json:"is_holiday"`
-	LoadLag1h          float64 `json:"load_lag_1h"`
-	LoadLag24h         float64 `json:"load_lag_24h"`
-	LoadLag168h        float64 `json:"load_lag_168h"`
-	OilPriceBrent      float64 `json:"oil_price_brent"`
-	OilDeltaPct30m     float64 `json:"oil_delta_pct_30m"`
-	HeadlineScore      float64 `json:"headline_score"`
-	GridImbalancePrice float64 `json:"grid_imbalance_price"`
+	CurrentLoadMw  float64 `json:"current_load_mw"`
+	TemperatureC   float64 `json:"temperature_c"`
+	WindSpeedMs    float64 `json:"wind_speed_ms"`
+	Hour           int     `json:"hour"`
+	Weekday        int     `json:"weekday"`
+	IsHoliday      bool    `json:"is_holiday"`
+	LoadLag1h      float64 `json:"load_lag_1h"`
+	LoadLag24h     float64 `json:"load_lag_24h"`
+	LoadLag168h    float64 `json:"load_lag_168h"`
+	OilPriceBrent  float64 `json:"oil_price_brent"`
+	OilDeltaPct30m float64 `json:"oil_delta_pct_30m"`
+	HeadlineScore  float64 `json:"headline_score"`
 }
 
 // PythonPredictResponse is what the Python service sends back
@@ -56,17 +55,16 @@ type PythonPredictResponse struct {
 // ForecastResponse is what Go returns to the dashboard
 // It combines the Python prediction with the live shock signals
 type ForecastResponse struct {
-	ForecastMw        float64 `json:"forecast_mw"`
-	LowerBoundMw      float64 `json:"lower_bound_mw"`
-	UpperBoundMw      float64 `json:"upper_bound_mw"`
-	ShockScore        float64 `json:"shock_score"`
-	ShockActive       bool    `json:"shock_active"`
-	AlertLevel        string  `json:"alert_level"`
-	AlertColor        string  `json:"alert_color"`
-	OilDeltaPct       float64 `json:"oil_delta_pct"`
-	HeadlineScore     float64 `json:"headline_score"`
-	ImbalancePriceMwh float64 `json:"imbalance_price_gbp_mwh"`
-	Timestamp         string  `json:"timestamp"`
+	ForecastMw    float64 `json:"forecast_mw"`
+	LowerBoundMw  float64 `json:"lower_bound_mw"`
+	UpperBoundMw  float64 `json:"upper_bound_mw"`
+	ShockScore    float64 `json:"shock_score"`
+	ShockActive   bool    `json:"shock_active"`
+	AlertLevel    string  `json:"alert_level"`
+	AlertColor    string  `json:"alert_color"`
+	OilDeltaPct   float64 `json:"oil_delta_pct"`
+	HeadlineScore float64 `json:"headline_score"`
+	Timestamp     string  `json:"timestamp"`
 }
 
 func Forecast(c *gin.Context) {
@@ -89,9 +87,8 @@ func Forecast(c *gin.Context) {
 
 	oilCh := make(chan float64, 1)
 	newsCh := make(chan float64, 1)
-	gridCh := make(chan float64, 1)
 
-	// Launch three goroutines simultaneously
+	// Launch goroutines simultaneously
 	go func() {
 		v, err := fetchOilDeltaPct()
 		if err != nil {
@@ -110,38 +107,27 @@ func Forecast(c *gin.Context) {
 		newsCh <- v
 	}()
 
-	go func() {
-		v, err := fetchImbalancePrice()
-		if err != nil {
-			fmt.Printf("Warning: Elexon fetch failed: %v\n", err)
-			v = 0
-		}
-		gridCh <- v
-	}()
-
-	// Wait for all three to finish
+	// Wait for signals to finish
 	oilDelta := <-oilCh
 	headlineScore := <-newsCh
-	imbalancePrice := <-gridCh
 
-	fmt.Printf("Signals fetched — oil: %.2f%% headline: %.2f imbalance: £%.2f\n",
-		oilDelta, headlineScore, imbalancePrice)
+	fmt.Printf("Signals fetched — oil: %.2f%% headline: %.2f\n",
+		oilDelta, headlineScore)
 
 	// 3. Build the request for the Python ML service
 	pythonReq := PythonPredictRequest{
-		CurrentLoadMw:      req.CurrentLoadMw,
-		TemperatureC:       req.TemperatureC,
-		WindSpeedMs:        req.WindSpeedMs,
-		Hour:               req.Hour,
-		Weekday:            req.Weekday,
-		IsHoliday:          req.IsHoliday,
-		LoadLag1h:          req.LoadLag1h,
-		LoadLag24h:         req.LoadLag24h,
-		LoadLag168h:        req.LoadLag168h,
-		OilPriceBrent:      104.0, // placeholder — add EIA price endpoint later
-		OilDeltaPct30m:     oilDelta,
-		HeadlineScore:      headlineScore,
-		GridImbalancePrice: imbalancePrice,
+		CurrentLoadMw:  req.CurrentLoadMw,
+		TemperatureC:   req.TemperatureC,
+		WindSpeedMs:    req.WindSpeedMs,
+		Hour:           req.Hour,
+		Weekday:        req.Weekday,
+		IsHoliday:      req.IsHoliday,
+		LoadLag1h:      req.LoadLag1h,
+		LoadLag24h:     req.LoadLag24h,
+		LoadLag168h:    req.LoadLag168h,
+		OilPriceBrent:  104.0, // placeholder — add EIA price endpoint later
+		OilDeltaPct30m: oilDelta,
+		HeadlineScore:  headlineScore,
 	}
 
 	// 4. Call the Python ML service
@@ -162,17 +148,16 @@ func Forecast(c *gin.Context) {
 	level, _, alertMsg := getAlertLevel(prediction.ShockScore)
 
 	c.JSON(http.StatusOK, ForecastResponse{
-		ForecastMw:        prediction.ForecastMw,
-		LowerBoundMw:      prediction.LowerBoundMw,
-		UpperBoundMw:      prediction.UpperBoundMw,
-		ShockScore:        prediction.ShockScore,
-		ShockActive:       prediction.ShockActive,
-		AlertLevel:        level,
-		AlertColor:        alertColor,
-		OilDeltaPct:       oilDelta,
-		HeadlineScore:     headlineScore,
-		ImbalancePriceMwh: imbalancePrice,
-		Timestamp:         time.Now().UTC().Format(time.RFC3339),
+		ForecastMw:    prediction.ForecastMw,
+		LowerBoundMw:  prediction.LowerBoundMw,
+		UpperBoundMw:  prediction.UpperBoundMw,
+		ShockScore:    prediction.ShockScore,
+		ShockActive:   prediction.ShockActive,
+		AlertLevel:    level,
+		AlertColor:    alertColor,
+		OilDeltaPct:   oilDelta,
+		HeadlineScore: headlineScore,
+		Timestamp:     time.Now().UTC().Format(time.RFC3339),
 	})
 
 	_ = alertMsg // used in dashboard — suppress unused warning
@@ -184,7 +169,7 @@ func Forecast(c *gin.Context) {
 func callPythonMLService(req PythonPredictRequest) (*PythonPredictResponse, error) {
 	pythonURL := os.Getenv("PYTHON_ML_URL")
 	if pythonURL == "" {
-		pythonURL = "http://localhost:8000" // default Python FastAPI port
+		pythonURL = "http://localhost:8001" // default Python FastAPI port
 	}
 
 	// Marshal the request to JSON

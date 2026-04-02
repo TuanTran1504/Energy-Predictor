@@ -13,7 +13,6 @@ import (
 type ShockInput struct {
 	OilDeltaPct    float64 `json:"oil_delta_pct"`
 	HeadlineScore  float64 `json:"headline_score"`
-	ImbalancePrice float64 `json:"imbalance_price"`
 }
 
 // ShockResponse is what the endpoint returns.
@@ -25,20 +24,18 @@ type ShockResponse struct {
 	ShockActive bool    `json:"shock_active"`
 
 	// Raw signals — so you can see exactly what each source contributed
-	ImbalancePrice float64 `json:"imbalance_price_gbp_mwh"`
-	OilDeltaPct    float64 `json:"oil_delta_pct"`
-	HeadlineScore  float64 `json:"headline_score"`
+	OilDeltaPct   float64 `json:"oil_delta_pct"`
+	HeadlineScore float64 `json:"headline_score"`
 }
 
 // ComputeShockScore is the same logic as your Python shock_scorer.py
 // translated into Go. Same weights, same thresholds.
-func computeShockScore(oilDelta, headlineScore, imbalancePrice float64) float64 {
+func computeShockScore(oilDelta, headlineScore float64) float64 {
 	// Only upward oil moves signal supply shock
 	oilSignal := math.Min(math.Max(oilDelta, 0)/15.0, 1.0)
 	newsSignal := math.Min(math.Max(headlineScore, 0), 1.0)
-	imbalanceSignal := math.Min(math.Abs(imbalancePrice)/2000.0, 1.0)
 
-	score := 0.50*oilSignal + 0.30*newsSignal + 0.20*imbalanceSignal
+	score := 0.70*oilSignal + 0.30*newsSignal
 
 	// Round to 4 decimal places
 	return math.Round(score*10000) / 10000
@@ -58,13 +55,6 @@ func getAlertLevel(score float64) (level, color, message string) {
 // ShockStatus handles GET /shock/status
 // c *gin.Context is like FastAPI's Request — it holds the request and response.
 func ShockStatus(c *gin.Context) {
-	// Fetch real imbalance price from Elexon
-	imbalancePrice, err := fetchImbalancePrice()
-	if err != nil {
-		fmt.Printf("Warning: Elexon fetch failed: %v\n", err)
-		imbalancePrice = 0
-	}
-
 	// Fetch real oil delta from EIA
 	oilDelta, err := fetchOilDeltaPct()
 	if err != nil {
@@ -78,7 +68,7 @@ func ShockStatus(c *gin.Context) {
 		headlineScore = 0
 	}
 
-	score := computeShockScore(oilDelta, headlineScore, imbalancePrice)
+	score := computeShockScore(oilDelta, headlineScore)
 	level, color, message := getAlertLevel(score)
 
 	c.JSON(http.StatusOK, ShockResponse{
@@ -87,7 +77,6 @@ func ShockStatus(c *gin.Context) {
 		AlertColor:     color,
 		Message:        message,
 		ShockActive:    score >= 0.6,
-		ImbalancePrice: imbalancePrice,
 		OilDeltaPct:    oilDelta,
 		HeadlineScore:  headlineScore,
 	})
