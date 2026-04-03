@@ -39,6 +39,7 @@ func main() {
 	r.POST("/ml/analyze", handlers.MLAnalyze)
 	r.POST("/ml/trade/chat", handlers.MLTradeChat)
 	r.POST("/ml/trade/execute", handlers.MLTradeExecute)
+	r.GET("/macro/indicators", handlers.GetMacroIndicators)
 	r.GET("/trading/status", handlers.TradingStatus)
 	r.GET("/trading/history", handlers.TradingHistory)
 	r.GET("/trading/positions/sync", handlers.TradingPositionsSync)
