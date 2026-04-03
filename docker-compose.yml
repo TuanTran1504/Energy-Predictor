@@ -78,6 +78,18 @@ services:
       - redis
     restart: unless-stopped
 
+  # ── Data scheduler (Fear&Greed, FRED, funding rates) ─────
+  scheduler:
+    build:
+      context: ./backend/schedule
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+    depends_on:
+      - redis
+    restart: unless-stopped
+
   # ── Redis cache ───────────────────────────────────────────
   redis:
     image: redis:7-alpine

@@ -82,67 +82,215 @@ const TickerStrip = ({ signals }) => {
 };
 
 // ── Macro Tab ─────────────────────────────────────────────────────────────────
-const MacroTab = ({ signals, history }) => {
-  if (!signals) return <div className="loading">Awaiting data stream...</div>;
-  const { brent_crude } = signals;
+const fgColor = (v) =>
+  v <= 25 ? "#ff3b30" : v <= 45 ? "#ff9f0a" : v <= 55 ? "#aeaeb2" : v <= 75 ? "#30d158" : "#00ff88";
+
+const eventTypeLabel = (t) =>
+  t === "FED_RATE" ? "FED RATE" : t === "CPI" ? "CPI" : t === "NFP" ? "NFP" : t;
+
+const eventTypeColor = (t) =>
+  t === "FED_RATE" ? "#0a84ff" : t === "CPI" ? "#ff9f0a" : t === "NFP" ? "#30d158" : "#aeaeb2";
+
+const MacroTab = ({ signals }) => {
+  const [macro, setMacro] = useState(null);
+  const [macroLoading, setMacroLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_URL}/macro/indicators`);
+        setMacro(await res.json());
+      } catch (e) {
+        console.error("Macro fetch failed:", e);
+      } finally {
+        setMacroLoading(false);
+      }
+    };
+    load();
+    const id = setInterval(load, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { brent_crude } = signals || {};
+  const fg = macro?.fear_greed;
+  const fgVal = fg?.value ?? 0;
 
   return (
     <div className="tab-content">
-      <div className="card-grid">
-        <div className="card">
-          <div className="card-header">
-            <span className="card-label">BRENT CRUDE</span>
-            <span className="card-sub">USD / barrel</span>
-          </div>
-          <div className="card-value">${fmt(brent_crude?.price_usd)}</div>
-          <div className="card-meta">
-            <ChangeTag n={brent_crude?.delta_day_pct} /> <span className="muted">24h</span>
-          </div>
-          <div className="card-note">Iran-US conflict · Hormuz closure risk</div>
+
+      {/* ── Key indicators ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+
+        {/* Brent Crude */}
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--muted2)", letterSpacing: "0.08em", marginBottom: 4 }}>BRENT CRUDE</div>
+          <div style={{ fontSize: 22, fontWeight: 300, fontFamily: "var(--mono)" }}>${fmt(brent_crude?.price_usd)}</div>
+          <div style={{ fontSize: 11, marginTop: 4 }}><ChangeTag n={brent_crude?.delta_day_pct} /> <span className="muted">24h</span></div>
         </div>
 
+        {/* Fed Rate */}
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--muted2)", letterSpacing: "0.08em", marginBottom: 4 }}>FED RATE</div>
+          {macroLoading ? <div style={{ color: "var(--muted2)", fontSize: 12 }}>Loading...</div> : macro?.fed_rate ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 300, fontFamily: "var(--mono)", color: "#0a84ff" }}>
+                {macro.fed_rate.actual}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{macro.fed_rate.event_date}</div>
+              <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 2 }}>{macro.fed_rate.description}</div>
+            </>
+          ) : <div style={{ color: "var(--muted2)", fontSize: 11 }}>No data</div>}
+        </div>
 
-        <div className="card card-wide">
-          <div className="card-header">
-            <span className="card-label">GEOPOLITICAL CONTEXT</span>
-          </div>
-          <div className="context-lines">
-            <div className="context-line">
-              <span className="ctx-key">Strait of Hormuz</span>
-              <span className="ctx-val neg">DISRUPTED</span>
-            </div>
-            <div className="context-line">
-              <span className="ctx-key">IEA Reserve Release</span>
-              <span className="ctx-val pos">400M barrels</span>
-            </div>
-            <div className="context-line">
-              <span className="ctx-key">US-Iran talks</span>
-              <span className="ctx-val">ONGOING</span>
-            </div>
-            <div className="context-line">
-              <span className="ctx-key">Brent 30d change</span>
-              <span className="ctx-val pos">+40%</span>
-            </div>
-          </div>
+        {/* CPI */}
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--muted2)", letterSpacing: "0.08em", marginBottom: 4 }}>CPI (MoM)</div>
+          {macroLoading ? <div style={{ color: "var(--muted2)", fontSize: 12 }}>Loading...</div> : macro?.cpi ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 300, fontFamily: "var(--mono)", color: macro.cpi.actual?.startsWith("+") ? "#ff9f0a" : "#30d158" }}>
+                {macro.cpi.actual}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{macro.cpi.event_date}</div>
+              <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 2 }}>US Consumer Price Index</div>
+            </>
+          ) : <div style={{ color: "var(--muted2)", fontSize: 11 }}>No data</div>}
+        </div>
+
+        {/* NFP */}
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--muted2)", letterSpacing: "0.08em", marginBottom: 4 }}>NFP JOBS</div>
+          {macroLoading ? <div style={{ color: "var(--muted2)", fontSize: 12 }}>Loading...</div> : macro?.nfp ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 300, fontFamily: "var(--mono)", color: macro.nfp.actual?.startsWith("+") ? "#30d158" : "#ff3b30" }}>
+                {macro.nfp.actual}
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{macro.nfp.event_date}</div>
+              <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 2 }}>Non-Farm Payrolls</div>
+            </>
+          ) : <div style={{ color: "var(--muted2)", fontSize: 11 }}>No data</div>}
+        </div>
+
+        {/* Fear & Greed */}
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--muted2)", letterSpacing: "0.08em", marginBottom: 4 }}>FEAR & GREED</div>
+          {macroLoading ? <div style={{ color: "var(--muted2)", fontSize: 12 }}>Loading...</div> : fg ? (
+            <>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <div style={{ fontSize: 32, fontWeight: 300, fontFamily: "var(--mono)", color: fgColor(fgVal) }}>{fgVal}</div>
+                <div style={{ fontSize: 11, color: fgColor(fgVal) }}>{fg.classification}</div>
+              </div>
+              <div style={{ marginTop: 8, height: 6, background: "var(--border)", borderRadius: 3 }}>
+                <div style={{ height: "100%", width: `${fgVal}%`, background: fgColor(fgVal), borderRadius: 3, transition: "width 0.5s" }} />
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{fg.date}</div>
+            </>
+          ) : <div style={{ color: "var(--muted2)", fontSize: 11 }}>No data</div>}
+        </div>
+
+        {/* BTC Funding Rate */}
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--muted2)", letterSpacing: "0.08em", marginBottom: 4 }}>BTC FUNDING RATE</div>
+          {macroLoading ? <div style={{ color: "var(--muted2)", fontSize: 12 }}>Loading...</div> : macro?.funding_btc ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 300, fontFamily: "var(--mono)", color: macro.funding_btc.rate_avg > 0 ? "#30d158" : "#ff3b30" }}>
+                {(macro.funding_btc.rate_avg * 100).toFixed(4)}%
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{macro.funding_btc.date} · 8h avg</div>
+              <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 2 }}>
+                {macro.funding_btc.rate_avg > 0.0001 ? "Longs paying shorts" : macro.funding_btc.rate_avg < -0.0001 ? "Shorts paying longs" : "Neutral"}
+              </div>
+            </>
+          ) : <div style={{ color: "var(--muted2)", fontSize: 11 }}>No data</div>}
+        </div>
+
+        {/* ETH Funding Rate */}
+        <div className="card" style={{ padding: "12px 16px" }}>
+          <div style={{ fontSize: 10, color: "var(--muted2)", letterSpacing: "0.08em", marginBottom: 4 }}>ETH FUNDING RATE</div>
+          {macroLoading ? <div style={{ color: "var(--muted2)", fontSize: 12 }}>Loading...</div> : macro?.funding_eth ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 300, fontFamily: "var(--mono)", color: macro.funding_eth.rate_avg > 0 ? "#30d158" : "#ff3b30" }}>
+                {(macro.funding_eth.rate_avg * 100).toFixed(4)}%
+              </div>
+              <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 4 }}>{macro.funding_eth.date} · 8h avg</div>
+              <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 2 }}>
+                {macro.funding_eth.rate_avg > 0.0001 ? "Longs paying shorts" : macro.funding_eth.rate_avg < -0.0001 ? "Shorts paying longs" : "Neutral"}
+              </div>
+            </>
+          ) : <div style={{ color: "var(--muted2)", fontSize: 11 }}>No data</div>}
         </div>
       </div>
 
-      {history.length > 1 && (
-        <div className="chart-section">
-          <div className="chart-label">USD/VND — session history</div>
-          <ResponsiveContainer width="100%" height={160}>
-            <LineChart data={history}>
-              <XAxis dataKey="date" tick={{ fill: "#666", fontSize: 10 }} tickLine={false} axisLine={false} />
-              <YAxis domain={["auto", "auto"]} tick={{ fill: "#666", fontSize: 10 }} tickLine={false} axisLine={false} width={60} tickFormatter={v => v.toLocaleString()} />
+      {/* ── Fear & Greed 30-day chart ── */}
+      {macro?.fear_greed_30d?.length > 1 && (
+        <div className="chart-section" style={{ marginBottom: 20 }}>
+          <div className="chart-label">FEAR & GREED — 30 DAYS</div>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={[...macro.fear_greed_30d].reverse()}>
+              <XAxis dataKey="date" tick={{ fill: "#444", fontSize: 9 }} tickLine={false} axisLine={false}
+                tickFormatter={d => d.slice(5)} interval="preserveStartEnd" />
+              <YAxis domain={[0, 100]} tick={{ fill: "#444", fontSize: 9 }} tickLine={false} axisLine={false} width={28} />
               <Tooltip
                 contentStyle={{ background: "#0d0d0d", border: "1px solid #333", borderRadius: 4 }}
-                labelStyle={{ color: "#888" }}
-                itemStyle={{ color: "#00ff88" }}
-                formatter={v => [v.toLocaleString(), "USD/VND"]}
+                labelStyle={{ color: "#888", fontSize: 10 }}
+                itemStyle={{ color: "#aeaeb2", fontSize: 10 }}
+                formatter={(v, _, p) => [`${v} — ${p.payload.classification}`, "Fear & Greed"]}
               />
-              <Line type="monotone" dataKey="rate" stroke="#00ff88" strokeWidth={1.5} dot={false} />
+              <Line type="monotone" dataKey="value" stroke="#0a84ff" strokeWidth={1.5} dot={false} />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* ── Recent macro events timeline ── */}
+      {!macroLoading && macro?.recent_events?.length > 0 && (
+        <div>
+          <div className="chart-label" style={{ marginBottom: 10 }}>MACRO EVENTS TIMELINE</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--mono)", fontSize: 11 }}>
+              <thead>
+                <tr style={{ color: "var(--muted2)", borderBottom: "1px solid var(--border)" }}>
+                  {["DATE", "TYPE", "EVENT", "ACTUAL", "BTC 24H", "ETH 24H"].map(h => (
+                    <th key={h} style={{ padding: "6px 8px", textAlign: "left", fontWeight: 400, letterSpacing: "0.06em" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {macro.recent_events.map((ev, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: "6px 8px", color: "var(--muted)" }}>{ev.event_date}</td>
+                    <td style={{ padding: "6px 8px" }}>
+                      <span style={{
+                        padding: "2px 6px", borderRadius: 3, fontSize: 10,
+                        background: eventTypeColor(ev.event_type) + "22",
+                        color: eventTypeColor(ev.event_type),
+                      }}>{eventTypeLabel(ev.event_type)}</span>
+                    </td>
+                    <td style={{ padding: "6px 8px", color: "var(--text)", maxWidth: 280 }}>{ev.description}</td>
+                    <td style={{ padding: "6px 8px", fontWeight: 600, color: "var(--text)" }}>{ev.actual || "—"}</td>
+                    <td style={{ padding: "6px 8px", color: ev.btc_impact_24h == null ? "var(--muted2)" : ev.btc_impact_24h >= 0 ? "#30d158" : "#ff3b30" }}>
+                      {ev.btc_impact_24h != null ? `${ev.btc_impact_24h >= 0 ? "+" : ""}${ev.btc_impact_24h.toFixed(2)}%` : "—"}
+                    </td>
+                    <td style={{ padding: "6px 8px", color: ev.eth_impact_24h == null ? "var(--muted2)" : ev.eth_impact_24h >= 0 ? "#30d158" : "#ff3b30" }}>
+                      {ev.eth_impact_24h != null ? `${ev.eth_impact_24h >= 0 ? "+" : ""}${ev.eth_impact_24h.toFixed(2)}%` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 8 }}>
+            Sources: FRED (Federal Reserve) · BTC/ETH impact measured 24h after event
+            · Updated daily at 06:00 UTC
+          </div>
+        </div>
+      )}
+
+      {macroLoading && (
+        <div style={{ color: "var(--muted2)", fontSize: 11, padding: "20px 0" }}>Loading macro data...</div>
+      )}
+      {!macroLoading && !macro?.recent_events?.length && (
+        <div className="card" style={{ color: "var(--muted2)", fontSize: 11, padding: 16 }}>
+          No macro events yet — scheduler will populate data on first run.
         </div>
       )}
     </div>
@@ -486,7 +634,6 @@ export default function App() {
   const [connected,     setConnected]     = useState(false);
   const [lastUpdate,    setLastUpdate]    = useState(null);
   const [clientCount,   setClientCount]   = useState(0);
-  const [vndHistory,    setVndHistory]    = useState([]);
   const [mlPredictions, setMlPredictions] = useState(null);
   const wsRef = useRef(null);
 
@@ -526,14 +673,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!signals?.usd_vnd) return;
-    const rate = signals.usd_vnd.usd_to_vnd;
-    setVndHistory(prev => {
-      const now = new Date().toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit" });
-      return [...prev, { date: now, rate }].slice(-20);
-    });
-  }, [signals]);
 
   const shockLevel   = shockData?.alert_level || "NORMAL";
   const shockScore   = shockData?.shock_score  || 0;
@@ -570,7 +709,7 @@ export default function App() {
       </div>
 
       <main className="main">
-        {tab === "macro"   && <MacroTab   signals={signals} history={vndHistory} />}
+        {tab === "macro"   && <MacroTab   signals={signals} />}
         {tab === "crypto"  && <CryptoTab  signals={signals} />}
         {tab === "signals" && <SignalsTab  signals={signals} shockData={shockData} />}
         {tab === "ml"      && <MLTab      mlPredictions={mlPredictions} />}
