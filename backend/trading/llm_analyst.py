@@ -13,6 +13,8 @@ API:   OpenAI-compatible endpoint provided by Google
 
 import json
 import os
+
+import pandas as pd
 from openai import OpenAI
 
 # ── Client ─────────────────────────────────────────────────────────────────────
@@ -406,14 +408,13 @@ OUTPUT FORMAT:
 
 
 def _build_candle_summary(df_m5: pd.DataFrame) -> str:
-    import pandas as pd
     lines = []
     for _, row in df_m5.tail(5).iterrows():
-        o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
+        o, h, lo, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
         color    = "green" if c >= o else "red"
         body     = abs(c - o)
         wick_up  = h - max(o, c)
-        wick_dn  = min(o, c) - l
+        wick_dn  = min(o, c) - lo
         vol      = float(row["volume"])
         lines.append(
             f"  {color:5s}  O={o:.2f} H={h:.2f} L={l:.2f} C={c:.2f}  "
@@ -427,8 +428,6 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
     Sends chart image + context to Gemini Flash.
     Returns parsed decision dict or None on failure.
     """
-    import pandas as pd
-
     if not chart_b64:
         return None
 

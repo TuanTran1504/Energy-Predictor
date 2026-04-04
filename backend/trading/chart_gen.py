@@ -107,12 +107,12 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
             o = float(df["open"].iloc[i])
             c = float(df["close"].iloc[i])
             h = float(df["high"].iloc[i])
-            l = float(df["low"].iloc[i])
+            lo = float(df["low"].iloc[i])
             is_bull = c >= o
             bc = BULL_BODY  if is_bull else BEAR_BODY
             wc = BULL_WICK  if is_bull else BEAR_WICK
 
-            ax_price.plot([i, i], [l, h], color=wc, linewidth=0.8, zorder=2)
+            ax_price.plot([i, i], [lo, h], color=wc, linewidth=0.8, zorder=2)
             body_lo = min(o, c)
             body_hi = max(o, c)
             body_h  = max(body_hi - body_lo, min_body)

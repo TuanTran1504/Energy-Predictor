@@ -212,7 +212,7 @@ def find_sr_levels(df_h1: pd.DataFrame, current_price: float,
 
     resistances = sorted(h for h in set(swing_highs) if h > current_price * 1.002)
     supports    = sorted(
-        (l for l in set(swing_lows) if l < current_price * 0.998), reverse=True
+        (lv for lv in set(swing_lows) if lv < current_price * 0.998), reverse=True
     )
 
     return {
@@ -378,29 +378,30 @@ def detect_candle_pattern(df: pd.DataFrame, idx: int) -> dict:
     row  = df.iloc[idx]
     prev = df.iloc[idx - 1]
 
-    o, h, l, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
+    o, h, lo, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
     body     = abs(c - o)
-    total    = h - l
+    total    = h - lo
     wick_up  = h - max(o, c)
-    wick_dn  = min(o, c) - l
+    wick_dn  = min(o, c) - lo
 
     if total == 0:
         return {"pattern": "none", "direction": "NONE"}
 
     # Bullish Pinbar
     if (wick_dn >= 2 * body and
-            c > (l + total * 0.5) and
+            c > (lo + total * 0.5) and
             wick_up <= wick_dn * 0.4):
         return {"pattern": "bullish_pinbar", "direction": "BUY"}
 
     # Bearish Pinbar
     if (wick_up >= 2 * body and
-            c < (l + total * 0.5) and
+            c < (lo + total * 0.5) and
             wick_dn <= wick_up * 0.4):
         return {"pattern": "bearish_pinbar", "direction": "SELL"}
 
     # Bullish Engulfing
-    p_o = float(prev["open"]); p_c = float(prev["close"])
+    p_o = float(prev["open"])
+    p_c = float(prev["close"])
     if (c > o and p_c < p_o and           # current green, prev red
             o <= p_c and c >= p_o):        # body engulfs prev body
         return {"pattern": "bullish_engulfing", "direction": "BUY"}
