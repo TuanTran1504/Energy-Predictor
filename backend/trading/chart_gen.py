@@ -13,15 +13,11 @@ Returns base64-encoded PNG string ready for Gemini vision API.
 """
 
 import base64
+import gc
 import io
 from datetime import datetime, timezone
 UTC = timezone.utc
 
-import matplotlib
-matplotlib.use("Agg")   # non-interactive backend — safe for server/threads
-import matplotlib.gridspec as gridspec
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -59,6 +55,12 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
     Returns base64 PNG string or empty string on failure.
     """
     try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.gridspec as gridspec
+        import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
+
         df = df_m5.tail(80).copy().reset_index(drop=True)
 
         df["ema34"]  = df["close"].ewm(span=34, adjust=False).mean()
@@ -210,14 +212,19 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         plt.savefig(buf, format="png", dpi=80, bbox_inches="tight",
                     facecolor=BG)
         plt.close(fig)
+        plt.close("all")
         buf.seek(0)
-        return base64.b64encode(buf.read()).decode("utf-8")
+        data = base64.b64encode(buf.read()).decode("utf-8")
+        gc.collect()
+        return data
 
     except Exception as e:
         import traceback
         print(f"[chart_gen] Failed: {e}\n{traceback.format_exc()}")
         try:
-            plt.close("all")
+            import matplotlib.pyplot as _plt
+            _plt.close("all")
         except Exception:
             pass
+        gc.collect()
         return ""

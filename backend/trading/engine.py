@@ -75,7 +75,8 @@ def _get_conn():
 
 def db_ensure_trades_table():
     """Create trades table if it doesn't exist (idempotent)."""
-    with _get_conn() as conn:
+    conn = _get_conn()
+    try:
         with conn.cursor() as cur:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS trades (
@@ -102,12 +103,15 @@ def db_ensure_trades_table():
                 )
             """)
         conn.commit()
+    finally:
+        conn.close()
 
 
 def db_save_trade(symbol: str, side: str, entry_price: float, quantity: float,
                   stop_loss: float, take_profit: float, order_id: str,
                   setup: str, notes: str, confidence: float = 0.0) -> int:
-    with _get_conn() as conn:
+    conn = _get_conn()
+    try:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO trades
@@ -119,11 +123,14 @@ def db_save_trade(symbol: str, side: str, entry_price: float, quantity: float,
                   stop_loss, take_profit, confidence, order_id, setup, notes))
             tid = cur.fetchone()[0]
         conn.commit()
+    finally:
+        conn.close()
     return tid
 
 
 def db_close_trade(trade_id: int, exit_price: float, reason: str):
-    with _get_conn() as conn:
+    conn = _get_conn()
+    try:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT entry_price, quantity, side FROM trades WHERE id=%s",
@@ -147,23 +154,27 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
             """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4),
                   reason, trade_id))
         conn.commit()
+    finally:
+        conn.close()
     log.info(f"[DB] Trade {trade_id} closed — {reason} @ {exit_price} pnl={pnl_pct*100:.2f}%")
 
 
 def db_get_open_trades() -> list[dict]:
+    conn = _get_conn()
     try:
-        with _get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT id, symbol, side, entry_price, quantity,
-                           stop_loss, take_profit, binance_order_id, opened_at
-                    FROM trades WHERE status='OPEN'
-                """)
-                cols = [d[0] for d in cur.description]
-                return [dict(zip(cols, r)) for r in cur.fetchall()]
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, symbol, side, entry_price, quantity,
+                       stop_loss, take_profit, binance_order_id, opened_at
+                FROM trades WHERE status='OPEN'
+            """)
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, r)) for r in cur.fetchall()]
     except Exception as e:
         log.warning(f"[DB] get_open_trades failed: {e}")
         return []
+    finally:
+        conn.close()
 
 
 def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None:
@@ -257,27 +268,29 @@ def get_ml_predictions() -> dict:
 def get_market_signals() -> dict:
     """Pull fear/greed + funding rates from DB."""
     signals = {}
+    conn = _get_conn()
     try:
-        with psycopg2.connect(DATABASE_URL, sslmode="require") as conn:
-            with conn.cursor() as cur:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT value FROM fear_greed_index ORDER BY date DESC LIMIT 1"
+            )
+            row = cur.fetchone()
+            if row:
+                signals["fear_greed"] = int(row[0])
+
+            for sym in SYMBOLS:
                 cur.execute(
-                    "SELECT value FROM fear_greed_index ORDER BY date DESC LIMIT 1"
+                    "SELECT rate_avg FROM funding_rates WHERE symbol=%s "
+                    "ORDER BY date DESC LIMIT 1",
+                    (sym,)
                 )
                 row = cur.fetchone()
                 if row:
-                    signals["fear_greed"] = int(row[0])
-
-                for sym in SYMBOLS:
-                    cur.execute(
-                        "SELECT rate_avg FROM funding_rates WHERE symbol=%s "
-                        "ORDER BY date DESC LIMIT 1",
-                        (sym,)
-                    )
-                    row = cur.fetchone()
-                    if row:
-                        signals[f"{sym.lower()}_funding"] = float(row[0])
+                    signals[f"{sym.lower()}_funding"] = float(row[0])
     except Exception as e:
         log.warning(f"DB market signals failed: {e}")
+    finally:
+        conn.close()
     return signals
 
 
