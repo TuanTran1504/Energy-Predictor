@@ -446,7 +446,8 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
             raw_sl  = close_now * (1 - SL_MAX_PCT)
             sl_dist = close_now - raw_sl
 
-        tp = float(sma20)
+        # TP at upper BB (full range target) — better R:R than SMA20 on tight bands
+        tp = float(upper_bb)
         if tp <= close_now:
             return None
 
@@ -473,7 +474,8 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
             raw_sl  = close_now * (1 + SL_MAX_PCT)
             sl_dist = raw_sl - close_now
 
-        tp = float(sma20)
+        # TP at lower BB (full range target) — better R:R than SMA20 on tight bands
+        tp = float(lower_bb)
         if tp >= close_now:
             return None
 

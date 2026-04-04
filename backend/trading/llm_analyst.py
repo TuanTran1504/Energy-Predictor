@@ -200,7 +200,7 @@ REQUIRED — ALL must be true:
     Option C: Rejection wick — long lower wick shows rejection at the band level.
 [4] VOLUME: Signal candle has equal or higher volume than the 2 preceding candles.
 [5] ENTRY: at signal candle close. SL below candle low minus 0.2% buffer.
-    TP = SMA20 midline (the MIDDLE of the Bollinger Bands — NOT at resistance).
+    TP = upper Bollinger Band (the opposite band — full range target).
 
 FALSE SIGNALS — output WAIT if:
   - Candle closes well BELOW the lower band (momentum breakdown, not reversal)
@@ -226,7 +226,7 @@ REQUIRED — ALL must be true:
     Option C: Rejection wick — long upper wick shows rejection at the band level.
 [4] VOLUME: Signal candle has equal or higher volume than the 2 preceding candles.
 [5] ENTRY: at signal candle close. SL above candle high plus 0.2% buffer.
-    TP = SMA20 midline (the MIDDLE of the Bollinger Bands — NOT at support).
+    TP = lower Bollinger Band (the opposite band — full range target).
 
 FALSE SIGNALS — output WAIT if:
   - Candle closes well ABOVE the upper band (momentum breakout, not reversal)
@@ -359,8 +359,8 @@ TREND setups (A/B/C/D):
         TP must be ABOVE support = {sr.get('support','?')}.
 
 SIDEWAY Setup E (mean reversion):
-  BUY : SL below lower Bollinger Band minus 0.2% buffer. TP = SMA20 midline.
-  SELL: SL above upper Bollinger Band plus 0.2% buffer. TP = SMA20 midline.
+  BUY : SL below lower Bollinger Band minus 0.2% buffer. TP = upper Bollinger Band.
+  SELL: SL above upper Bollinger Band plus 0.2% buffer. TP = lower Bollinger Band.
 
 Minimum R:R = 1.5 for ALL setups. If R:R < 1.5 → WAIT.
 
