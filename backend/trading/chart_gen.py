@@ -82,7 +82,7 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         ml_dir      = context.get("ml_direction", "—")
         ml_conf     = context.get("ml_confidence", 0)
 
-        fig = plt.figure(figsize=(22, 12), facecolor=BG)
+        fig = plt.figure(figsize=(14, 8), facecolor=BG)
         gs  = gridspec.GridSpec(
             2, 1, height_ratios=[3, 1], hspace=0.04,
             left=0.04, right=0.97, top=0.93, bottom=0.05,
@@ -207,7 +207,7 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
                      fontweight="bold", y=0.975)
 
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=110, bbox_inches="tight",
+        plt.savefig(buf, format="png", dpi=80, bbox_inches="tight",
                     facecolor=BG)
         plt.close(fig)
         buf.seek(0)

@@ -436,37 +436,45 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
         {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{chart_b64}"}},
     ]
 
-    try:
-        client   = _get_client()
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": content_payload},
-            ],
-            max_tokens=2048,
-            temperature=0.1,
-            response_format={"type": "json_object"},
-            timeout=60,
-        )
-        raw    = response.choices[0].message.content
-        result = _safe_parse(raw)
+    import time as _time
+    last_err = None
+    for attempt in range(1, 4):
+        try:
+            client   = _get_client()
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": content_payload},
+                ],
+                max_tokens=2048,
+                temperature=0.1,
+                response_format={"type": "json_object"},
+                timeout=60,
+            )
+            raw    = response.choices[0].message.content
+            result = _safe_parse(raw)
 
-        if "analysis" in result:
-            a = result["analysis"]
-            print(f"    [AI] setup={a.get('setup_identified')}  signal={result.get('signal')}")
-            print(f"    [AI] EMA  : {a.get('ema_check','')}")
-            print(f"    [AI] PA   : {a.get('price_action','')}")
-            print(f"    [AI] VOL  : {a.get('volume_check','')}")
-            print(f"    [AI] R:R  : {a.get('rr_check','')}")
-            print(f"    [AI] Match: {a.get('pattern_match','')}")
-            print(f"    [AI] Reason: {result.get('reason','')}")
+            if "analysis" in result:
+                a = result["analysis"]
+                print(f"    [AI] setup={a.get('setup_identified')}  signal={result.get('signal')}")
+                print(f"    [AI] EMA  : {a.get('ema_check','')}")
+                print(f"    [AI] PA   : {a.get('price_action','')}")
+                print(f"    [AI] VOL  : {a.get('volume_check','')}")
+                print(f"    [AI] R:R  : {a.get('rr_check','')}")
+                print(f"    [AI] Match: {a.get('pattern_match','')}")
+                print(f"    [AI] Reason: {result.get('reason','')}")
 
-        return result
+            return result
 
-    except Exception as e:
-        print(f"[llm_analyst] Gemini call failed: {e}")
-        return None
+        except Exception as e:
+            last_err = e
+            print(f"[llm_analyst] Gemini attempt {attempt}/3 failed: {e}")
+            if attempt < 3:
+                _time.sleep(5)
+
+    print(f"[llm_analyst] Gemini all retries exhausted: {last_err}")
+    return None
 
 
 def _safe_parse(raw: str) -> dict:
