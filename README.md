@@ -74,8 +74,7 @@ Gate 4 │ Gemini Vision      Chart image → BUY / SELL / WAIT
        │ Execute            Market order + native SL/TP on Binance
 ```
 
-![Trading Engine Logs](docs/images/engine_logs.png)
-<!-- SCREENSHOT NEEDED: Terminal showing the trading engine cycle logs with gate pass/fail output -->
+![Trading Engine Logs](docs/images/engine_log.png)
 
 ### Supported Setups
 
