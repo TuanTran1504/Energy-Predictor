@@ -43,7 +43,7 @@ const PredictionCard = ({ symbol, label = "24H FORECAST", prediction }) => {
     <div className={`card ${accentClass}`}>
       <div className="card-header">
         <span className="card-label">{symbol} / USDT · {label}</span>
-        <span className="card-sub">XGBoost · updated {new Date(prediction.predicted_at).toLocaleTimeString()}</span>
+        <span className="card-sub">XGBoost · trained {new Date(prediction.model_trained_at || prediction.predicted_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
       </div>
 
       {/* Direction */}

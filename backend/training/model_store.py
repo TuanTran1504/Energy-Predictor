@@ -88,28 +88,37 @@ def _redis_key(symbol: str, horizon: int) -> str:
     return f"ml:model:{symbol.upper()}:{horizon}d"
 
 
+def _trained_at_key(symbol: str, horizon: int) -> str:
+    return f"ml:trained_at:{symbol.upper()}:{horizon}d"
+
+
 def _load_from_redis(symbol: str, horizon: int, r: redis.Redis):
     key = _model_key(symbol, horizon)
     try:
         blob = r.get(_redis_key(symbol, horizon))
         if blob is None:
             log.info(f"[{key}] Redis cache miss")
-            return None
+            return None, None
         model = joblib.load(io.BytesIO(blob))
+        trained_at = r.get(_trained_at_key(symbol, horizon))
+        if isinstance(trained_at, bytes):
+            trained_at = trained_at.decode()
         log.info(f"[{key}] Loaded from Redis cache")
-        return model
+        return model, trained_at
     except Exception as e:
         log.warning(f"[{key}] Redis read failed: {e}")
-        return None
+        return None, None
 
 
-def _save_to_redis(symbol: str, horizon: int, model, r: redis.Redis) -> None:
+def _save_to_redis(symbol: str, horizon: int, model, r: redis.Redis, trained_at: Optional[str] = None) -> None:
     key = _model_key(symbol, horizon)
     try:
         buf = io.BytesIO()
         joblib.dump(model, buf)
         size_kb = len(buf.getvalue()) / 1024
         r.setex(_redis_key(symbol, horizon), REDIS_TTL_SECONDS, buf.getvalue())
+        if trained_at:
+            r.setex(_trained_at_key(symbol, horizon), REDIS_TTL_SECONDS, trained_at)
         log.info(f"[{key}] Cached in Redis ({size_kb:.0f} KB, TTL=24h)")
     except Exception as e:
         log.warning(f"[{key}] Redis write failed (non-fatal): {e}")
@@ -137,17 +146,17 @@ def _extract_model_from_artifact(artifact_dir: Path, symbol: str):
         bundle = joblib.load(pkl_files[0])
         if isinstance(bundle, dict) and "model" in bundle:
             log.info(f"[{symbol}] Extracted XGBClassifier from custom bundle dict")
-            return bundle["model"]
+            return bundle["model"], bundle.get("trained_at_utc")
         # It's already a raw model (unlikely but handle it)
         log.info(f"[{symbol}] Loaded raw model from .pkl artifact")
-        return bundle
+        return bundle, None
 
     # Format B: MLflow model directory
     mlmodel_file = artifact_dir / "MLmodel"
     if mlmodel_file.exists():
         model = mlflow.xgboost.load_model(str(artifact_dir))
         log.info(f"[{symbol}] Loaded MLflow XGBoost model from artifact dir")
-        return model
+        return model, None
 
     raise RuntimeError(
         f"[{symbol}] Could not find .pkl or MLmodel in artifact dir: {artifact_dir}"
@@ -198,7 +207,7 @@ def _load_from_dagshub(symbol: str, horizon: int = 1):
                     run_id=mv.run_id,
                     artifact_path=target_artifact,
                 )
-                return _extract_model_from_artifact(Path(artifact_dir), symbol)
+                return _extract_model_from_artifact(Path(artifact_dir), symbol)  # (model, trained_at)
     except Exception as e:
         log.info(f"[{key}] No @champion alias found ({e}) — falling back to run search")
 
@@ -251,9 +260,9 @@ def _load_from_dagshub(symbol: str, horizon: int = 1):
         artifact_path=target_artifact,
     )
 
-    model = _extract_model_from_artifact(Path(artifact_dir), symbol)
+    model, trained_at = _extract_model_from_artifact(Path(artifact_dir), symbol)
     log.info(f"[{symbol}] Loaded from DagsHub ✓")
-    return model
+    return model, trained_at
 
 
 # ── Local disk ─────────────────────────────────────────────────────────────────
@@ -267,42 +276,45 @@ def _load_from_disk(symbol: str):
     # Handle both raw model and custom bundle dict
     if isinstance(data, dict) and "model" in data:
         log.info(f"[{symbol}] Loaded bundle dict from disk, extracting model")
-        return data["model"]
+        return data["model"], data.get("trained_at_utc")
 
     log.info(f"[{symbol}] Loaded from disk ({path.name})")
-    return data
+    return data, None
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
-def load_all_models() -> dict[str, object]:
+def load_all_models() -> tuple[dict[str, object], dict[str, str]]:
     """
     Loads models for every (symbol, horizon) combination.
-    Keys in returned dict: "BTC_1d", "BTC_7d", "ETH_1d", "ETH_7d"
+    Returns (models_dict, trained_at_dict).
+    Keys: "BTC_1d", "BTC_7d", "ETH_1d", "ETH_7d"
     Load priority: Redis → DagsHub → local disk (horizon=1 only for disk fallback)
     """
     r = _redis_client()
     loaded: dict[str, object] = {}
+    trained_at: dict[str, str] = {}
 
     for symbol in SYMBOLS:
         for horizon in HORIZONS:
             key = _model_key(symbol, horizon)
             model = None
+            ts = None
 
             # 1. Redis
             if r is not None:
-                model = _load_from_redis(symbol, horizon, r)
+                model, ts = _load_from_redis(symbol, horizon, r)
 
             # 2. DagsHub
             if model is None and _mlflow_uri():
                 try:
-                    model = _load_from_dagshub(symbol, horizon)
+                    model, ts = _load_from_dagshub(symbol, horizon)
                 except Exception as e:
                     log.warning(f"[{key}] DagsHub load failed: {e}")
 
             # 3. Local disk — only meaningful for horizon=1 (legacy pkl)
             if model is None and horizon == 1:
                 try:
-                    model = _load_from_disk(symbol)
+                    model, ts = _load_from_disk(symbol)
                 except Exception as e:
                     log.warning(f"[{key}] Disk fallback failed: {e}")
 
@@ -311,12 +323,14 @@ def load_all_models() -> dict[str, object]:
                 continue
 
             if r is not None:
-                _save_to_redis(symbol, horizon, model, r)
+                _save_to_redis(symbol, horizon, model, r, ts)
 
             loaded[key] = model
+            if ts:
+                trained_at[key] = ts
             log.info(f"[{key}] Ready ✓")
 
-    return loaded
+    return loaded, trained_at
 
 
 def bust_cache(symbol: Optional[str] = None) -> None:

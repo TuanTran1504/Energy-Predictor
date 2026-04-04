@@ -125,6 +125,7 @@ SYMBOLS: list[str] = ["BTC", "ETH"]
 
 # ── Global model registry — populated at startup ───────────────────────────────
 models: dict[str, object] = {}
+model_trained_at: dict[str, str] = {}   # key → ISO UTC timestamp from train.py bundle
 _executor = ThreadPoolExecutor(max_workers=2)
 
 
@@ -172,13 +173,14 @@ def precompute_predictions() -> dict:
             confidence = up_prob if direction == "UP" else down_prob
 
             payload = {
-                "symbol":       symbol,
-                "direction":    direction,
-                "confidence":   round(confidence, 4),
-                "up_prob":      round(up_prob, 4),
-                "down_prob":    round(down_prob, 4),
-                "threshold":    threshold,
-                "predicted_at": datetime.utcnow().isoformat(),
+                "symbol":           symbol,
+                "direction":        direction,
+                "confidence":       round(confidence, 4),
+                "up_prob":          round(up_prob, 4),
+                "down_prob":        round(down_prob, 4),
+                "threshold":        threshold,
+                "predicted_at":     datetime.utcnow().isoformat(),
+                "model_trained_at": model_trained_at.get(key, datetime.utcnow().isoformat()),
             }
             results[key] = payload
 
@@ -220,9 +222,9 @@ async def _precompute_scheduler():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load models on startup, start daily precompute scheduler, clear on shutdown."""
-    global models
+    global models, model_trained_at
     log.info("Loading models via model_store...")
-    models = load_all_models()
+    models, model_trained_at = load_all_models()
     if models:
         log.info(f"Ready — loaded: {list(models.keys())}")
     else:
@@ -277,10 +279,11 @@ class PredictionOut(BaseModel):
     symbol:       str
     direction:    Literal["UP", "DOWN"]
     confidence:   float   # probability of the predicted class, 0-1
-    up_prob:      float   # raw P(UP)
-    down_prob:    float   # raw P(DOWN)
-    threshold:    float   # UP threshold applied (symbol-specific, e.g. 0.55 for BTC)
-    predicted_at: str     # UTC ISO timestamp
+    up_prob:          float   # raw P(UP)
+    down_prob:        float   # raw P(DOWN)
+    threshold:        float   # UP threshold applied (symbol-specific, e.g. 0.55 for BTC)
+    predicted_at:     str     # UTC ISO timestamp of when prediction was computed
+    model_trained_at: str     # UTC ISO timestamp of when the model was trained
 
 
 class BacktestPoint(BaseModel):
@@ -504,14 +507,16 @@ def predict(req: PredictRequest):
     direction = "UP" if up_prob >= threshold else "DOWN"
     confidence = up_prob if direction == "UP" else down_prob
 
+    model_key = f"{req.symbol}_{req.lookahead}d"
     return PredictionOut(
-        symbol       = req.symbol,
-        direction    = direction,
-        confidence   = round(confidence, 4),
-        up_prob      = round(up_prob, 4),
-        down_prob    = round(down_prob, 4),
-        threshold    = threshold,
-        predicted_at = datetime.utcnow().isoformat(),
+        symbol           = req.symbol,
+        direction        = direction,
+        confidence       = round(confidence, 4),
+        up_prob          = round(up_prob, 4),
+        down_prob        = round(down_prob, 4),
+        threshold        = threshold,
+        predicted_at     = datetime.utcnow().isoformat(),
+        model_trained_at = model_trained_at.get(model_key, datetime.utcnow().isoformat()),
     )
 
 
@@ -645,12 +650,13 @@ def predict_live_all(
                 direction = "UP" if up_prob >= 0.5 else "DOWN"
                 confidence = up_prob if direction == "UP" else down_prob
                 payload = {
-                    "symbol":       symbol,
-                    "direction":    direction,
-                    "confidence":   round(confidence, 4),
-                    "up_prob":      round(up_prob, 4),
-                    "down_prob":    round(down_prob, 4),
-                    "predicted_at": datetime.utcnow().isoformat(),
+                    "symbol":           symbol,
+                    "direction":        direction,
+                    "confidence":       round(confidence, 4),
+                    "up_prob":          round(up_prob, 4),
+                    "down_prob":        round(down_prob, 4),
+                    "predicted_at":     datetime.utcnow().isoformat(),
+                    "model_trained_at": model_trained_at.get(key, datetime.utcnow().isoformat()),
                 }
                 results[key] = payload
                 if r:
@@ -708,13 +714,14 @@ def predict_live(
     confidence = up_prob if direction == "UP" else down_prob
 
     return PredictionOut(
-        symbol       = symbol,
-        direction    = direction,
-        confidence   = round(confidence, 4),
-        up_prob      = round(up_prob, 4),
-        down_prob    = round(down_prob, 4),
-        threshold    = threshold,
-        predicted_at = datetime.utcnow().isoformat(),
+        symbol           = symbol,
+        direction        = direction,
+        confidence       = round(confidence, 4),
+        up_prob          = round(up_prob, 4),
+        down_prob        = round(down_prob, 4),
+        threshold        = threshold,
+        predicted_at     = datetime.utcnow().isoformat(),
+        model_trained_at = model_trained_at.get(model_key, datetime.utcnow().isoformat()),
     )
 
 
@@ -1325,10 +1332,10 @@ def reload_models(
       POST /reload            — reload both BTC and ETH
       POST /reload?symbol=BTC — reload only BTC
     """
-    global models
+    global models, model_trained_at
     bust_cache(symbol)
 
-    fresh = load_all_models()
+    fresh, fresh_trained_at = load_all_models()
     if not fresh:
         raise HTTPException(
             status_code=503,
@@ -1352,9 +1359,12 @@ def reload_models(
             )
         for k in sym_keys:
             models[k] = fresh[k]
+            if k in fresh_trained_at:
+                model_trained_at[k] = fresh_trained_at[k]
         return {"reloaded": sym_keys, "timestamp": datetime.utcnow().isoformat()}
 
     models = fresh
+    model_trained_at = fresh_trained_at
     return {
         "reloaded":  list(models.keys()),
         "timestamp": datetime.utcnow().isoformat(),
