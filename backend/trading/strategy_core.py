@@ -423,9 +423,15 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     low_now   = float(df_m5["low"].iloc[idx])
     rsi       = context.get("rsi", 50)
 
-    near_lower = close_now <= lower_bb * 1.005  # within 0.5% of lower band
-    near_upper = close_now >= upper_bb * 0.995  # within 0.5% of upper band
-    SETUP_E_MIN_RR = 1.1  # relaxed vs trend setups — tight bands compress R:R
+    # Proportional proximity: price must be in the outer 25% of the band range.
+    # A fixed % window breaks on tight bands (both sides overlap in the middle).
+    band_width = upper_bb - lower_bb
+    if band_width <= 0:
+        return None
+    quarter    = band_width * 0.25
+    near_lower = close_now <= lower_bb + quarter
+    near_upper = close_now >= upper_bb - quarter
+    SETUP_E_MIN_RR = 1.0
 
     context["_bb_debug"] = {
         "price": round(close_now, 4),
