@@ -446,9 +446,10 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     if near_lower and rsi < 35:  # BUY: near lower BB + RSI oversold
         raw_sl  = min(low_now, lower_bb) - close_now * 0.002
         sl_dist = close_now - raw_sl
-
+        # Enforce min/max SL distance (clamp, don't reject)
         if sl_dist / close_now < SL_MIN_PCT:
-            return None
+            raw_sl  = close_now * (1 - SL_MIN_PCT)
+            sl_dist = close_now - raw_sl
         if sl_dist / close_now > SL_MAX_PCT:
             raw_sl  = close_now * (1 - SL_MAX_PCT)
             sl_dist = close_now - raw_sl
@@ -476,9 +477,10 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     if near_upper and rsi > 65:  # SELL: near upper BB + RSI overbought
         raw_sl  = max(high_now, upper_bb) + close_now * 0.002
         sl_dist = raw_sl - close_now
-
+        # Enforce min/max SL distance (clamp, don't reject)
         if sl_dist / close_now < SL_MIN_PCT:
-            return None
+            raw_sl  = close_now * (1 + SL_MIN_PCT)
+            sl_dist = raw_sl - close_now
         if sl_dist / close_now > SL_MAX_PCT:
             raw_sl  = close_now * (1 + SL_MAX_PCT)
             sl_dist = raw_sl - close_now

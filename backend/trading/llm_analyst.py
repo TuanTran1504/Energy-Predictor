@@ -23,7 +23,7 @@ def _get_client() -> OpenAI:
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
     )
 
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-2.5-flash-lite"
 
 
 PATTERN_LIBRARY = {
@@ -501,4 +501,4 @@ def _safe_parse(raw: str) -> dict:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
-    raise ValueError(f"Cannot parse Gemini JSON (len={len(raw)})")
+    raise ValueError(f"Cannot parse Gemini JSON (len={len(raw)}): {raw[:300]!r}")
