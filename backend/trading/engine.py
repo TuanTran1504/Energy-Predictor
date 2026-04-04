@@ -554,7 +554,14 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log.info("  SIDEWAY mode → Setup E (BB mean reversion) pre-check...")
         mr_signal = detect_bb_mean_reversion(df_m5, len(df_m5) - 1, ctx)
         if mr_signal is None:
+            bb = ctx.get("_bb_debug", {})
             log_gate_fail("SETUP_E", "No BB extreme + RSI signal (price not at band or RSI neutral)", symbol, ctx)
+            if bb:
+                log.info(
+                    f"  [BB] price={bb.get('price')} upper={bb.get('upper_bb')} "
+                    f"lower={bb.get('lower_bb')} sma20={bb.get('sma20')} "
+                    f"RSI={bb.get('rsi')} near_lower={bb.get('near_lower')} near_upper={bb.get('near_upper')}"
+                )
             return
         log_gate_pass("SETUP_E", f"BB MR: {mr_signal['signal']} entry={mr_signal['entry']} "
                                   f"SL={mr_signal['sl']} TP={mr_signal['tp']} R:R={mr_signal['rr']}")

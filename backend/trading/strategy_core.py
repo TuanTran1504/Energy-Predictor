@@ -426,6 +426,16 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     near_lower = close_now <= lower_bb * 1.005  # within 0.5% of lower band
     near_upper = close_now >= upper_bb * 0.995  # within 0.5% of upper band
 
+    context["_bb_debug"] = {
+        "price": round(close_now, 4),
+        "upper_bb": round(upper_bb, 4),
+        "lower_bb": round(lower_bb, 4),
+        "sma20": round(float(sma20), 4),
+        "rsi": round(rsi, 1),
+        "near_lower": near_lower,
+        "near_upper": near_upper,
+    }
+
     if near_lower and rsi < 35:  # BUY: near lower BB + RSI oversold
         raw_sl  = min(low_now, lower_bb) - close_now * 0.002
         sl_dist = close_now - raw_sl
