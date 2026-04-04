@@ -85,28 +85,41 @@ def _pred_cache_key(symbol: str, horizon: int) -> str:
 # ── Feature column list ────────────────────────────────────────────────────────
 # Defined here — NOT imported from feature_engineering — so this file has zero
 # dependency on feature_engineering at prediction time. The list must exactly
-# match get_feature_columns() in feature_engineering.py. 28 features total.
+# match get_feature_columns() in feature_engineering.py.
 FEATURE_COLS: list[str] = [
     # Price momentum
-    "ret_1d", "ret_3d", "ret_7d", "ret_14d",
-    # Volatility / volume / range
-    "hl_range", "vol_trend", "price_position",
-    # Sentiment
-    "fear_greed", "fear_greed_7d_avg", "fear_greed_extreme",
-    # Derivatives positioning
-    "funding_rate_avg", "funding_rate_7d_avg",
-    "funding_extreme_long", "funding_extreme_short",
+    "ret_3d", "ret_7d", "ret_14d",
+    # Volatility regime
+    "volatility_7d",
+    # Price position / range
+    "price_position", "hl_range",
+    # Volume
+    "vol_trend",
+    # Momentum indicators
+    "rsi_14", "macd_hist",
+    # Regime
+    "bull_regime",
     # Market structure
     "btc_eth_ratio_7d_change",
-    # Geopolitical shocks
-    "shock_active", "days_since_shock",
-    "max_shock_severity", "shock_oil_impact",
-    # Macro events
-    "fed_event_last_7d", "fed_dovish", "fed_hawkish",
-    "cpi_event_last_7d", "nfp_event_last_7d",
+    # Sentiment
+    "fear_greed",
+    # Derivatives positioning
+    "funding_rate_avg", "funding_extreme_long",
+    # Macro (as-of joined in training; neutral defaults at inference)
+    "macro_fed_rate", "macro_cpi_surprise", "macro_nfp_surprise",
     # Calendar
-    "day_of_week", "month", "is_weekend", "is_month_end",
+    "day_of_week",
 ]
+
+# ── Per-symbol UP thresholds ───────────────────────────────────────────────────
+# BTC shows a persistent UP bias in validation (recall UP ~0.76, DOWN ~0.33)
+# caused by the training period being predominantly bullish (2021-2025).
+# Requiring higher confidence before calling UP reduces false UP signals.
+# Configurable via env vars so you can tune without redeploying.
+UP_THRESHOLDS: dict[str, float] = {
+    "BTC": float(os.getenv("BTC_UP_THRESHOLD", "0.55")),
+    "ETH": float(os.getenv("ETH_UP_THRESHOLD", "0.50")),
+}
 
 SYMBOLS: list[str] = ["BTC", "ETH"]
 
@@ -154,7 +167,8 @@ def precompute_predictions() -> dict:
             proba     = model.predict_proba(X)[0]
             up_prob   = float(proba[1])
             down_prob = float(proba[0])
-            direction = "UP" if up_prob >= 0.5 else "DOWN"
+            threshold = UP_THRESHOLDS.get(symbol, 0.5)
+            direction = "UP" if up_prob >= threshold else "DOWN"
             confidence = up_prob if direction == "UP" else down_prob
 
             payload = {
@@ -163,6 +177,7 @@ def precompute_predictions() -> dict:
                 "confidence":   round(confidence, 4),
                 "up_prob":      round(up_prob, 4),
                 "down_prob":    round(down_prob, 4),
+                "threshold":    threshold,
                 "predicted_at": datetime.utcnow().isoformat(),
             }
             results[key] = payload
@@ -264,6 +279,7 @@ class PredictionOut(BaseModel):
     confidence:   float   # probability of the predicted class, 0-1
     up_prob:      float   # raw P(UP)
     down_prob:    float   # raw P(DOWN)
+    threshold:    float   # UP threshold applied (symbol-specific, e.g. 0.55 for BTC)
     predicted_at: str     # UTC ISO timestamp
 
 
@@ -300,6 +316,16 @@ def _price_position(df: pd.DataFrame, i: int, close: float) -> float:
     return (close - lo) / (hi - lo) if hi > lo else 0.5
 
 
+def _compute_rsi_series(close: pd.Series, window: int) -> pd.Series:
+    delta = close.diff()
+    gain = delta.clip(lower=0.0)
+    loss = -delta.clip(upper=0.0)
+    avg_gain = gain.ewm(alpha=1 / window, adjust=False, min_periods=window).mean()
+    avg_loss = loss.ewm(alpha=1 / window, adjust=False, min_periods=window).mean()
+    rs = avg_gain / avg_loss.replace(0, pd.NA)
+    return (100 - (100 / (1 + rs))).fillna(50.0)
+
+
 def candles_to_features(candles: list[CandleIn]) -> pd.DataFrame:
     """
     Convert a list of daily candles into a single-row feature DataFrame
@@ -319,63 +345,73 @@ def candles_to_features(candles: list[CandleIn]) -> pd.DataFrame:
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").reset_index(drop=True)
 
-    i     = len(df) - 1          # index of the most recent (current) candle
-    close = float(df.iloc[i]["close_usd"])
-    date  = df.iloc[i]["date"]
+    close_series = df["close_usd"].astype(float)
+    ret_series   = close_series.pct_change().fillna(0.0)
+
+    vol_7d         = ret_series.rolling(7, min_periods=1).std().fillna(0.0)
+    rsi_14         = _compute_rsi_series(close_series, 14)
+    ema_12_series  = close_series.ewm(span=12, adjust=False, min_periods=1).mean()
+    ema_26_series  = close_series.ewm(span=26, adjust=False, min_periods=1).mean()
+    macd_line      = ema_12_series - ema_26_series
+    macd_signal    = macd_line.ewm(span=9, adjust=False, min_periods=1).mean()
+    macd_hist_series = macd_line - macd_signal
+    ma_200_series  = close_series.rolling(200, min_periods=1).mean()
+
+    i      = len(df) - 1    # index of the most recent candle
+    close  = float(df.iloc[i]["close_usd"])
+    date   = df.iloc[i]["date"]
+    ma_200 = float(ma_200_series.iloc[i])
 
     row: dict = {
         # ── Price momentum ──────────────────────────────────────────────────
-        "ret_1d":  float(df.iloc[i]["change_pct"]) / 100.0,
         "ret_3d":  close / float(df.iloc[i - 3]["close_usd"]) - 1.0,
         "ret_7d":  close / float(df.iloc[i - 7]["close_usd"]) - 1.0,
         "ret_14d": close / float(df.iloc[i - 14]["close_usd"]) - 1.0,
 
         # ── Volatility / range ──────────────────────────────────────────────
+        "volatility_7d": float(vol_7d.iloc[i]),
         "hl_range": (
             float(df.iloc[i]["high_usd"]) - float(df.iloc[i]["low_usd"])
         ) / close,
 
-        # ── Volume trend ────────────────────────────────────────────────────
-        "vol_trend": _vol_trend(df, i),
-
-        # ── Price position in 14-day range ──────────────────────────────────
+        # ── Price position / volume ─────────────────────────────────────────
         "price_position": _price_position(df, i, close),
+        "vol_trend":      _vol_trend(df, i),
 
-        # ── Sentiment — neutral defaults ────────────────────────────────────
-        # Fear & Greed not available from raw candles — use neutral 0.5.
-        "fear_greed":         0.5,
-        "fear_greed_7d_avg":  0.5,
-        "fear_greed_extreme": 0,
+        # ── Momentum indicators ─────────────────────────────────────────────
+        "rsi_14":    float(rsi_14.iloc[i]),
+        "macd_hist": float(macd_hist_series.iloc[i]),
 
-        # ── Funding rate — neutral defaults ─────────────────────────────────
-        # Funding rate not available from spot candles — use 0 (neutral).
-        "funding_rate_avg":      0.0,
-        "funding_rate_7d_avg":   0.0,
-        "funding_extreme_long":  0,
-        "funding_extreme_short": 0,
+        # ── Regime ──────────────────────────────────────────────────────────
+        # bull_regime: 1 when price is above the 200-day MA.
+        # With only 20 candles provided, ma_200 is just the mean of those
+        # candles (not a real 200MA), so we default to 0 (unknown regime).
+        # For accurate bull_regime at inference, send 200+ candles.
+        "bull_regime": int(close > ma_200) if len(df) >= 200 else 0,
 
-        # ── BTC/ETH ratio — neutral default ─────────────────────────────────
+        # ── Market structure ────────────────────────────────────────────────
         # Ratio change not computable without the other symbol's candles.
         "btc_eth_ratio_7d_change": 0.0,
 
-        # ── Shock regime — neutral defaults ─────────────────────────────────
-        "shock_active":       0,
-        "days_since_shock":   30,   # 30 = "no recent shock"
-        "max_shock_severity": 0,
-        "shock_oil_impact":   0.0,
+        # ── Sentiment — neutral default ─────────────────────────────────────
+        # Fear & Greed not available from raw candles.
+        "fear_greed": 0.5,
 
-        # ── Macro events — neutral defaults ─────────────────────────────────
-        "fed_event_last_7d": 0,
-        "fed_dovish":        0,
-        "fed_hawkish":       0,
-        "cpi_event_last_7d": 0,
-        "nfp_event_last_7d": 0,
+        # ── Funding rate — neutral defaults ─────────────────────────────────
+        # Not available from spot candles.
+        "funding_rate_avg":     0.0,
+        "funding_extreme_long": 0,
+
+        # ── Macro — neutral defaults ─────────────────────────────────────────
+        # As-of macro values are not available at candle-only inference time.
+        # macro_fed_rate defaults to 5.25 (approximate current US rate level).
+        # Override via FED_RATE_DEFAULT env var if the rate changes significantly.
+        "macro_fed_rate":     float(os.getenv("FED_RATE_DEFAULT", "5.25")),
+        "macro_cpi_surprise": 0.0,
+        "macro_nfp_surprise": 0.0,
 
         # ── Calendar ────────────────────────────────────────────────────────
-        "day_of_week":  int(date.dayofweek),   # 0=Mon, 6=Sun
-        "month":        int(date.month),
-        "is_weekend":   int(date.dayofweek >= 5),
-        "is_month_end": int(date.day >= 28),
+        "day_of_week": int(date.dayofweek),
     }
 
     # Select columns in exact training order
@@ -464,7 +500,8 @@ def predict(req: PredictRequest):
     proba     = model.predict_proba(X)[0]   # shape: (2,) → [P(DOWN), P(UP)]
     up_prob   = float(proba[1])
     down_prob = float(proba[0])
-    direction = "UP" if up_prob >= 0.5 else "DOWN"
+    threshold = UP_THRESHOLDS.get(req.symbol, 0.5)
+    direction = "UP" if up_prob >= threshold else "DOWN"
     confidence = up_prob if direction == "UP" else down_prob
 
     return PredictionOut(
@@ -473,6 +510,7 @@ def predict(req: PredictRequest):
         confidence   = round(confidence, 4),
         up_prob      = round(up_prob, 4),
         down_prob    = round(down_prob, 4),
+        threshold    = threshold,
         predicted_at = datetime.utcnow().isoformat(),
     )
 
@@ -665,7 +703,8 @@ def predict_live(
     proba     = model.predict_proba(X)[0]
     up_prob   = float(proba[1])
     down_prob = float(proba[0])
-    direction = "UP" if up_prob >= 0.5 else "DOWN"
+    threshold = UP_THRESHOLDS.get(symbol, 0.5)
+    direction = "UP" if up_prob >= threshold else "DOWN"
     confidence = up_prob if direction == "UP" else down_prob
 
     return PredictionOut(
@@ -674,6 +713,7 @@ def predict_live(
         confidence   = round(confidence, 4),
         up_prob      = round(up_prob, 4),
         down_prob    = round(down_prob, 4),
+        threshold    = threshold,
         predicted_at = datetime.utcnow().isoformat(),
     )
 

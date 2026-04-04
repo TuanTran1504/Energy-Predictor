@@ -58,6 +58,13 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       BINANCE_FUTURES_API_KEY: ${BINANCE_FUTURES_API_KEY}
       BINANCE_FUTURES_SECRET_KEY: ${BINANCE_FUTURES_SECRET_KEY}
+      # Threshold to call UP — BTC raised to 0.55 to counteract UP bias
+      BTC_UP_THRESHOLD: ${BTC_UP_THRESHOLD:-0.55}
+      ETH_UP_THRESHOLD: ${ETH_UP_THRESHOLD:-0.50}
+      # Fallback FED rate for candle-only inference (no DB access)
+      FED_RATE_DEFAULT: ${FED_RATE_DEFAULT:-5.25}
+      MLFLOW_REGISTER_MODELS: ${MLFLOW_REGISTER_MODELS:-true}
+      SHADOW_TRAIN: ${SHADOW_TRAIN:-false}
     depends_on:
       - redis
     restart: unless-stopped
@@ -78,7 +85,7 @@ services:
       - redis
     restart: unless-stopped
 
-  # ── Data scheduler (Fear&Greed, FRED, funding rates) ─────
+  # ── Data scheduler (Fear&Greed, FRED, funding rates, macro_releases) ──
   scheduler:
     build:
       context: ./backend/schedule
@@ -86,6 +93,12 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       FRED_API_KEY: ${FRED_API_KEY:-}
+      # Optional: plug in a calendar API for forward-looking macro events
+      ECON_CALENDAR_URL: ${ECON_CALENDAR_URL:-}
+      ECON_CALENDAR_API_KEY: ${ECON_CALENDAR_API_KEY:-}
+      # Optional: ETF flow data source
+      ETF_FLOW_API_URL: ${ETF_FLOW_API_URL:-}
+      ETF_FLOW_API_KEY: ${ETF_FLOW_API_KEY:-}
     depends_on:
       - redis
     restart: unless-stopped

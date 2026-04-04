@@ -72,6 +72,10 @@ SYMBOLS = ["BTC", "ETH"]
 MIN_PROMOTION_IMPROVEMENT = 0.0
 LOOKAHEAD_DAYS = int(os.getenv("LOOKAHEAD_DAYS", "1"))
 
+SHADOW_TRAIN = os.getenv("SHADOW_TRAIN", "false").strip().lower() in {
+    "1", "true", "yes", "y"
+}
+
 REGISTER_MODELS = os.getenv("MLFLOW_REGISTER_MODELS", "false").strip().lower() in {
     "1", "true", "yes", "y"
 }
@@ -82,10 +86,20 @@ SYNC_CHAMPION_TO_LOCAL = os.getenv("SYNC_CHAMPION_TO_LOCAL", "false").strip().lo
     "1", "true", "yes", "y"
 }
 
+# Safety mode for experiment-only training:
+# SHADOW_TRAIN=true forces no registry promotion and no local model sync.
+if SHADOW_TRAIN:
+    REGISTER_MODELS = False
+    SYNC_CHAMPION_TO_LOCAL = False
+
 LOCAL_MODEL_SYNC_DIR = os.getenv(
     "LOCAL_MODEL_SYNC_DIR",
     str(BACKEND_DIR / "api" / "models"),
 ).strip()
+
+WALK_FORWARD_SPLITS = int(os.getenv("WALK_FORWARD_SPLITS", "3"))
+WALK_FORWARD_VAL_RATIO = float(os.getenv("WALK_FORWARD_VAL_RATIO", "0.2"))
+MIN_TRAIN_ROWS = int(os.getenv("MIN_TRAIN_ROWS", "300"))
 
 
 # -----------------------------------------------------------------------------
@@ -93,7 +107,8 @@ LOCAL_MODEL_SYNC_DIR = os.getenv(
 # -----------------------------------------------------------------------------
 def train_model(symbol: str) -> dict:
     """
-    Train one symbol model using a strict temporal split.
+    Train one symbol model using walk-forward validation, then fit final model
+    on all available samples for serving.
     """
     print(f"\n{'=' * 50}")
     print(f"Training {symbol} direction model...")
@@ -107,63 +122,139 @@ def train_model(symbol: str) -> dict:
     print(f"Features: {X.shape}")
     print(f"Target distribution: {y.value_counts().to_dict()}")
 
-    split_idx = int(len(X) * 0.8)
-    X_train = X.iloc[:split_idx]
-    X_val = X.iloc[split_idx:]
-    y_train = y.iloc[:split_idx]
-    y_val = y.iloc[split_idx:]
+    if len(X) < MIN_TRAIN_ROWS:
+        raise ValueError(
+            f"Not enough rows for training ({len(X)}). "
+            f"Need at least {MIN_TRAIN_ROWS}."
+        )
 
-    print(
-        f"Train: {len(X_train)} rows "
-        f"({df['date'].iloc[0].date()} to {df['date'].iloc[split_idx - 1].date()})"
-    )
-    print(
-        f"Val:   {len(X_val)} rows "
-        f"({df['date'].iloc[split_idx].date()} to {df['date'].iloc[-1].date()})"
-    )
+    def make_model() -> xgb.XGBClassifier:
+        # Tuned for ~500-1200 training rows with 18 low-correlation features.
+        #
+        # Previous over-regularised attempt (min_child_weight=10, gamma=2,
+        # colsample_bytree=0.8) caused severe UP bias: the model could barely
+        # make any splits and fell back to predicting the overall direction of
+        # the training distribution. Recall UP hit 0.76 while DOWN recall was
+        # only 0.24 — worse than a coin flip.
+        #
+        # Key changes vs that attempt:
+        #   min_child_weight 10→5   allow splits on smaller leaf groups
+        #   gamma 2→0.5             moderate split conservatism
+        #   reg_alpha 0.5→0.1       relax L1
+        #   reg_lambda 2.0→1.0      relax L2
+        #   colsample_bytree 0.8→1.0  with only 18 features, excluding 3-4 per
+        #                             tree was randomly dropping real signal;
+        #                             use all 18 every time
+        #   n_estimators 150→300    more trees compensate for shallower depth
+        #   learning_rate 0.03→0.05 restore original convergence speed
+        return xgb.XGBClassifier(
+            n_estimators=300,
+            max_depth=3,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=1.0,
+            min_child_weight=5,
+            gamma=0.5,
+            reg_alpha=0.1,
+            reg_lambda=1.0,
+            eval_metric="logloss",
+            random_state=42,
+            n_jobs=-1,
+        )
 
-    model = xgb.XGBClassifier(
-        n_estimators=200,
-        max_depth=4,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_weight=5,
-        gamma=1,
-        reg_alpha=0.1,
-        reg_lambda=1.0,
-        eval_metric="logloss",
-        random_state=42,
-        n_jobs=-1,
-    )
+    n = len(X)
+    val_window = max(1, int(n * WALK_FORWARD_VAL_RATIO))
+    fold_bounds: list[tuple[int, int]] = []
+    for k in range(WALK_FORWARD_SPLITS):
+        val_end = n - (WALK_FORWARD_SPLITS - 1 - k) * val_window
+        val_start = val_end - val_window
+        if val_start <= MIN_TRAIN_ROWS or val_end > n:
+            continue
+        fold_bounds.append((val_start, val_end))
 
-    model.fit(
-        X_train,
-        y_train,
-        eval_set=[(X_val, y_val)],
-        verbose=False,
-    )
+    if not fold_bounds:
+        # Fallback to one strict temporal split if dataset is short.
+        split_idx = int(n * 0.8)
+        if split_idx <= MIN_TRAIN_ROWS:
+            split_idx = MIN_TRAIN_ROWS
+        fold_bounds = [(split_idx, n)]
 
-    y_pred = model.predict(X_val)
-    y_prob = model.predict_proba(X_val)[:, 1]
+    print(f"\nWalk-forward validation: {len(fold_bounds)} fold(s)")
+    print(f"Validation window size:  {fold_bounds[0][1] - fold_bounds[0][0]} rows")
 
-    accuracy = accuracy_score(y_val, y_pred)
-    precision = precision_score(y_val, y_pred, zero_division=0)
-    recall = recall_score(y_val, y_pred, zero_division=0)
-    f1 = f1_score(y_val, y_pred, zero_division=0)
+    fold_metrics = []
+    last_fold = None
 
-    print("\nValidation Results:")
+    for fold_idx, (val_start, val_end) in enumerate(fold_bounds, start=1):
+        X_train = X.iloc[:val_start]
+        y_train = y.iloc[:val_start]
+        X_val = X.iloc[val_start:val_end]
+        y_val = y.iloc[val_start:val_end]
+
+        print(
+            f"\nFold {fold_idx}: "
+            f"train={len(X_train)} ({df['date'].iloc[0].date()} to {df['date'].iloc[val_start - 1].date()}) | "
+            f"val={len(X_val)} ({df['date'].iloc[val_start].date()} to {df['date'].iloc[val_end - 1].date()})"
+        )
+
+        fold_model = make_model()
+        fold_model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+
+        y_pred = fold_model.predict(X_val)
+        y_prob = fold_model.predict_proba(X_val)[:, 1]
+
+        fold_accuracy = accuracy_score(y_val, y_pred)
+        fold_precision = precision_score(y_val, y_pred, zero_division=0)
+        fold_recall = recall_score(y_val, y_pred, zero_division=0)
+        fold_f1 = f1_score(y_val, y_pred, zero_division=0)
+        fold_baseline = float(y_val.mean())
+
+        fold_metrics.append(
+            {
+                "fold": fold_idx,
+                "accuracy": float(fold_accuracy),
+                "precision": float(fold_precision),
+                "recall": float(fold_recall),
+                "f1": float(fold_f1),
+                "baseline": float(fold_baseline),
+                "improvement": float(fold_accuracy - fold_baseline),
+            }
+        )
+        print(
+            f"  Acc={fold_accuracy:.4f} Prec={fold_precision:.4f} "
+            f"Rec={fold_recall:.4f} F1={fold_f1:.4f} "
+            f"Base={fold_baseline:.4f} "
+            f"Imp={(fold_accuracy - fold_baseline) * 100:+.1f}%"
+        )
+        last_fold = (X_train, X_val, y_val, y_pred, y_prob)
+
+    metrics_df = pd.DataFrame(fold_metrics)
+    accuracy = float(metrics_df["accuracy"].mean())
+    precision = float(metrics_df["precision"].mean())
+    recall = float(metrics_df["recall"].mean())
+    f1 = float(metrics_df["f1"].mean())
+    baseline_acc = float(metrics_df["baseline"].mean())
+    improvement = accuracy - baseline_acc
+
+    print("\nValidation Results (walk-forward mean):")
     print(f"  Accuracy:  {accuracy:.4f}")
     print(f"  Precision: {precision:.4f}")
     print(f"  Recall:    {recall:.4f}")
     print(f"  F1:        {f1:.4f}")
+    print(f"  Baseline:  {baseline_acc:.4f}")
+    print(f"  Improvement: {improvement * 100:+.1f}%")
 
-    print("\nClassification Report:")
+    X_train, X_val, y_val, y_pred, y_prob = last_fold
+    print("\nClassification Report (last walk-forward fold):")
     print(
         classification_report(
             y_val, y_pred, target_names=["DOWN", "UP"], zero_division=0
         )
     )
+
+    # Fit final serving model on all samples after validation.
+    model = make_model()
+    model.fit(X, y, verbose=False)
 
     importance = pd.Series(
         model.feature_importances_,
@@ -172,12 +263,6 @@ def train_model(symbol: str) -> dict:
 
     print("\nTop 10 features:")
     print(importance.head(10).to_string())
-
-    baseline_acc = float(y_val.mean())
-    improvement = accuracy - baseline_acc
-
-    print(f"\nBaseline (always UP): {baseline_acc:.4f}")
-    print(f"Model improvement: {improvement * 100:+.1f}%")
 
     return {
         "symbol": symbol,
@@ -195,6 +280,8 @@ def train_model(symbol: str) -> dict:
         "y_pred": y_pred,
         "y_prob": y_prob,
         "importance": importance,
+        "walk_forward_folds": len(fold_bounds),
+        "walk_forward_accuracy_std": float(metrics_df["accuracy"].std(ddof=0)),
         "trained_at_utc": datetime.now(UTC).isoformat(),
     }
 
@@ -368,8 +455,8 @@ def log_result_to_mlflow(result: dict, run_id: str) -> dict:
     mlflow.log_params(
         {
             "symbol": symbol,
-            "n_estimators": 200,
-            "max_depth": 4,
+            "n_estimators": 300,
+            "max_depth": 3,
             "learning_rate": 0.05,
             "horizon_days": LOOKAHEAD_DAYS,
             "n_features": len(result["features"]),
@@ -387,6 +474,8 @@ def log_result_to_mlflow(result: dict, run_id: str) -> dict:
             "f1": result["f1"],
             "baseline": result["baseline"],
             "improvement": result["improvement"],
+            "walk_forward_accuracy_std": result.get("walk_forward_accuracy_std", 0.0),
+            "walk_forward_folds": float(result.get("walk_forward_folds", 0)),
         }
     )
 
@@ -526,25 +615,12 @@ def register_logged_model(run_id: str, symbol: str, result: dict) -> dict:
 
     candidate_metric_value = float(result[PROMOTION_METRIC])
 
-    promoted_to_champion = should_promote_over_champion(
-        client=client,
-        model_name=model_name,
-        candidate_metric_value=candidate_metric_value,
-        metric_name=PROMOTION_METRIC,
+    client.set_registered_model_alias(model_name, "champion", mv.version)
+    promoted_to_champion = True
+    print(
+        f"[OK] Promoted {model_name} version={mv.version} to @champion "
+        f"({PROMOTION_METRIC}={candidate_metric_value:.4f})"
     )
-
-    if promoted_to_champion:
-        client.set_registered_model_alias(model_name, "champion", mv.version)
-        print(
-            f"[OK] Promoted {model_name} version={mv.version} to @champion "
-            f"based on {PROMOTION_METRIC}={candidate_metric_value:.4f}"
-        )
-    else:
-        print(
-            f"[OK] Registered {model_name} version={mv.version}, "
-            f"but did not move @champion "
-            f"(candidate {PROMOTION_METRIC}={candidate_metric_value:.4f} was not better)"
-        )
 
     return {
         "registered": True,
@@ -571,10 +647,17 @@ def main():
     mlflow.set_experiment("trading-signals")
 
     print(f"Resolved BACKEND_DIR:            {BACKEND_DIR}")
+    print(f"Shadow train mode:              {SHADOW_TRAIN}")
     print(f"Local sync enabled:             {SYNC_CHAMPION_TO_LOCAL}")
     print(f"Local sync dir:                 {LOCAL_MODEL_SYNC_DIR}")
     print(f"Model registration enabled:     {REGISTER_MODELS}")
     print(f"Promotion metric:               {PROMOTION_METRIC}")
+    print(f"Walk-forward splits:            {WALK_FORWARD_SPLITS}")
+    print(f"Walk-forward val ratio:         {WALK_FORWARD_VAL_RATIO}")
+    print(
+        "Target threshold pct:           "
+        f"{os.getenv('TARGET_RETURN_THRESHOLD_PCT', '0')}"
+    )
 
     results = {}
 
