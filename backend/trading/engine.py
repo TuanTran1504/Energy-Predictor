@@ -17,10 +17,10 @@ Logs written to backend/trading/logs/
 """
 
 import argparse
-import asyncio
 import json
 import os
 import time
+import threading
 from datetime import datetime, UTC
 from pathlib import Path
 
@@ -62,12 +62,170 @@ TAKE_PROFIT_MIN_RR = 1.5
 POSITION_RISK_PCT  = 0.01  # risk 1% of balance per trade
 CYCLE_INTERVAL     = 5 * 60  # 5 minutes
 
-TESTNET_BASE = "https://testnet.binancefuture.com"
+TESTNET_BASE    = "https://testnet.binancefuture.com"
+MONITOR_INTERVAL = 60  # seconds between DB↔Binance sync checks
 
 
 # ── Binance client ─────────────────────────────────────────────────────────────
 def get_client() -> UMFutures:
     return UMFutures(key=API_KEY, secret=API_SECRET, base_url=TESTNET_BASE)
+
+
+# ── DB helpers ─────────────────────────────────────────────────────────────────
+def _get_conn():
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
+
+
+def db_ensure_trades_table():
+    """Create trades table if it doesn't exist (idempotent)."""
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS trades (
+                    id                BIGSERIAL PRIMARY KEY,
+                    symbol            TEXT        NOT NULL,
+                    side              TEXT        NOT NULL,
+                    status            TEXT        NOT NULL DEFAULT 'OPEN',
+                    entry_price       FLOAT,
+                    exit_price        FLOAT,
+                    quantity          FLOAT,
+                    leverage          INTEGER     DEFAULT 5,
+                    stop_loss         FLOAT,
+                    take_profit       FLOAT,
+                    pnl_usdt          FLOAT,
+                    pnl_pct           FLOAT,
+                    confidence        FLOAT,
+                    horizon           INTEGER     DEFAULT 1,
+                    binance_order_id  TEXT,
+                    close_reason      TEXT,
+                    setup             TEXT,
+                    notes             TEXT,
+                    opened_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    closed_at         TIMESTAMPTZ
+                )
+            """)
+        conn.commit()
+
+
+def db_save_trade(symbol: str, side: str, entry_price: float, quantity: float,
+                  stop_loss: float, take_profit: float, order_id: str,
+                  setup: str, notes: str, confidence: float = 0.0) -> int:
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO trades
+                  (symbol, side, status, entry_price, quantity, leverage,
+                   stop_loss, take_profit, confidence, binance_order_id, setup, notes)
+                VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING id
+            """, (symbol, side, entry_price, quantity, LEVERAGE,
+                  stop_loss, take_profit, confidence, order_id, setup, notes))
+            tid = cur.fetchone()[0]
+        conn.commit()
+    return tid
+
+
+def db_close_trade(trade_id: int, exit_price: float, reason: str):
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT entry_price, quantity, side FROM trades WHERE id=%s",
+                (trade_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return
+            entry, qty, side = row
+            if side == "BUY":
+                pnl_pct = (exit_price - entry) / entry * LEVERAGE
+            else:
+                pnl_pct = (entry - exit_price) / entry * LEVERAGE
+            margin   = qty * entry / LEVERAGE
+            pnl_usdt = pnl_pct * margin
+            cur.execute("""
+                UPDATE trades SET
+                    status='CLOSED', exit_price=%s, pnl_usdt=%s,
+                    pnl_pct=%s, close_reason=%s, closed_at=NOW()
+                WHERE id=%s
+            """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4),
+                  reason, trade_id))
+        conn.commit()
+    log.info(f"[DB] Trade {trade_id} closed — {reason} @ {exit_price} pnl={pnl_pct*100:.2f}%")
+
+
+def db_get_open_trades() -> list[dict]:
+    try:
+        with _get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id, symbol, side, entry_price, quantity,
+                           stop_loss, take_profit, binance_order_id, opened_at
+                    FROM trades WHERE status='OPEN'
+                """)
+                cols = [d[0] for d in cur.description]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
+    except Exception as e:
+        log.warning(f"[DB] get_open_trades failed: {e}")
+        return []
+
+
+def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None:
+    """Get fill price of the most recent closing trade from Binance account trades."""
+    try:
+        trades = client.get_account_trades(symbol=f"{symbol}USDT", limit=10)
+        if trades:
+            return float(trades[-1]["price"])
+    except Exception as e:
+        log.warning(f"[MONITOR] Could not fetch exit price for {symbol}: {e}")
+    return None
+
+
+# ── Background monitor — syncs DB ↔ Binance every 60s ────────────────────────
+def _monitor_loop(client: UMFutures):
+    """
+    Detects when a native Binance SL/TP has fired and records the close in DB.
+    Runs in a background daemon thread.
+    """
+    log.info("[MONITOR] Background sync thread started (60s interval)")
+    while True:
+        try:
+            open_trades = db_get_open_trades()
+            for trade in open_trades:
+                sym = trade["symbol"]
+                # Check if position still exists on Binance
+                pos = get_open_position(client, sym)
+                if pos is not None:
+                    continue  # still open — nothing to do
+
+                # Position gone — SL/TP fired or manually closed
+                exit_price = _get_exit_price_from_binance(client, sym)
+                if exit_price is None:
+                    try:
+                        ticker = client.ticker_price(symbol=f"{sym}USDT")
+                        exit_price = float(ticker["price"])
+                    except Exception:
+                        continue
+
+                # Determine close reason
+                sl = trade["stop_loss"]
+                tp = trade["take_profit"]
+                side = trade["side"]
+                if side == "BUY":
+                    reason = ("take_profit" if exit_price >= tp
+                              else "stop_loss" if exit_price <= sl
+                              else "native_close")
+                else:
+                    reason = ("take_profit" if exit_price <= tp
+                              else "stop_loss" if exit_price >= sl
+                              else "native_close")
+
+                log.info(f"[MONITOR] {sym} closed on Binance → reason={reason} exit={exit_price}")
+                db_close_trade(trade["id"], exit_price, reason)
+
+        except Exception as e:
+            log.warning(f"[MONITOR] Sync error: {e}")
+
+        time.sleep(MONITOR_INTERVAL)
 
 
 # ── Redis ──────────────────────────────────────────────────────────────────────
@@ -305,6 +463,20 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
         log_trade_open(symbol, signal, actual_price, ai_sl, ai_tp, rr,
                        setup, reason, trade_id=order_id, context=context)
+
+        # ── Persist to DB for dashboard ───────────────────────────────────────
+        try:
+            db_save_trade(
+                symbol=symbol, side=signal,
+                entry_price=actual_price, quantity=qty,
+                stop_loss=ai_sl, take_profit=ai_tp,
+                order_id=order_id, setup=setup,
+                notes=reason[:200],
+                confidence=context.get("ml_confidence", 0.0),
+            )
+        except Exception as db_err:
+            log.warning(f"[{symbol}] DB save failed (trade still live): {db_err}")
+
         return True
 
     except Exception as e:
@@ -491,6 +663,18 @@ def run_once(dry_run: bool = False):
 
 def run_loop(dry_run: bool = False):
     log.info("Engine V2 started — 5-min cycle loop")
+
+    # Ensure trades table exists
+    try:
+        db_ensure_trades_table()
+    except Exception as e:
+        log.warning(f"DB table init failed (will retry): {e}")
+
+    # Start background monitor thread
+    client_monitor = get_client()
+    t = threading.Thread(target=_monitor_loop, args=(client_monitor,), daemon=True)
+    t.start()
+
     while True:
         try:
             run_once(dry_run=dry_run)
