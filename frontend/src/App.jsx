@@ -682,8 +682,8 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <span className="logo">VIETNAM MARKET INTELLIGENCE</span>
-          <span className="logo-sub">Real-time · Macro · Crypto · Signals · ML</span>
+          <span className="logo">CRYPTO AGENT</span>
+          <span className="logo-sub">Real-time · Macro · Crypto · Signals · ML · AI Trading</span>
         </div>
         <div className="header-right">
           <span className={`conn-dot ${connected ? "connected" : "disconnected"}`} />
