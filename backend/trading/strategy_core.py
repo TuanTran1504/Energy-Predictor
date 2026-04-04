@@ -17,7 +17,6 @@ Public API:
 import numpy as np
 import pandas as pd
 
-# ── Thresholds ─────────────────────────────────────────────────────────────────
 H1_TREND_GAP      = 0.8     # % EMA34/89 gap to call H1 trend
 M15_TREND_GAP     = 0.4     # % EMA34/89 gap to call M15 trend
 BTC_TREND_GAP     = 1.0     # % EMA34/89 gap to call BTC trend
@@ -26,13 +25,11 @@ FUNDING_THRESHOLD = 0.05    # % daily funding — above = crowded longs
 SCORE_THRESHOLD   = 3       # min score out of 5 to call AI
 ML_CONFIDENCE_MIN = 0.55    # min ML confidence to use as bias
 
-# ── Shared SL/TP constants (used by detect_bb_mean_reversion + callers) ────────
 SL_MAX_PCT = 0.008    # 0.8% hard max SL distance
 SL_MIN_PCT = 0.002    # 0.2% hard min SL distance
 MIN_RR     = 1.5      # minimum reward-to-risk ratio
 
 
-# ── Trend classification ───────────────────────────────────────────────────────
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
                    threshold: float, atr_pct: float = 0.0) -> str:
     """
@@ -48,19 +45,17 @@ def classify_trend(gap_pct: float, ema34: float, ema89: float,
     return "SIDEWAY"
 
 
-# ── Indicator computation ──────────────────────────────────────────────────────
 def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
                        df_m5: pd.DataFrame) -> dict:
     """
     Computes all indicators needed for gates + scoring + chart.
     Returns a flat context dict (no DataFrames — pass those separately).
     """
-    # ── H1 ────────────────────────────────────────────────────────────────────
+    # H1
     df_h1 = df_h1.copy()
     df_h1["ema34"] = df_h1["close"].ewm(span=34, adjust=False).mean()
     df_h1["ema89"] = df_h1["close"].ewm(span=89, adjust=False).mean()
 
-    # ATR H1
     df_h1["tr"] = np.maximum(
         df_h1["high"] - df_h1["low"],
         np.maximum(
@@ -79,12 +74,11 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     h1_trend    = classify_trend(h1_gap, h1_ema34, h1_ema89,
                                  H1_TREND_GAP, h1_atr_pct)
 
-    # ── M15 ───────────────────────────────────────────────────────────────────
+    # M15
     df_m15 = df_m15.copy()
     df_m15["ema34"] = df_m15["close"].ewm(span=34, adjust=False).mean()
     df_m15["ema89"] = df_m15["close"].ewm(span=89, adjust=False).mean()
 
-    # ATR M15
     df_m15["tr"] = np.maximum(
         df_m15["high"] - df_m15["low"],
         np.maximum(
@@ -101,14 +95,13 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
                                 M15_TREND_GAP, h1_atr_pct)
     atr_m15    = df_m15["atr"].iloc[-1]
 
-    # RSI (M15)
     delta  = df_m15["close"].diff()
     gain   = delta.clip(lower=0).ewm(span=14, adjust=False).mean()
     loss   = (-delta.clip(upper=0)).ewm(span=14, adjust=False).mean()
     rs     = gain / loss.replace(0, np.nan)
     rsi    = (100 - 100 / (1 + rs)).iloc[-1]
 
-    # ADX (M15) — simplified
+    # ADX (M15) — simplified directional movement
     df_m15["dm_plus"]  = np.where(
         (df_m15["high"].diff() > -df_m15["low"].diff()) &
         (df_m15["high"].diff() > 0),
@@ -125,12 +118,10 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     dx       = 100 * abs(di_plus - di_minus) / (di_plus + di_minus).replace(0, np.nan)
     adx      = dx.ewm(span=14, adjust=False).mean().iloc[-1]
 
-    # OBV (M15)
     direction = np.sign(df_m15["close"].diff()).fillna(0)
     obv       = (direction * df_m15["volume"]).cumsum()
     obv_slope = float(obv.iloc[-1] - obv.iloc[-6])
 
-    # Bollinger Bands (M15)
     sma20      = df_m15["close"].rolling(20).mean()
     std20      = df_m15["close"].rolling(20).std()
     upper_bb   = sma20 + 2 * std20
@@ -140,14 +131,11 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     bb_breakout = close_now > upper_bb.iloc[-1] or close_now < lower_bb.iloc[-1]
     bb_squeeze  = bb_width.iloc[-1] < bb_width.rolling(20).mean().iloc[-1]
 
-    # Volume spike (M15)
     vol_ma      = df_m15["volume"].rolling(20).mean().iloc[-1]
     vol_spike   = df_m15["volume"].iloc[-1] > vol_ma * 1.5
 
-    # ── Current price (from M5) ────────────────────────────────────────────────
     current_price = float(df_m5["close"].iloc[-1])
 
-    # ── Market mode ───────────────────────────────────────────────────────────
     is_range = (h1_trend == "VOLATILE_RANGE" or m15_trend == "VOLATILE_RANGE")
     is_aligned = (h1_trend == m15_trend and
                   h1_trend not in ("SIDEWAY", "VOLATILE_RANGE"))
@@ -175,13 +163,11 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
         "vol_spike":     bool(vol_spike),
         "vol_ma":        round(float(vol_ma), 2),
         "current_price": current_price,
-        # pass back for chart generation
         "_df_h1_ema34":  round(float(h1_ema34), 4),
         "_df_h1_ema89":  round(float(h1_ema89), 4),
     }
 
 
-# ── S/R levels ─────────────────────────────────────────────────────────────────
 def find_sr_levels(df_h1: pd.DataFrame, current_price: float,
                    df_m15: pd.DataFrame = None) -> dict:
     """
@@ -200,7 +186,6 @@ def find_sr_levels(df_h1: pd.DataFrame, current_price: float,
         if df["low"].iloc[i] == window_l.min():
             swing_lows.append(float(df["low"].iloc[i]))
 
-    # Supplement with M15 swing levels
     if df_m15 is not None and len(df_m15) >= 30:
         m15 = df_m15.tail(40).reset_index(drop=True)
         W2  = 3
@@ -221,7 +206,6 @@ def find_sr_levels(df_h1: pd.DataFrame, current_price: float,
     }
 
 
-# ── Score (0-5) ────────────────────────────────────────────────────────────────
 def compute_score(context: dict) -> tuple[int, list[str]]:
     """
     5-point quantitative score. Called after compute_indicators().
@@ -232,7 +216,7 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
     h1      = context["h1_trend"]
     is_range = context["is_range"]
 
-    # 1. Bollinger Bands (+2 breakout / +1 squeeze)
+    # Bollinger Bands (+2 breakout / +1 squeeze)
     if context["bb_breakout"]:
         score += 2
         details.append("BB breakout (+2)")
@@ -240,12 +224,12 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
         score += 1
         details.append("BB squeeze (+1)")
 
-    # 2. ADX
+    # ADX
     if context["adx"] > 20:
         score += 1
         details.append(f"ADX={context['adx']:.1f} (+1)")
 
-    # 3. RSI aligned with trend
+    # RSI aligned with trend
     rsi = context["rsi"]
     if (h1 == "UPTREND" and rsi > 55) or (h1 == "DOWNTREND" and rsi < 45):
         score += 1
@@ -254,7 +238,7 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
         score += 1
         details.append(f"RSI={rsi:.1f} extreme in range (+1)")
 
-    # 4. OBV slope
+    # OBV slope
     obv = context["obv_slope"]
     if (h1 == "UPTREND" and obv > 0) or (h1 == "DOWNTREND" and obv < 0):
         score += 1
@@ -263,7 +247,7 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
         score += 1
         details.append("OBV momentum (+1)")
 
-    # 5. Volume spike
+    # Volume spike
     if context["vol_spike"]:
         score += 1
         details.append("Vol spike 1.5x (+1)")
@@ -271,7 +255,6 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
     return score, details
 
 
-# ── Macro bias gate ────────────────────────────────────────────────────────────
 def check_macro_bias(ml_direction: str, ml_confidence: float,
                      fear_greed: int, funding_rate: float,
                      symbol: str) -> tuple[bool, str, str]:
@@ -281,18 +264,16 @@ def check_macro_bias(ml_direction: str, ml_confidence: float,
     """
     allowed = "BOTH"
 
-    # ML model bias
     if ml_confidence >= ML_CONFIDENCE_MIN:
         allowed = "BUY" if ml_direction == "UP" else "SELL"
 
-    # Fear & Greed override
+    # Fear & Greed: extreme values are contrarian signals
     if fear_greed is not None:
         if fear_greed <= 15:
-            allowed = "BUY"   # extreme fear = oversold = contrarian long
+            allowed = "BUY"   # extreme fear = contrarian long
         elif fear_greed >= 85:
-            allowed = "SELL"  # extreme greed = overbought = contrarian short
+            allowed = "SELL"  # extreme greed = contrarian short
 
-    # Funding rate guard
     if funding_rate > FUNDING_THRESHOLD and allowed in ("BUY", "BOTH"):
         if allowed == "BUY":
             return False, f"Funding {funding_rate:+.4f}% — longs saturated", allowed
@@ -306,7 +287,6 @@ def check_macro_bias(ml_direction: str, ml_confidence: float,
     return True, "OK", allowed
 
 
-# ── Technical gates ────────────────────────────────────────────────────────────
 def check_technical_gates(context: dict) -> tuple[bool, str]:
     """
     Runs all technical gates in order.
@@ -317,37 +297,34 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     score = context["score"]
     is_range = context["is_range"]
 
-    # Gate 1: Pure flat sideway — no edge
-    if h1 == "SIDEWAY" and m15 == "SIDEWAY":
+    if h1 == "SIDEWAY" and m15 == "SIDEWAY":  # pure flat — no edge
         return False, "GATE1: both H1+M15 SIDEWAY"
 
-    # Gate 2: Trend misalignment (only relevant outside range mode)
+    # Trend misalignment check (skipped in range mode)
     if not is_range:
         if (h1 not in ("SIDEWAY", "VOLATILE_RANGE") and
                 m15 not in ("SIDEWAY", "VOLATILE_RANGE") and
                 h1 != m15):
             return False, f"GATE2: H1={h1} vs M15={m15} misaligned"
 
-    # Gate 3: Score
     threshold = SCORE_THRESHOLD
     if score < threshold:
         return False, f"GATE3: score {score}/{threshold} insufficient"
 
-    # Gate 4: Range position guard — only trade near S/R
+    # Range mode: only trade when price is near S/R
     if is_range:
         price = context["current_price"]
         sr    = context.get("sr", {})
         if sr:
             dist_r = abs(sr["resistance"] - price) / price * 100
             dist_s = abs(price - sr["support"])    / price * 100
-            edge   = context.get("h1_atr_pct", 1.0)  # use ATR % as edge threshold
+            edge   = context.get("h1_atr_pct", 1.0)  # ATR % as proximity threshold
             if dist_r > edge and dist_s > edge:
                 return False, f"GATE4: price in middle of range (R:{dist_r:.2f}% S:{dist_s:.2f}%)"
 
     return True, "OK"
 
 
-# ── Range position bias ────────────────────────────────────────────────────────
 def get_range_bias(context: dict) -> str:
     """Returns 'NEAR_SUPPORT', 'NEAR_RESISTANCE', or 'MIDDLE'."""
     price = context["current_price"]
@@ -361,7 +338,6 @@ def get_range_bias(context: dict) -> str:
     return "NEAR_RESISTANCE"
 
 
-# ── Candle pattern detection (for backtesting — no LLM) ───────────────────────
 def detect_candle_pattern(df: pd.DataFrame, idx: int) -> dict:
     """
     Rule-based pattern detection on a single candle at df.iloc[idx].
@@ -387,34 +363,29 @@ def detect_candle_pattern(df: pd.DataFrame, idx: int) -> dict:
     if total == 0:
         return {"pattern": "none", "direction": "NONE"}
 
-    # Bullish Pinbar
-    if (wick_dn >= 2 * body and
+    if (wick_dn >= 2 * body and  # bullish pinbar
             c > (lo + total * 0.5) and
             wick_up <= wick_dn * 0.4):
         return {"pattern": "bullish_pinbar", "direction": "BUY"}
 
-    # Bearish Pinbar
-    if (wick_up >= 2 * body and
+    if (wick_up >= 2 * body and  # bearish pinbar
             c < (lo + total * 0.5) and
             wick_dn <= wick_up * 0.4):
         return {"pattern": "bearish_pinbar", "direction": "SELL"}
 
-    # Bullish Engulfing
     p_o = float(prev["open"])
     p_c = float(prev["close"])
     if (c > o and p_c < p_o and           # current green, prev red
             o <= p_c and c >= p_o):        # body engulfs prev body
         return {"pattern": "bullish_engulfing", "direction": "BUY"}
 
-    # Bearish Engulfing
-    if (c < o and p_c > p_o and           # current red, prev green
+    if (c < o and p_c > p_o and           # bearish engulfing
             o >= p_c and c <= p_o):
         return {"pattern": "bearish_engulfing", "direction": "SELL"}
 
     return {"pattern": "none", "direction": "NONE"}
 
 
-# ── Setup E — BB mean reversion (for SIDEWAY markets) ────────────────────────
 def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> dict | None:
     """
     Setup E: Mean reversion when price reaches Bollinger Band extreme in SIDEWAY mode.
@@ -434,7 +405,6 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     if idx < 20:
         return None
 
-    # Compute BB locally from M5 slice ending at idx
     slice_df = df_m5.iloc[max(0, idx - 29): idx + 1].copy()
     if len(slice_df) < 20:
         return None
@@ -453,8 +423,7 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     low_now   = float(df_m5["low"].iloc[idx])
     rsi       = context.get("rsi", 50)
 
-    # ── BUY: price at/below lower BB + RSI oversold ───────────────────────────
-    if close_now <= lower_bb and rsi < 30:
+    if close_now <= lower_bb and rsi < 30:  # BUY: lower BB + RSI oversold
         raw_sl  = min(low_now, lower_bb) - close_now * 0.002
         sl_dist = close_now - raw_sl
 
@@ -481,8 +450,7 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
             "setup":  "setup_E_bb_mean_reversion",
         }
 
-    # ── SELL: price at/above upper BB + RSI overbought ────────────────────────
-    if close_now >= upper_bb and rsi > 70:
+    if close_now >= upper_bb and rsi > 70:  # SELL: upper BB + RSI overbought
         raw_sl  = max(high_now, upper_bb) + close_now * 0.002
         sl_dist = raw_sl - close_now
 

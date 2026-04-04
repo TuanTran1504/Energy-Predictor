@@ -27,7 +27,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional
 
-# ── BLOCK 2: fix path + load .env — before ANY other import ──────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dotenv import load_dotenv
@@ -46,7 +45,6 @@ def _find_env_files() -> list[Path]:
 for _env_file in _find_env_files():
     load_dotenv(_env_file)
 
-# ── BLOCK 3: third-party imports — after env is loaded ────────────────────────
 import pandas as pd
 import redis as redis_lib
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -57,8 +55,7 @@ from model_store import bust_cache, load_all_models, HORIZONS, SYMBOLS
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 log = logging.getLogger(__name__)
 
-# ── Redis helper ───────────────────────────────────────────────────────────────
-PREDICTION_TTL = 90_000   # 25 hours — ensures cache survives even if daily job is late
+PREDICTION_TTL = 90_000   # 25h — survives even if the daily job is late
 _redis: Optional[redis_lib.Redis] = None
 
 def _get_redis() -> Optional[redis_lib.Redis]:
@@ -82,10 +79,8 @@ def _get_redis() -> Optional[redis_lib.Redis]:
 def _pred_cache_key(symbol: str, horizon: int) -> str:
     return f"prediction:{symbol.upper()}:{horizon}d"
 
-# ── Feature column list ────────────────────────────────────────────────────────
-# Defined here — NOT imported from feature_engineering — so this file has zero
-# dependency on feature_engineering at prediction time. The list must exactly
-# match get_feature_columns() in feature_engineering.py.
+# Must exactly match get_feature_columns() in feature_engineering.py.
+# Defined inline so this file has no dependency on feature_engineering at prediction time.
 FEATURE_COLS: list[str] = [
     # Price momentum
     "ret_3d", "ret_7d", "ret_14d",
@@ -111,11 +106,9 @@ FEATURE_COLS: list[str] = [
     "day_of_week",
 ]
 
-# ── Per-symbol UP thresholds ───────────────────────────────────────────────────
-# BTC shows a persistent UP bias in validation (recall UP ~0.76, DOWN ~0.33)
-# caused by the training period being predominantly bullish (2021-2025).
-# Requiring higher confidence before calling UP reduces false UP signals.
-# Configurable via env vars so you can tune without redeploying.
+# BTC shows a persistent UP bias in validation (recall UP ~0.76, DOWN ~0.33) from
+# the predominantly bullish 2021-2025 training window. A higher threshold reduces
+# false UP signals. Configurable via env vars to tune without redeploying.
 UP_THRESHOLDS: dict[str, float] = {
     "BTC": float(os.getenv("BTC_UP_THRESHOLD", "0.55")),
     "ETH": float(os.getenv("ETH_UP_THRESHOLD", "0.50")),
@@ -123,7 +116,6 @@ UP_THRESHOLDS: dict[str, float] = {
 
 SYMBOLS: list[str] = ["BTC", "ETH"]
 
-# ── Global model registry — populated at startup ───────────────────────────────
 models: dict[str, object] = {}
 model_trained_at: dict[str, str] = {}   # key → ISO UTC timestamp from train.py bundle
 _executor = ThreadPoolExecutor(max_workers=2)
@@ -158,8 +150,7 @@ def precompute_predictions() -> dict:
         r = _get_redis()
 
         for key, model in symbol_models.items():
-            # key format: "BTC_1d" → horizon = 1
-            horizon = int(key.split("_")[1].replace("d", ""))
+            horizon = int(key.split("_")[1].replace("d", ""))  # "BTC_1d" → 1
 
             if X.shape[1] != model.n_features_in_:
                 log.warning(f"[precompute] Feature mismatch for {key} — skipping")
@@ -202,8 +193,7 @@ async def _precompute_scheduler():
         r = _get_redis()
         acquired = False
         if r:
-            # nx=True → only sets if key doesn't exist (atomic lock)
-            # ex=3600 → lock expires after 1h so a crashed worker can't block forever
+            # nx=True → atomic acquire; ex=3600 so a crash can't block forever
             acquired = r.set("precompute:lock", "1", nx=True, ex=3600)
         else:
             acquired = True  # no Redis — single worker, always run
@@ -212,7 +202,7 @@ async def _precompute_scheduler():
             log.info("[scheduler] Running daily prediction precompute...")
             await loop.run_in_executor(_executor, precompute_predictions)
             if r:
-                r.delete("precompute:lock")  # release lock immediately after done
+                r.delete("precompute:lock")
         else:
             log.info("[scheduler] Skipping precompute — another worker is running it")
 
@@ -233,7 +223,6 @@ async def lifespan(app: FastAPI):
             "or call POST /reload."
         )
 
-    # Start background scheduler (non-blocking)
     task = asyncio.create_task(_precompute_scheduler())
 
     yield
@@ -247,17 +236,13 @@ app = FastAPI(title="ML Inference Service — BTC/ETH direction", lifespan=lifes
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:8080",   # Go backend
+        "http://localhost:5173",
+        "http://localhost:8080",
     ],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Schemas
-# ══════════════════════════════════════════════════════════════════════════════
 
 class CandleIn(BaseModel):
     """One daily OHLCV candle. Send the last 20 for a valid prediction."""
@@ -300,10 +285,6 @@ class BacktestOut(BaseModel):
     accuracy: float
     points:   list[BacktestPoint]
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Feature engineering (inference-only, no DB needed)
-# ══════════════════════════════════════════════════════════════════════════════
 
 def _vol_trend(df: pd.DataFrame, i: int) -> float:
     """Volume today vs 7-day average."""
@@ -366,64 +347,47 @@ def candles_to_features(candles: list[CandleIn]) -> pd.DataFrame:
     ma_200 = float(ma_200_series.iloc[i])
 
     row: dict = {
-        # ── Price momentum ──────────────────────────────────────────────────
+        # Price momentum
         "ret_3d":  close / float(df.iloc[i - 3]["close_usd"]) - 1.0,
         "ret_7d":  close / float(df.iloc[i - 7]["close_usd"]) - 1.0,
         "ret_14d": close / float(df.iloc[i - 14]["close_usd"]) - 1.0,
 
-        # ── Volatility / range ──────────────────────────────────────────────
+        # Volatility / range
         "volatility_7d": float(vol_7d.iloc[i]),
         "hl_range": (
             float(df.iloc[i]["high_usd"]) - float(df.iloc[i]["low_usd"])
         ) / close,
 
-        # ── Price position / volume ─────────────────────────────────────────
+        # Price position / volume
         "price_position": _price_position(df, i, close),
         "vol_trend":      _vol_trend(df, i),
 
-        # ── Momentum indicators ─────────────────────────────────────────────
+        # Momentum
         "rsi_14":    float(rsi_14.iloc[i]),
         "macd_hist": float(macd_hist_series.iloc[i]),
 
-        # ── Regime ──────────────────────────────────────────────────────────
-        # bull_regime: 1 when price is above the 200-day MA.
-        # With only 20 candles provided, ma_200 is just the mean of those
-        # candles (not a real 200MA), so we default to 0 (unknown regime).
-        # For accurate bull_regime at inference, send 200+ candles.
+        # Regime: with only 20 candles ma_200 is not a real 200MA, so default 0
         "bull_regime": int(close > ma_200) if len(df) >= 200 else 0,
 
-        # ── Market structure ────────────────────────────────────────────────
-        # Ratio change not computable without the other symbol's candles.
+        # Market structure: ratio not computable without the other symbol's candles
         "btc_eth_ratio_7d_change": 0.0,
 
-        # ── Sentiment — neutral default ─────────────────────────────────────
-        # Fear & Greed not available from raw candles.
-        "fear_greed": 0.5,
-
-        # ── Funding rate — neutral defaults ─────────────────────────────────
-        # Not available from spot candles.
+        # Neutral defaults — not available from raw candles
+        "fear_greed":           0.5,
         "funding_rate_avg":     0.0,
         "funding_extreme_long": 0,
 
-        # ── Macro — neutral defaults ─────────────────────────────────────────
-        # As-of macro values are not available at candle-only inference time.
-        # macro_fed_rate defaults to 5.25 (approximate current US rate level).
-        # Override via FED_RATE_DEFAULT env var if the rate changes significantly.
+        # Macro neutral defaults — as-of values not available at candle-only inference time.
+        # Override FED_RATE_DEFAULT env var if the rate changes significantly.
         "macro_fed_rate":     float(os.getenv("FED_RATE_DEFAULT", "5.25")),
         "macro_cpi_surprise": 0.0,
         "macro_nfp_surprise": 0.0,
 
-        # ── Calendar ────────────────────────────────────────────────────────
         "day_of_week": int(date.dayofweek),
     }
 
-    # Select columns in exact training order
     return pd.DataFrame([row])[FEATURE_COLS]
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Routes
-# ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/health")
 def health():
@@ -855,7 +819,6 @@ async def analyze(request: Request):
     if not api_key:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY not configured")
 
-    # ── Gather live context ────────────────────────────────────────────────────
     r = _get_redis()
     context_parts = []
 
@@ -991,7 +954,6 @@ async def trade_chat(request: Request):
     if not api_key:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY not configured")
 
-    # ── Gather market context (same as /analyze) ───────────────────────────────
     r = _get_redis()
     context_parts = []
     for symbol in SYMBOLS:

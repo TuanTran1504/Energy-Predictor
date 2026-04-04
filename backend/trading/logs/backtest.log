@@ -1,0 +1,1376 @@
+2026-04-04 11:30:11 | INFO    | ============================================================
+2026-04-04 11:30:11 | INFO    | BACKTEST  BTC  30d  started 2026-04-04T04:30:11.860241+00:00
+2026-04-04 11:30:11 | INFO    | ============================================================
+2026-04-04 11:30:11 | INFO    | Fetching BTC data for 30 days...
+2026-04-04 11:30:11 | INFO    |   1h...
+2026-04-04 11:30:12 | INFO    |   1h: 840 candles
+2026-04-04 11:30:12 | INFO    |   15m...
+2026-04-04 11:30:12 | INFO    |   15m: 3359 candles
+2026-04-04 11:30:12 | INFO    |   5m...
+2026-04-04 11:30:14 | INFO    |   5m: 10080 candles
+2026-04-04 11:30:14 | INFO    | Backtest window: 8640 M5 candles
+2026-04-04 11:30:14 | INFO    |   Progress 0/8640 (0%) | balance=10000 trades=0
+2026-04-04 11:30:15 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=72563.2 SL=72285.392 TP=72979.912 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:15 | INFO    |   CLOSE TP | BUY BTC | entry=72563.2 exit=72979.912 pnl=+2.87% (+2.87 USDT) | bal=10003
+2026-04-04 11:30:19 | INFO    |   Progress 432/8640 (5%) | balance=10003 trades=1
+2026-04-04 11:30:19 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68434.1 SL=68050.9147 TP=69008.8779 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:19 | INFO    |   CLOSE SL | BUY BTC | entry=68434.1 exit=68050.9147 pnl=-2.80% (-2.80 USDT) | bal=10000
+2026-04-04 11:30:19 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=68396.2 SL=68064.5095 TP=68893.7357 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:19 | INFO    |   CLOSE SL | BUY BTC | entry=68396.2 exit=68064.5095 pnl=-2.42% (-2.42 USDT) | bal=9998
+2026-04-04 11:30:21 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=67920.4 SL=67695.299 TP=68258.0515 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:30:21 | INFO    |   CLOSE SL | BUY BTC | entry=67920.4 exit=67695.299 pnl=-1.66% (-1.66 USDT) | bal=9996
+2026-04-04 11:30:21 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67665.7 SL=67900.1643 TP=67314.0036 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:30:21 | INFO    |   CLOSE SL | SELL BTC | entry=67665.7 exit=67900.1643 pnl=-1.73% (-1.73 USDT) | bal=9994
+2026-04-04 11:30:22 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67276.9 SL=67613.1922 TP=66772.4616 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:30:22 | INFO    |   CLOSE TP | SELL BTC | entry=67276.9 exit=66772.4616 pnl=+3.75% (+3.75 USDT) | bal=9998
+2026-04-04 11:30:22 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66884.3 SL=67168.6107 TP=66457.8339 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:30:22 | INFO    |   Progress 864/8640 (10%) | balance=9998 trades=6
+2026-04-04 11:30:22 | INFO    |   CLOSE SL | SELL BTC | entry=66884.3 exit=67168.6107 pnl=-2.13% (-2.12 USDT) | bal=9996
+2026-04-04 11:30:25 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66200.0 SL=66507.6 TP=65738.6 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:30:25 | INFO    |   CLOSE SL | SELL BTC | entry=66200.0 exit=66507.6 pnl=-2.32% (-2.32 USDT) | bal=9994
+2026-04-04 11:30:26 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67792.8 SL=68207.882 TP=67170.177 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:26 | INFO    |   CLOSE TP | SELL BTC | entry=67792.8 exit=67170.177 pnl=+4.59% (+4.59 USDT) | bal=9998
+2026-04-04 11:30:26 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67693.8 SL=68017.5345 TP=67208.1982 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:26 | INFO    |   CLOSE SL | SELL BTC | entry=67693.8 exit=68017.5345 pnl=-2.39% (-2.39 USDT) | bal=9996
+2026-04-04 11:30:26 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67850.0 SL=68118.125 TP=67447.8125 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:26 | INFO    |   CLOSE TP | SELL BTC | entry=67850.0 exit=67447.8125 pnl=+2.96% (+2.96 USDT) | bal=9999
+2026-04-04 11:30:27 | INFO    |   Progress 1296/8640 (15%) | balance=9999 trades=11
+2026-04-04 11:30:27 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68928.9 SL=69360.3222 TP=68281.7666 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:27 | INFO    |   CLOSE TP | SELL BTC | entry=68928.9 exit=68281.7666 pnl=+4.69% (+4.69 USDT) | bal=10003
+2026-04-04 11:30:27 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68462.8 SL=68202.743 TP=68852.8855 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:27 | INFO    |   CLOSE TP | BUY BTC | entry=68462.8 exit=68852.8855 pnl=+2.85% (+2.85 USDT) | bal=10006
+2026-04-04 11:30:27 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68952.8 SL=69272.582 TP=68473.127 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:27 | INFO    |   CLOSE TP | SELL BTC | entry=68952.8 exit=68473.127 pnl=+3.48% (+3.48 USDT) | bal=10010
+2026-04-04 11:30:27 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68495.1 SL=68264.1622 TP=68841.5066 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:27 | INFO    |   CLOSE TP | BUY BTC | entry=68495.1 exit=68841.5066 pnl=+2.53% (+2.53 USDT) | bal=10012
+2026-04-04 11:30:27 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69229.0 SL=69535.9725 TP=68768.5413 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:27 | INFO    |   CLOSE SL | SELL BTC | entry=69229.0 exit=69535.9725 pnl=-2.22% (-2.22 USDT) | bal=10010
+2026-04-04 11:30:28 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69477.6 SL=69164.806 TP=69946.791 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:28 | INFO    |   CLOSE TP | BUY BTC | entry=69477.6 exit=69946.791 pnl=+3.38% (+3.38 USDT) | bal=10013
+2026-04-04 11:30:28 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69911.1 SL=69625.5223 TP=70339.4666 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:28 | INFO    |   CLOSE TP | BUY BTC | entry=69911.1 exit=70339.4666 pnl=+3.06% (+3.07 USDT) | bal=10017
+2026-04-04 11:30:28 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70294.2 SL=70550.8355 TP=69909.2467 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:28 | INFO    |   CLOSE SL | SELL BTC | entry=70294.2 exit=70550.8355 pnl=-1.83% (-1.83 USDT) | bal=10015
+2026-04-04 11:30:29 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69588.4 SL=70145.1072 TP=68531.9935 R:R=1.9 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:30:29 | INFO    |   CLOSE SL | SELL BTC | entry=69588.4 exit=70145.1072 pnl=-4.00% (-4.01 USDT) | bal=10011
+2026-04-04 11:30:30 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70243.5 SL=70551.0087 TP=69782.2369 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:30 | INFO    |   CLOSE TP | SELL BTC | entry=70243.5 exit=69782.2369 pnl=+3.28% (+3.29 USDT) | bal=10014
+2026-04-04 11:30:30 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69697.5 SL=69328.7563 TP=70250.6156 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:30:30 | INFO    |   Progress 1728/8640 (20%) | balance=10014 trades=21
+2026-04-04 11:30:30 | INFO    |   CLOSE SL | BUY BTC | entry=69697.5 exit=69328.7563 pnl=-2.65% (-2.65 USDT) | bal=10011
+2026-04-04 11:30:30 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69247.5 SL=69801.48 TP=68278.0375 R:R=1.75 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:30:30 | INFO    |   CLOSE SL | SELL BTC | entry=69247.5 exit=69801.48 pnl=-4.00% (-4.00 USDT) | bal=10007
+2026-04-04 11:30:30 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70410.5 SL=70973.784 TP=69534.4105 R:R=1.56 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:30:30 | INFO    |   CLOSE SL | SELL BTC | entry=70410.5 exit=70973.784 pnl=-4.00% (-4.00 USDT) | bal=10003
+2026-04-04 11:30:30 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70721.0 SL=71106.8025 TP=70142.2962 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:30 | INFO    |   CLOSE TP | SELL BTC | entry=70721.0 exit=70142.2962 pnl=+4.09% (+4.09 USDT) | bal=10007
+2026-04-04 11:30:30 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70150.0 SL=69917.325 TP=70499.0125 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:30:30 | INFO    |   CLOSE SL | BUY BTC | entry=70150.0 exit=69917.325 pnl=-1.66% (-1.66 USDT) | bal=10006
+2026-04-04 11:30:32 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69455.0 SL=69130.1625 TP=69942.2562 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:30:32 | INFO    |   CLOSE TP | BUY BTC | entry=69455.0 exit=69942.2562 pnl=+3.51% (+3.51 USDT) | bal=10009
+2026-04-04 11:30:32 | INFO    |   Progress 2160/8640 (25%) | balance=10009 trades=27
+2026-04-04 11:30:33 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69983.1 SL=70208.8577 TP=69644.4634 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:33 | INFO    |   CLOSE SL | SELL BTC | entry=69983.1 exit=70208.8577 pnl=-1.61% (-1.61 USDT) | bal=10008
+2026-04-04 11:30:34 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71540.6 SL=71917.4515 TP=70975.3227 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:34 | INFO    |   CLOSE TP | SELL BTC | entry=71540.6 exit=70975.3227 pnl=+3.95% (+3.95 USDT) | bal=10012
+2026-04-04 11:30:34 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71120.9 SL=71392.0022 TP=70714.2466 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:30:34 | INFO    |   CLOSE SL | SELL BTC | entry=71120.9 exit=71392.0022 pnl=-1.91% (-1.91 USDT) | bal=10010
+2026-04-04 11:30:34 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71298.6 SL=71021.7535 TP=71713.8698 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:30:34 | INFO    |   CLOSE TP | BUY BTC | entry=71298.6 exit=71713.8698 pnl=+2.91% (+2.92 USDT) | bal=10013
+2026-04-04 11:30:34 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=72220.4 SL=71910.849 TP=72684.7265 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:30:34 | INFO    |   CLOSE TP | BUY BTC | entry=72220.4 exit=72684.7265 pnl=+3.21% (+3.22 USDT) | bal=10016
+2026-04-04 11:30:34 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73151.6 SL=72787.121 TP=73698.3185 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:30:34 | INFO    |   CLOSE SL | BUY BTC | entry=73151.6 exit=72787.121 pnl=-2.49% (-2.50 USDT) | bal=10013
+2026-04-04 11:30:34 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73496.9 SL=73120.7578 TP=74061.1134 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:30:34 | INFO    |   CLOSE SL | BUY BTC | entry=73496.9 exit=73120.7578 pnl=-2.56% (-2.56 USDT) | bal=10011
+2026-04-04 11:30:35 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71167.2 SL=70785.082 TP=71740.377 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:35 | INFO    |   CLOSE SL | BUY BTC | entry=71167.2 exit=70785.082 pnl=-2.68% (-2.69 USDT) | bal=10008
+2026-04-04 11:30:35 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70850.6 SL=70642.3735 TP=71162.9398 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:35 | INFO    |   CLOSE SL | BUY BTC | entry=70850.6 exit=70642.3735 pnl=-1.47% (-1.47 USDT) | bal=10007
+2026-04-04 11:30:35 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71050.0 SL=70849.375 TP=71350.9375 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:30:35 | INFO    |   Progress 2592/8640 (30%) | balance=10007 trades=36
+2026-04-04 11:30:35 | INFO    |   CLOSE SL | BUY BTC | entry=71050.0 exit=70849.375 pnl=-1.41% (-1.41 USDT) | bal=10005
+2026-04-04 11:30:36 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70870.4 SL=70664.524 TP=71179.214 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:30:36 | INFO    |   CLOSE SL | BUY BTC | entry=70870.4 exit=70664.524 pnl=-1.45% (-1.45 USDT) | bal=10004
+2026-04-04 11:30:40 | INFO    |   Progress 3024/8640 (35%) | balance=10004 trades=38
+2026-04-04 11:30:42 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73655.5 SL=73367.0612 TP=74088.1581 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:30:42 | INFO    |   CLOSE TP | BUY BTC | entry=73655.5 exit=74088.1581 pnl=+2.94% (+2.94 USDT) | bal=10007
+2026-04-04 11:30:44 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=73940.5 SL=73686.7487 TP=74321.1269 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:30:44 | INFO    |   CLOSE TP | BUY BTC | entry=73940.5 exit=74321.1269 pnl=+2.57% (+2.58 USDT) | bal=10009
+2026-04-04 11:30:44 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74434.5 SL=74025.3138 TP=75048.2794 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:30:44 | INFO    |   CLOSE TP | BUY BTC | entry=74434.5 exit=75048.2794 pnl=+4.12% (+4.13 USDT) | bal=10013
+2026-04-04 11:30:45 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=74999.3 SL=74691.9017 TP=75460.3974 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:30:45 | INFO    |   CLOSE TP | BUY BTC | entry=74999.3 exit=75460.3974 pnl=+3.07% (+3.08 USDT) | bal=10016
+2026-04-04 11:30:45 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=75851.9 SL=75552.2703 TP=76301.3446 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:30:45 | INFO    |   CLOSE SL | BUY BTC | entry=75851.9 exit=75552.2703 pnl=-1.98% (-1.98 USDT) | bal=10014
+2026-04-04 11:30:45 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=75584.7 SL=75270.9382 TP=76055.3426 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:30:45 | INFO    |   CLOSE SL | BUY BTC | entry=75584.7 exit=75270.9382 pnl=-2.08% (-2.08 USDT) | bal=10012
+2026-04-04 11:30:45 | INFO    |   Progress 3456/8640 (40%) | balance=10012 trades=44
+2026-04-04 11:30:45 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=73984.8 SL=73740.638 TP=74351.043 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:45 | INFO    |   CLOSE TP | BUY BTC | entry=73984.8 exit=74351.043 pnl=+2.48% (+2.48 USDT) | bal=10015
+2026-04-04 11:30:45 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74357.1 SL=74094.1073 TP=74751.5891 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:45 | INFO    |   CLOSE SL | BUY BTC | entry=74357.1 exit=74094.1073 pnl=-1.77% (-1.77 USDT) | bal=10013
+2026-04-04 11:30:45 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74355.3 SL=73978.9117 TP=74919.8824 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:45 | INFO    |   CLOSE SL | BUY BTC | entry=74355.3 exit=73978.9117 pnl=-2.53% (-2.53 USDT) | bal=10011
+2026-04-04 11:30:46 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73890.1 SL=73607.0747 TP=74314.6379 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:46 | INFO    |   CLOSE SL | BUY BTC | entry=73890.1 exit=73607.0747 pnl=-1.92% (-1.92 USDT) | bal=10009
+2026-04-04 11:30:46 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73721.7 SL=73382.7958 TP=74230.0564 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:30:46 | INFO    |   CLOSE TP | BUY BTC | entry=73721.7 exit=74230.0564 pnl=+3.45% (+3.45 USDT) | bal=10012
+2026-04-04 11:30:47 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74720.5 SL=74394.4987 TP=75209.5019 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:30:47 | INFO    |   CLOSE SL | BUY BTC | entry=74720.5 exit=74394.4987 pnl=-2.18% (-2.18 USDT) | bal=10010
+2026-04-04 11:30:49 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=74103.9 SL=73866.6402 TP=74459.7896 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:30:49 | INFO    |   CLOSE SL | BUY BTC | entry=74103.9 exit=73866.6402 pnl=-1.60% (-1.60 USDT) | bal=10008
+2026-04-04 11:30:49 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=72893.8 SL=72606.5655 TP=73324.6518 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:30:49 | INFO    |   CLOSE SL | BUY BTC | entry=72893.8 exit=72606.5655 pnl=-1.97% (-1.97 USDT) | bal=10006
+2026-04-04 11:30:50 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71320.0 SL=70995.5 TP=71806.75 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:50 | INFO    |   Progress 3888/8640 (45%) | balance=10006 trades=52
+2026-04-04 11:30:50 | INFO    |   CLOSE TP | BUY BTC | entry=71320.0 exit=71806.75 pnl=+3.41% (+3.41 USDT) | bal=10010
+2026-04-04 11:30:52 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70029.3 SL=70263.0733 TP=69678.6401 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:30:52 | INFO    |   CLOSE SL | SELL BTC | entry=70029.3 exit=70263.0733 pnl=-1.67% (-1.67 USDT) | bal=10008
+2026-04-04 11:30:52 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69980.8 SL=70216.152 TP=69627.772 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:30:52 | INFO    |   CLOSE TP | SELL BTC | entry=69980.8 exit=69627.772 pnl=+2.52% (+2.52 USDT) | bal=10011
+2026-04-04 11:30:52 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69264.6 SL=69533.4615 TP=68861.3078 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:30:52 | INFO    |   CLOSE SL | SELL BTC | entry=69264.6 exit=69533.4615 pnl=-1.94% (-1.94 USDT) | bal=10009
+2026-04-04 11:30:53 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69183.5 SL=69466.4588 TP=68759.0619 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:30:53 | INFO    |   CLOSE TP | SELL BTC | entry=69183.5 exit=68759.0619 pnl=+3.07% (+3.07 USDT) | bal=10012
+2026-04-04 11:30:53 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70025.6 SL=70360.064 TP=69523.904 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:30:53 | INFO    |   CLOSE SL | SELL BTC | entry=70025.6 exit=70360.064 pnl=-2.39% (-2.39 USDT) | bal=10009
+2026-04-04 11:30:55 | INFO    |   Progress 4320/8640 (50%) | balance=10009 trades=58
+2026-04-04 11:30:55 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70538.4 SL=70800.046 TP=70145.931 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:30:55 | INFO    |   CLOSE SL | SELL BTC | entry=70538.4 exit=70800.046 pnl=-1.85% (-1.86 USDT) | bal=10007
+2026-04-04 11:30:57 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70165.9 SL=70400.4147 TP=69814.1279 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:57 | INFO    |   CLOSE TP | SELL BTC | entry=70165.9 exit=69814.1279 pnl=+2.51% (+2.51 USDT) | bal=10010
+2026-04-04 11:30:57 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70510.7 SL=70896.8768 TP=69931.4349 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:30:57 | INFO    |   CLOSE SL | SELL BTC | entry=70510.7 exit=70896.8768 pnl=-2.74% (-2.74 USDT) | bal=10007
+2026-04-04 11:30:57 | INFO    |   Progress 4752/8640 (55%) | balance=10007 trades=61
+2026-04-04 11:30:59 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69361.6 SL=69666.604 TP=68904.094 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:30:59 | INFO    |   CLOSE TP | SELL BTC | entry=69361.6 exit=68904.094 pnl=+3.30% (+3.30 USDT) | bal=10011
+2026-04-04 11:30:59 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68601.1 SL=68815.7027 TP=68279.1959 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:30:59 | INFO    |   CLOSE TP | SELL BTC | entry=68601.1 exit=68279.1959 pnl=+2.35% (+2.35 USDT) | bal=10013
+2026-04-04 11:31:00 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68635.0 SL=68878.0875 TP=68270.3688 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:31:00 | INFO    |   CLOSE TP | SELL BTC | entry=68635.0 exit=68270.3688 pnl=+2.66% (+2.66 USDT) | bal=10016
+2026-04-04 11:31:00 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68126.2 SL=68544.1155 TP=67499.3267 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:31:00 | INFO    |   CLOSE TP | SELL BTC | entry=68126.2 exit=67499.3267 pnl=+4.60% (+4.61 USDT) | bal=10020
+2026-04-04 11:31:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67965.5 SL=68300.5138 TP=67462.9794 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:31:01 | INFO    |   CLOSE TP | SELL BTC | entry=67965.5 exit=67462.9794 pnl=+3.70% (+3.70 USDT) | bal=10024
+2026-04-04 11:31:02 | INFO    |   Progress 5184/8640 (60%) | balance=10024 trades=66
+2026-04-04 11:31:03 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=71408.3 SL=71746.2207 TP=70901.4189 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:03 | INFO    |   CLOSE TP | SELL BTC | entry=71408.3 exit=70901.4189 pnl=+3.55% (+3.56 USDT) | bal=10027
+2026-04-04 11:31:03 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70755.1 SL=71088.0877 TP=70255.6184 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:03 | INFO    |   CLOSE TP | SELL BTC | entry=70755.1 exit=70255.6184 pnl=+3.53% (+3.54 USDT) | bal=10031
+2026-04-04 11:31:03 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=70440.0 SL=70167.7 TP=70848.45 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:03 | INFO    |   CLOSE TP | BUY BTC | entry=70440.0 exit=70848.45 pnl=+2.90% (+2.91 USDT) | bal=10034
+2026-04-04 11:31:05 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70190.1 SL=70500.7753 TP=69724.0871 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:31:05 | INFO    |   CLOSE SL | SELL BTC | entry=70190.1 exit=70500.7753 pnl=-2.21% (-2.22 USDT) | bal=10032
+2026-04-04 11:31:07 | INFO    |   Progress 5616/8640 (65%) | balance=10032 trades=70
+2026-04-04 11:31:07 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69562.6 SL=69805.3065 TP=69198.5403 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:07 | INFO    |   CLOSE SL | SELL BTC | entry=69562.6 exit=69805.3065 pnl=-1.74% (-1.75 USDT) | bal=10030
+2026-04-04 11:31:07 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70037.2 SL=70308.193 TP=69630.7105 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:31:07 | INFO    |   CLOSE SL | SELL BTC | entry=70037.2 exit=70308.193 pnl=-1.93% (-1.94 USDT) | bal=10028
+2026-04-04 11:31:07 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70253.7 SL=69995.3657 TP=70641.2014 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:07 | INFO    |   CLOSE TP | BUY BTC | entry=70253.7 exit=70641.2014 pnl=+2.76% (+2.77 USDT) | bal=10031
+2026-04-04 11:31:07 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70621.6 SL=70348.446 TP=71031.331 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:07 | INFO    |   CLOSE TP | BUY BTC | entry=70621.6 exit=71031.331 pnl=+2.90% (+2.91 USDT) | bal=10034
+2026-04-04 11:31:08 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71832.8 SL=71465.518 TP=72383.723 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:31:08 | INFO    |   CLOSE SL | BUY BTC | entry=71832.8 exit=71465.518 pnl=-2.56% (-2.57 USDT) | bal=10031
+2026-04-04 11:31:09 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=70873.1 SL=70631.2172 TP=71235.9241 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:31:09 | INFO    |   CLOSE SL | BUY BTC | entry=70873.1 exit=70631.2172 pnl=-1.71% (-1.71 USDT) | bal=10029
+2026-04-04 11:31:11 | INFO    |   Progress 6048/8640 (70%) | balance=10029 trades=76
+2026-04-04 11:31:12 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69281.9 SL=68953.9952 TP=69773.7571 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:31:12 | INFO    |   CLOSE TP | BUY BTC | entry=69281.9 exit=69773.7571 pnl=+3.55% (+3.56 USDT) | bal=10033
+2026-04-04 11:31:12 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68854.3 SL=68381.2642 TP=69563.8536 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:31:12 | INFO    |   CLOSE SL | BUY BTC | entry=68854.3 exit=68381.2642 pnl=-3.44% (-3.45 USDT) | bal=10029
+2026-04-04 11:31:12 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69133.6 SL=68869.566 TP=69529.651 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:12 | INFO    |   CLOSE SL | BUY BTC | entry=69133.6 exit=68869.566 pnl=-1.91% (-1.92 USDT) | bal=10028
+2026-04-04 11:31:14 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68195.3 SL=68439.2882 TP=67829.3176 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:31:14 | INFO    |   CLOSE TP | SELL BTC | entry=68195.3 exit=67829.3176 pnl=+2.68% (+2.69 USDT) | bal=10030
+2026-04-04 11:31:14 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67822.2 SL=68023.9555 TP=67519.5667 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:31:14 | INFO    |   CLOSE TP | SELL BTC | entry=67822.2 exit=67519.5667 pnl=+2.23% (+2.24 USDT) | bal=10032
+2026-04-04 11:31:14 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66707.1 SL=66927.7677 TP=66376.0984 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:31:14 | INFO    |   CLOSE TP | SELL BTC | entry=66707.1 exit=66376.0984 pnl=+2.48% (+2.49 USDT) | bal=10035
+2026-04-04 11:31:15 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65943.5 SL=66222.8587 TP=65524.4619 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:31:15 | INFO    |   CLOSE SL | SELL BTC | entry=65943.5 exit=66222.8587 pnl=-2.12% (-2.13 USDT) | bal=10033
+2026-04-04 11:31:15 | INFO    |   Progress 6480/8640 (75%) | balance=10033 trades=83
+2026-04-04 11:31:15 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65618.0 SL=65875.845 TP=65231.2325 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:31:15 | INFO    |   CLOSE SL | SELL BTC | entry=65618.0 exit=65875.845 pnl=-1.96% (-1.97 USDT) | bal=10031
+2026-04-04 11:31:17 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66427.0 SL=66621.5675 TP=66135.1487 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:31:17 | INFO    |   CLOSE TP | SELL BTC | entry=66427.0 exit=66135.1487 pnl=+2.20% (+2.20 USDT) | bal=10033
+2026-04-04 11:31:19 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66735.9 SL=66991.9398 TP=66351.8404 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:31:19 | INFO    |   CLOSE TP | SELL BTC | entry=66735.9 exit=66351.8404 pnl=+2.88% (+2.89 USDT) | bal=10036
+2026-04-04 11:31:19 | INFO    |   Progress 6912/8640 (80%) | balance=10036 trades=86
+2026-04-04 11:31:22 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65995.6 SL=66515.389 TP=65215.9165 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:31:22 | INFO    |   CLOSE SL | SELL BTC | entry=65995.6 exit=66515.389 pnl=-3.94% (-3.95 USDT) | bal=10032
+2026-04-04 11:31:23 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67139.8 SL=67367.7495 TP=66797.8758 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:23 | INFO    |   CLOSE SL | SELL BTC | entry=67139.8 exit=67367.7495 pnl=-1.70% (-1.70 USDT) | bal=10030
+2026-04-04 11:31:25 | INFO    |   Progress 7344/8640 (85%) | balance=10030 trades=88
+2026-04-04 11:31:26 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67870.0 SL=68135.675 TP=67471.4875 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:26 | INFO    |   CLOSE TP | SELL BTC | entry=67870.0 exit=67471.4875 pnl=+2.94% (+2.94 USDT) | bal=10033
+2026-04-04 11:31:27 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=66391.2 SL=66147.222 TP=66757.167 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:27 | INFO    |   CLOSE TP | BUY BTC | entry=66391.2 exit=66757.167 pnl=+2.76% (+2.77 USDT) | bal=10036
+2026-04-04 11:31:28 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=66858.0 SL=66524.755 TP=67357.8675 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:31:28 | INFO    |   CLOSE TP | BUY BTC | entry=66858.0 exit=67357.8675 pnl=+3.74% (+3.75 USDT) | bal=10040
+2026-04-04 11:31:28 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67144.6 SL=67452.4615 TP=66682.8078 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:31:28 | INFO    |   CLOSE SL | SELL BTC | entry=67144.6 exit=67452.4615 pnl=-2.29% (-2.30 USDT) | bal=10037
+2026-04-04 11:31:28 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66893.2 SL=66561.667 TP=67390.4995 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:28 | INFO    |   CLOSE TP | BUY BTC | entry=66893.2 exit=67390.4995 pnl=+3.72% (+3.73 USDT) | bal=10041
+2026-04-04 11:31:30 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67623.8 SL=67389.6405 TP=67975.0393 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:30 | INFO    |   CLOSE TP | BUY BTC | entry=67623.8 exit=67975.0393 pnl=+2.60% (+2.61 USDT) | bal=10044
+2026-04-04 11:31:30 | INFO    |   Progress 7776/8640 (90%) | balance=10044 trades=94
+2026-04-04 11:31:30 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68418.2 SL=68655.9455 TP=68061.5818 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:30 | INFO    |   CLOSE SL | SELL BTC | entry=68418.2 exit=68655.9455 pnl=-1.74% (-1.75 USDT) | bal=10042
+2026-04-04 11:31:31 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68358.7 SL=68703.7967 TP=67841.0549 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:31:31 | INFO    |   CLOSE SL | SELL BTC | entry=68358.7 exit=68703.7967 pnl=-2.52% (-2.53 USDT) | bal=10040
+2026-04-04 11:31:33 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66255.2 SL=66006.162 TP=66628.757 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:31:33 | INFO    |   CLOSE TP | BUY BTC | entry=66255.2 exit=66628.757 pnl=+2.82% (+2.83 USDT) | bal=10042
+2026-04-04 11:31:34 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65875.1 SL=66374.4878 TP=65126.0184 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:31:34 | INFO    |   CLOSE SL | SELL BTC | entry=65875.1 exit=66374.4878 pnl=-3.79% (-3.81 USDT) | bal=10039
+2026-04-04 11:31:35 | INFO    |   Progress 8208/8640 (95%) | balance=10039 trades=98
+2026-04-04 11:32:19 | INFO    | ============================================================
+2026-04-04 11:32:19 | INFO    | BACKTEST  BTC  30d  started 2026-04-04T04:32:19.731647+00:00
+2026-04-04 11:32:19 | INFO    | ============================================================
+2026-04-04 11:32:19 | INFO    | Fetching BTC data for 30 days...
+2026-04-04 11:32:19 | INFO    |   1h...
+2026-04-04 11:32:19 | INFO    |   1h: 840 candles
+2026-04-04 11:32:19 | INFO    |   15m...
+2026-04-04 11:32:20 | INFO    |   15m: 3360 candles
+2026-04-04 11:32:20 | INFO    |   5m...
+2026-04-04 11:32:22 | INFO    |   5m: 10080 candles
+2026-04-04 11:32:22 | INFO    | Backtest window: 8640 M5 candles
+2026-04-04 11:32:22 | INFO    |   Progress 0/8640 (0%) | balance=10000 trades=0
+2026-04-04 11:32:23 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=72563.2 SL=72285.392 TP=72979.912 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:23 | INFO    |   CLOSE TP | BUY BTC | entry=72563.2 exit=72979.912 pnl=+2.87% (+2.87 USDT) | bal=10003
+2026-04-04 11:32:27 | INFO    |   Progress 432/8640 (5%) | balance=10003 trades=1
+2026-04-04 11:32:27 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68434.1 SL=68050.9147 TP=69008.8779 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:27 | INFO    |   CLOSE SL | BUY BTC | entry=68434.1 exit=68050.9147 pnl=-2.80% (-2.80 USDT) | bal=10000
+2026-04-04 11:32:28 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=68396.2 SL=68064.5095 TP=68893.7357 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:28 | INFO    |   CLOSE SL | BUY BTC | entry=68396.2 exit=68064.5095 pnl=-2.42% (-2.42 USDT) | bal=9998
+2026-04-04 11:32:29 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=67920.4 SL=67695.299 TP=68258.0515 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:32:29 | INFO    |   CLOSE SL | BUY BTC | entry=67920.4 exit=67695.299 pnl=-1.66% (-1.66 USDT) | bal=9996
+2026-04-04 11:32:29 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67665.7 SL=67900.1643 TP=67314.0036 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:32:29 | INFO    |   CLOSE SL | SELL BTC | entry=67665.7 exit=67900.1643 pnl=-1.73% (-1.73 USDT) | bal=9994
+2026-04-04 11:32:31 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67276.9 SL=67613.1922 TP=66772.4616 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:32:31 | INFO    |   CLOSE TP | SELL BTC | entry=67276.9 exit=66772.4616 pnl=+3.75% (+3.75 USDT) | bal=9998
+2026-04-04 11:32:31 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66884.3 SL=67168.6107 TP=66457.8339 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:32:31 | INFO    |   Progress 864/8640 (10%) | balance=9998 trades=6
+2026-04-04 11:32:31 | INFO    |   CLOSE SL | SELL BTC | entry=66884.3 exit=67168.6107 pnl=-2.13% (-2.12 USDT) | bal=9996
+2026-04-04 11:32:35 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66200.0 SL=66507.6 TP=65738.6 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:32:35 | INFO    |   CLOSE SL | SELL BTC | entry=66200.0 exit=66507.6 pnl=-2.32% (-2.32 USDT) | bal=9994
+2026-04-04 11:32:37 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67792.8 SL=68207.882 TP=67170.177 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:37 | INFO    |   CLOSE TP | SELL BTC | entry=67792.8 exit=67170.177 pnl=+4.59% (+4.59 USDT) | bal=9998
+2026-04-04 11:32:37 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67693.8 SL=68017.5345 TP=67208.1982 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:37 | INFO    |   CLOSE SL | SELL BTC | entry=67693.8 exit=68017.5345 pnl=-2.39% (-2.39 USDT) | bal=9996
+2026-04-04 11:32:37 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67850.0 SL=68118.125 TP=67447.8125 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:37 | INFO    |   CLOSE TP | SELL BTC | entry=67850.0 exit=67447.8125 pnl=+2.96% (+2.96 USDT) | bal=9999
+2026-04-04 11:32:38 | INFO    |   Progress 1296/8640 (15%) | balance=9999 trades=11
+2026-04-04 11:32:38 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68928.9 SL=69360.3222 TP=68281.7666 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:38 | INFO    |   CLOSE TP | SELL BTC | entry=68928.9 exit=68281.7666 pnl=+4.69% (+4.69 USDT) | bal=10003
+2026-04-04 11:32:39 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68462.8 SL=68202.743 TP=68852.8855 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:39 | INFO    |   CLOSE TP | BUY BTC | entry=68462.8 exit=68852.8855 pnl=+2.85% (+2.85 USDT) | bal=10006
+2026-04-04 11:32:39 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68952.8 SL=69272.582 TP=68473.127 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:39 | INFO    |   CLOSE TP | SELL BTC | entry=68952.8 exit=68473.127 pnl=+3.48% (+3.48 USDT) | bal=10010
+2026-04-04 11:32:39 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68495.1 SL=68264.1622 TP=68841.5066 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:39 | INFO    |   CLOSE TP | BUY BTC | entry=68495.1 exit=68841.5066 pnl=+2.53% (+2.53 USDT) | bal=10012
+2026-04-04 11:32:39 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69229.0 SL=69535.9725 TP=68768.5413 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:39 | INFO    |   CLOSE SL | SELL BTC | entry=69229.0 exit=69535.9725 pnl=-2.22% (-2.22 USDT) | bal=10010
+2026-04-04 11:32:40 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69477.6 SL=69164.806 TP=69946.791 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:40 | INFO    |   CLOSE TP | BUY BTC | entry=69477.6 exit=69946.791 pnl=+3.38% (+3.38 USDT) | bal=10013
+2026-04-04 11:32:40 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69911.1 SL=69625.5223 TP=70339.4666 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:40 | INFO    |   CLOSE TP | BUY BTC | entry=69911.1 exit=70339.4666 pnl=+3.06% (+3.07 USDT) | bal=10017
+2026-04-04 11:32:40 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70294.2 SL=70550.8355 TP=69909.2467 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:40 | INFO    |   CLOSE SL | SELL BTC | entry=70294.2 exit=70550.8355 pnl=-1.83% (-1.83 USDT) | bal=10015
+2026-04-04 11:32:41 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69588.4 SL=70145.1072 TP=68531.9935 R:R=1.9 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:32:41 | INFO    |   CLOSE SL | SELL BTC | entry=69588.4 exit=70145.1072 pnl=-4.00% (-4.01 USDT) | bal=10011
+2026-04-04 11:32:42 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70243.5 SL=70551.0087 TP=69782.2369 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:42 | INFO    |   CLOSE TP | SELL BTC | entry=70243.5 exit=69782.2369 pnl=+3.28% (+3.29 USDT) | bal=10014
+2026-04-04 11:32:42 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69697.5 SL=69328.7563 TP=70250.6156 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:32:42 | INFO    |   Progress 1728/8640 (20%) | balance=10014 trades=21
+2026-04-04 11:32:42 | INFO    |   CLOSE SL | BUY BTC | entry=69697.5 exit=69328.7563 pnl=-2.65% (-2.65 USDT) | bal=10011
+2026-04-04 11:32:43 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69247.5 SL=69801.48 TP=68278.0375 R:R=1.75 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:32:43 | INFO    |   CLOSE SL | SELL BTC | entry=69247.5 exit=69801.48 pnl=-4.00% (-4.00 USDT) | bal=10007
+2026-04-04 11:32:43 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70410.5 SL=70973.784 TP=69534.4105 R:R=1.56 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:32:43 | INFO    |   CLOSE SL | SELL BTC | entry=70410.5 exit=70973.784 pnl=-4.00% (-4.00 USDT) | bal=10003
+2026-04-04 11:32:43 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70721.0 SL=71106.8025 TP=70142.2962 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:43 | INFO    |   CLOSE TP | SELL BTC | entry=70721.0 exit=70142.2962 pnl=+4.09% (+4.09 USDT) | bal=10007
+2026-04-04 11:32:43 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70150.0 SL=69917.325 TP=70499.0125 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:32:43 | INFO    |   CLOSE SL | BUY BTC | entry=70150.0 exit=69917.325 pnl=-1.66% (-1.66 USDT) | bal=10006
+2026-04-04 11:32:46 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69455.0 SL=69130.1625 TP=69942.2562 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:32:46 | INFO    |   CLOSE TP | BUY BTC | entry=69455.0 exit=69942.2562 pnl=+3.51% (+3.51 USDT) | bal=10009
+2026-04-04 11:32:46 | INFO    |   Progress 2160/8640 (25%) | balance=10009 trades=27
+2026-04-04 11:32:47 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69983.1 SL=70208.8577 TP=69644.4634 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:47 | INFO    |   CLOSE SL | SELL BTC | entry=69983.1 exit=70208.8577 pnl=-1.61% (-1.61 USDT) | bal=10008
+2026-04-04 11:32:48 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71540.6 SL=71917.4515 TP=70975.3227 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:48 | INFO    |   CLOSE TP | SELL BTC | entry=71540.6 exit=70975.3227 pnl=+3.95% (+3.95 USDT) | bal=10012
+2026-04-04 11:32:48 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71120.9 SL=71392.0022 TP=70714.2466 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:32:48 | INFO    |   CLOSE SL | SELL BTC | entry=71120.9 exit=71392.0022 pnl=-1.91% (-1.91 USDT) | bal=10010
+2026-04-04 11:32:48 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71298.6 SL=71021.7535 TP=71713.8698 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:32:48 | INFO    |   CLOSE TP | BUY BTC | entry=71298.6 exit=71713.8698 pnl=+2.91% (+2.92 USDT) | bal=10013
+2026-04-04 11:32:48 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=72220.4 SL=71910.849 TP=72684.7265 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:32:48 | INFO    |   CLOSE TP | BUY BTC | entry=72220.4 exit=72684.7265 pnl=+3.21% (+3.22 USDT) | bal=10016
+2026-04-04 11:32:49 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73151.6 SL=72787.121 TP=73698.3185 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:32:49 | INFO    |   CLOSE SL | BUY BTC | entry=73151.6 exit=72787.121 pnl=-2.49% (-2.50 USDT) | bal=10013
+2026-04-04 11:32:49 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73496.9 SL=73120.7578 TP=74061.1134 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:32:49 | INFO    |   CLOSE SL | BUY BTC | entry=73496.9 exit=73120.7578 pnl=-2.56% (-2.56 USDT) | bal=10011
+2026-04-04 11:32:50 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71167.2 SL=70785.082 TP=71740.377 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:50 | INFO    |   CLOSE SL | BUY BTC | entry=71167.2 exit=70785.082 pnl=-2.68% (-2.69 USDT) | bal=10008
+2026-04-04 11:32:50 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70850.6 SL=70642.3735 TP=71162.9398 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:32:50 | INFO    |   CLOSE SL | BUY BTC | entry=70850.6 exit=70642.3735 pnl=-1.47% (-1.47 USDT) | bal=10007
+2026-04-04 11:32:51 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71050.0 SL=70849.375 TP=71350.9375 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:32:51 | INFO    |   Progress 2592/8640 (30%) | balance=10007 trades=36
+2026-04-04 11:32:51 | INFO    |   CLOSE SL | BUY BTC | entry=71050.0 exit=70849.375 pnl=-1.41% (-1.41 USDT) | bal=10005
+2026-04-04 11:32:52 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70870.4 SL=70664.524 TP=71179.214 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:32:52 | INFO    |   CLOSE SL | BUY BTC | entry=70870.4 exit=70664.524 pnl=-1.45% (-1.45 USDT) | bal=10004
+2026-04-04 11:32:57 | INFO    |   Progress 3024/8640 (35%) | balance=10004 trades=38
+2026-04-04 11:32:59 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73655.5 SL=73367.0612 TP=74088.1581 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:32:59 | INFO    |   CLOSE TP | BUY BTC | entry=73655.5 exit=74088.1581 pnl=+2.94% (+2.94 USDT) | bal=10007
+2026-04-04 11:33:01 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=73940.5 SL=73686.7487 TP=74321.1269 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:33:01 | INFO    |   CLOSE TP | BUY BTC | entry=73940.5 exit=74321.1269 pnl=+2.57% (+2.58 USDT) | bal=10009
+2026-04-04 11:33:02 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74434.5 SL=74025.3138 TP=75048.2794 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:33:02 | INFO    |   CLOSE TP | BUY BTC | entry=74434.5 exit=75048.2794 pnl=+4.12% (+4.13 USDT) | bal=10013
+2026-04-04 11:33:02 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=74999.3 SL=74691.9017 TP=75460.3974 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:33:02 | INFO    |   CLOSE TP | BUY BTC | entry=74999.3 exit=75460.3974 pnl=+3.07% (+3.08 USDT) | bal=10016
+2026-04-04 11:33:02 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=75851.9 SL=75552.2703 TP=76301.3446 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:33:02 | INFO    |   CLOSE SL | BUY BTC | entry=75851.9 exit=75552.2703 pnl=-1.98% (-1.98 USDT) | bal=10014
+2026-04-04 11:33:02 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=75584.7 SL=75270.9382 TP=76055.3426 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:33:02 | INFO    |   CLOSE SL | BUY BTC | entry=75584.7 exit=75270.9382 pnl=-2.08% (-2.08 USDT) | bal=10012
+2026-04-04 11:33:03 | INFO    |   Progress 3456/8640 (40%) | balance=10012 trades=44
+2026-04-04 11:33:03 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=73984.8 SL=73740.638 TP=74351.043 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:03 | INFO    |   CLOSE TP | BUY BTC | entry=73984.8 exit=74351.043 pnl=+2.48% (+2.48 USDT) | bal=10015
+2026-04-04 11:33:03 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74357.1 SL=74094.1073 TP=74751.5891 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:03 | INFO    |   CLOSE SL | BUY BTC | entry=74357.1 exit=74094.1073 pnl=-1.77% (-1.77 USDT) | bal=10013
+2026-04-04 11:33:04 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74355.3 SL=73978.9117 TP=74919.8824 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:04 | INFO    |   CLOSE SL | BUY BTC | entry=74355.3 exit=73978.9117 pnl=-2.53% (-2.53 USDT) | bal=10011
+2026-04-04 11:33:04 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73890.1 SL=73607.0747 TP=74314.6379 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:04 | INFO    |   CLOSE SL | BUY BTC | entry=73890.1 exit=73607.0747 pnl=-1.92% (-1.92 USDT) | bal=10009
+2026-04-04 11:33:04 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73721.7 SL=73382.7958 TP=74230.0564 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:33:04 | INFO    |   CLOSE TP | BUY BTC | entry=73721.7 exit=74230.0564 pnl=+3.45% (+3.45 USDT) | bal=10012
+2026-04-04 11:33:06 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74720.5 SL=74394.4987 TP=75209.5019 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:33:06 | INFO    |   CLOSE SL | BUY BTC | entry=74720.5 exit=74394.4987 pnl=-2.18% (-2.18 USDT) | bal=10010
+2026-04-04 11:33:08 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=74103.9 SL=73866.6402 TP=74459.7896 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:33:08 | INFO    |   CLOSE SL | BUY BTC | entry=74103.9 exit=73866.6402 pnl=-1.60% (-1.60 USDT) | bal=10008
+2026-04-04 11:33:09 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=72893.8 SL=72606.5655 TP=73324.6518 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:33:09 | INFO    |   CLOSE SL | BUY BTC | entry=72893.8 exit=72606.5655 pnl=-1.97% (-1.97 USDT) | bal=10006
+2026-04-04 11:33:09 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71320.0 SL=70995.5 TP=71806.75 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:09 | INFO    |   Progress 3888/8640 (45%) | balance=10006 trades=52
+2026-04-04 11:33:09 | INFO    |   CLOSE TP | BUY BTC | entry=71320.0 exit=71806.75 pnl=+3.41% (+3.41 USDT) | bal=10010
+2026-04-04 11:33:12 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70029.3 SL=70263.0733 TP=69678.6401 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:33:12 | INFO    |   CLOSE SL | SELL BTC | entry=70029.3 exit=70263.0733 pnl=-1.67% (-1.67 USDT) | bal=10008
+2026-04-04 11:33:13 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69980.8 SL=70216.152 TP=69627.772 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:33:13 | INFO    |   CLOSE TP | SELL BTC | entry=69980.8 exit=69627.772 pnl=+2.52% (+2.52 USDT) | bal=10011
+2026-04-04 11:33:13 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69264.6 SL=69533.4615 TP=68861.3078 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:33:13 | INFO    |   CLOSE SL | SELL BTC | entry=69264.6 exit=69533.4615 pnl=-1.94% (-1.94 USDT) | bal=10009
+2026-04-04 11:33:13 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69183.5 SL=69466.4588 TP=68759.0619 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:13 | INFO    |   CLOSE TP | SELL BTC | entry=69183.5 exit=68759.0619 pnl=+3.07% (+3.07 USDT) | bal=10012
+2026-04-04 11:33:14 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70025.6 SL=70360.064 TP=69523.904 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:33:14 | INFO    |   CLOSE SL | SELL BTC | entry=70025.6 exit=70360.064 pnl=-2.39% (-2.39 USDT) | bal=10009
+2026-04-04 11:33:16 | INFO    |   Progress 4320/8640 (50%) | balance=10009 trades=58
+2026-04-04 11:33:16 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70538.4 SL=70800.046 TP=70145.931 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:33:16 | INFO    |   CLOSE SL | SELL BTC | entry=70538.4 exit=70800.046 pnl=-1.85% (-1.86 USDT) | bal=10007
+2026-04-04 11:33:19 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70165.9 SL=70400.4147 TP=69814.1279 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:19 | INFO    |   CLOSE TP | SELL BTC | entry=70165.9 exit=69814.1279 pnl=+2.51% (+2.51 USDT) | bal=10010
+2026-04-04 11:33:19 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70510.7 SL=70896.8768 TP=69931.4349 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:19 | INFO    |   CLOSE SL | SELL BTC | entry=70510.7 exit=70896.8768 pnl=-2.74% (-2.74 USDT) | bal=10007
+2026-04-04 11:33:19 | INFO    |   Progress 4752/8640 (55%) | balance=10007 trades=61
+2026-04-04 11:33:22 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69361.6 SL=69666.604 TP=68904.094 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:22 | INFO    |   CLOSE TP | SELL BTC | entry=69361.6 exit=68904.094 pnl=+3.30% (+3.30 USDT) | bal=10011
+2026-04-04 11:33:22 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68601.1 SL=68815.7027 TP=68279.1959 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:22 | INFO    |   CLOSE TP | SELL BTC | entry=68601.1 exit=68279.1959 pnl=+2.35% (+2.35 USDT) | bal=10013
+2026-04-04 11:33:24 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68635.0 SL=68878.0875 TP=68270.3688 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:24 | INFO    |   CLOSE TP | SELL BTC | entry=68635.0 exit=68270.3688 pnl=+2.66% (+2.66 USDT) | bal=10016
+2026-04-04 11:33:24 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68126.2 SL=68544.1155 TP=67499.3267 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:33:24 | INFO    |   CLOSE TP | SELL BTC | entry=68126.2 exit=67499.3267 pnl=+4.60% (+4.61 USDT) | bal=10020
+2026-04-04 11:33:24 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67965.5 SL=68300.5138 TP=67462.9794 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:24 | INFO    |   CLOSE TP | SELL BTC | entry=67965.5 exit=67462.9794 pnl=+3.70% (+3.70 USDT) | bal=10024
+2026-04-04 11:33:25 | INFO    |   Progress 5184/8640 (60%) | balance=10024 trades=66
+2026-04-04 11:33:28 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=71408.3 SL=71746.2207 TP=70901.4189 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:28 | INFO    |   CLOSE TP | SELL BTC | entry=71408.3 exit=70901.4189 pnl=+3.55% (+3.56 USDT) | bal=10027
+2026-04-04 11:33:28 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70755.1 SL=71088.0877 TP=70255.6184 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:28 | INFO    |   CLOSE TP | SELL BTC | entry=70755.1 exit=70255.6184 pnl=+3.53% (+3.54 USDT) | bal=10031
+2026-04-04 11:33:28 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=70440.0 SL=70167.7 TP=70848.45 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:28 | INFO    |   CLOSE TP | BUY BTC | entry=70440.0 exit=70848.45 pnl=+2.90% (+2.91 USDT) | bal=10034
+2026-04-04 11:33:30 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70190.1 SL=70500.7753 TP=69724.0871 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:33:30 | INFO    |   CLOSE SL | SELL BTC | entry=70190.1 exit=70500.7753 pnl=-2.21% (-2.22 USDT) | bal=10032
+2026-04-04 11:33:32 | INFO    |   Progress 5616/8640 (65%) | balance=10032 trades=70
+2026-04-04 11:33:33 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69562.6 SL=69805.3065 TP=69198.5403 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:33 | INFO    |   CLOSE SL | SELL BTC | entry=69562.6 exit=69805.3065 pnl=-1.74% (-1.75 USDT) | bal=10030
+2026-04-04 11:33:33 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70037.2 SL=70308.193 TP=69630.7105 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:33:33 | INFO    |   CLOSE SL | SELL BTC | entry=70037.2 exit=70308.193 pnl=-1.93% (-1.94 USDT) | bal=10028
+2026-04-04 11:33:33 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70253.7 SL=69995.3657 TP=70641.2014 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:33 | INFO    |   CLOSE TP | BUY BTC | entry=70253.7 exit=70641.2014 pnl=+2.76% (+2.77 USDT) | bal=10031
+2026-04-04 11:33:33 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70621.6 SL=70348.446 TP=71031.331 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:33 | INFO    |   CLOSE TP | BUY BTC | entry=70621.6 exit=71031.331 pnl=+2.90% (+2.91 USDT) | bal=10034
+2026-04-04 11:33:35 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71832.8 SL=71465.518 TP=72383.723 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:33:35 | INFO    |   CLOSE SL | BUY BTC | entry=71832.8 exit=71465.518 pnl=-2.56% (-2.57 USDT) | bal=10031
+2026-04-04 11:33:36 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=70873.1 SL=70631.2172 TP=71235.9241 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:33:36 | INFO    |   CLOSE SL | BUY BTC | entry=70873.1 exit=70631.2172 pnl=-1.71% (-1.71 USDT) | bal=10029
+2026-04-04 11:33:38 | INFO    |   Progress 6048/8640 (70%) | balance=10029 trades=76
+2026-04-04 11:33:39 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69281.9 SL=68953.9952 TP=69773.7571 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:33:39 | INFO    |   CLOSE TP | BUY BTC | entry=69281.9 exit=69773.7571 pnl=+3.55% (+3.56 USDT) | bal=10033
+2026-04-04 11:33:40 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68854.3 SL=68381.2642 TP=69563.8536 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:33:40 | INFO    |   CLOSE SL | BUY BTC | entry=68854.3 exit=68381.2642 pnl=-3.44% (-3.45 USDT) | bal=10029
+2026-04-04 11:33:40 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69133.6 SL=68869.566 TP=69529.651 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:40 | INFO    |   CLOSE SL | BUY BTC | entry=69133.6 exit=68869.566 pnl=-1.91% (-1.92 USDT) | bal=10028
+2026-04-04 11:33:43 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68195.3 SL=68439.2882 TP=67829.3176 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:33:43 | INFO    |   CLOSE TP | SELL BTC | entry=68195.3 exit=67829.3176 pnl=+2.68% (+2.69 USDT) | bal=10030
+2026-04-04 11:33:43 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67822.2 SL=68023.9555 TP=67519.5667 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:43 | INFO    |   CLOSE TP | SELL BTC | entry=67822.2 exit=67519.5667 pnl=+2.23% (+2.24 USDT) | bal=10032
+2026-04-04 11:33:43 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66707.1 SL=66927.7677 TP=66376.0984 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:43 | INFO    |   CLOSE TP | SELL BTC | entry=66707.1 exit=66376.0984 pnl=+2.48% (+2.49 USDT) | bal=10035
+2026-04-04 11:33:44 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65943.5 SL=66222.8587 TP=65524.4619 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:33:44 | INFO    |   CLOSE SL | SELL BTC | entry=65943.5 exit=66222.8587 pnl=-2.12% (-2.13 USDT) | bal=10033
+2026-04-04 11:33:44 | INFO    |   Progress 6480/8640 (75%) | balance=10033 trades=83
+2026-04-04 11:33:44 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65618.0 SL=65875.845 TP=65231.2325 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:33:44 | INFO    |   CLOSE SL | SELL BTC | entry=65618.0 exit=65875.845 pnl=-1.96% (-1.97 USDT) | bal=10031
+2026-04-04 11:33:47 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66427.0 SL=66621.5675 TP=66135.1487 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:47 | INFO    |   CLOSE TP | SELL BTC | entry=66427.0 exit=66135.1487 pnl=+2.20% (+2.20 USDT) | bal=10033
+2026-04-04 11:33:49 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66735.9 SL=66991.9398 TP=66351.8404 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:33:49 | INFO    |   CLOSE TP | SELL BTC | entry=66735.9 exit=66351.8404 pnl=+2.88% (+2.89 USDT) | bal=10036
+2026-04-04 11:33:50 | INFO    |   Progress 6912/8640 (80%) | balance=10036 trades=86
+2026-04-04 11:33:54 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65995.6 SL=66515.389 TP=65215.9165 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:33:54 | INFO    |   CLOSE SL | SELL BTC | entry=65995.6 exit=66515.389 pnl=-3.94% (-3.95 USDT) | bal=10032
+2026-04-04 11:33:55 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67139.8 SL=67367.7495 TP=66797.8758 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:33:55 | INFO    |   CLOSE SL | SELL BTC | entry=67139.8 exit=67367.7495 pnl=-1.70% (-1.70 USDT) | bal=10030
+2026-04-04 11:33:58 | INFO    |   Progress 7344/8640 (85%) | balance=10030 trades=88
+2026-04-04 11:34:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67870.0 SL=68135.675 TP=67471.4875 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:34:01 | INFO    |   CLOSE TP | SELL BTC | entry=67870.0 exit=67471.4875 pnl=+2.94% (+2.94 USDT) | bal=10033
+2026-04-04 11:34:02 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=66391.2 SL=66147.222 TP=66757.167 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:34:02 | INFO    |   CLOSE TP | BUY BTC | entry=66391.2 exit=66757.167 pnl=+2.76% (+2.77 USDT) | bal=10036
+2026-04-04 11:34:03 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=66858.0 SL=66524.755 TP=67357.8675 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:34:03 | INFO    |   CLOSE TP | BUY BTC | entry=66858.0 exit=67357.8675 pnl=+3.74% (+3.75 USDT) | bal=10040
+2026-04-04 11:34:03 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67144.6 SL=67452.4615 TP=66682.8078 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:34:03 | INFO    |   CLOSE SL | SELL BTC | entry=67144.6 exit=67452.4615 pnl=-2.29% (-2.30 USDT) | bal=10037
+2026-04-04 11:34:03 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66893.2 SL=66561.667 TP=67390.4995 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:34:03 | INFO    |   CLOSE TP | BUY BTC | entry=66893.2 exit=67390.4995 pnl=+3.72% (+3.73 USDT) | bal=10041
+2026-04-04 11:34:05 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67623.8 SL=67389.6405 TP=67975.0393 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:34:05 | INFO    |   CLOSE TP | BUY BTC | entry=67623.8 exit=67975.0393 pnl=+2.60% (+2.61 USDT) | bal=10044
+2026-04-04 11:34:06 | INFO    |   Progress 7776/8640 (90%) | balance=10044 trades=94
+2026-04-04 11:34:06 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68418.2 SL=68655.9455 TP=68061.5818 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:34:06 | INFO    |   CLOSE SL | SELL BTC | entry=68418.2 exit=68655.9455 pnl=-1.74% (-1.75 USDT) | bal=10042
+2026-04-04 11:34:08 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68358.7 SL=68703.7967 TP=67841.0549 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:34:08 | INFO    |   CLOSE SL | SELL BTC | entry=68358.7 exit=68703.7967 pnl=-2.52% (-2.53 USDT) | bal=10040
+2026-04-04 11:34:11 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66255.2 SL=66006.162 TP=66628.757 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:34:11 | INFO    |   CLOSE TP | BUY BTC | entry=66255.2 exit=66628.757 pnl=+2.82% (+2.83 USDT) | bal=10042
+2026-04-04 11:34:12 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65875.1 SL=66374.4878 TP=65126.0184 R:R=1.5 | mode=SIDEWAY score=4
+2026-04-04 11:34:12 | INFO    |   CLOSE SL | SELL BTC | entry=65875.1 exit=66374.4878 pnl=-3.79% (-3.81 USDT) | bal=10039
+2026-04-04 11:34:13 | INFO    |   Progress 8208/8640 (95%) | balance=10039 trades=98
+2026-04-04 11:34:22 | INFO    | 
+============================================================
+2026-04-04 11:34:22 | INFO    | BACKTEST RESULTS — BTC 30d
+2026-04-04 11:34:22 | INFO    | ============================================================
+2026-04-04 11:34:22 | INFO    |   symbol                    BTC
+2026-04-04 11:34:22 | INFO    |   days                      30
+2026-04-04 11:34:22 | INFO    |   total_trades              98
+2026-04-04 11:34:22 | INFO    |   wins                      48
+2026-04-04 11:34:22 | INFO    |   losses                    50
+2026-04-04 11:34:22 | INFO    |   win_rate_pct              49.0
+2026-04-04 11:34:22 | INFO    |   total_pnl_usdt            38.59
+2026-04-04 11:34:22 | INFO    |   avg_win_usdt              3.17
+2026-04-04 11:34:22 | INFO    |   avg_loss_usdt             -2.27
+2026-04-04 11:34:22 | INFO    |   profit_factor             1.34
+2026-04-04 11:34:22 | INFO    |   max_drawdown_pct          -0.13
+2026-04-04 11:34:22 | INFO    |   sharpe_ratio              3.73
+2026-04-04 11:34:22 | INFO    |   final_balance             10038.56
+2026-04-04 11:34:22 | INFO    | ============================================================
+2026-04-04 11:34:22 | INFO    | 
+Setup breakdown:
+2026-04-04 11:34:22 | INFO    |   bearish_engulfing         19 trades  9/19 wins  pnl=4.50
+2026-04-04 11:34:22 | INFO    |   bearish_pinbar            32 trades  15/32 wins  pnl=8.78
+2026-04-04 11:34:22 | INFO    |   bullish_engulfing         17 trades  8/17 wins  pnl=5.10
+2026-04-04 11:34:22 | INFO    |   bullish_pinbar            30 trades  16/30 wins  pnl=20.21
+2026-04-04 11:34:22 | INFO    | Trade log also saved to C:\Users\Dustin\Projects\energy-forcaster\backend\trading\logs\backtest_BTC_30d_20260404_0434.csv
+2026-04-04 11:48:10 | INFO    | ============================================================
+2026-04-04 11:48:10 | INFO    | BACKTEST  BTC  100d  started 2026-04-04T04:48:10.400421+00:00
+2026-04-04 11:48:10 | INFO    | ============================================================
+2026-04-04 11:48:10 | INFO    | Fetching BTC data for 100 days...
+2026-04-04 11:48:10 | INFO    |   1h...
+2026-04-04 11:48:10 | INFO    |   1h: 2520 candles
+2026-04-04 11:48:10 | INFO    |   15m...
+2026-04-04 11:48:12 | INFO    |   15m: 10080 candles
+2026-04-04 11:48:12 | INFO    |   5m...
+2026-04-04 11:48:18 | INFO    |   5m: 30240 candles
+2026-04-04 11:48:18 | INFO    | Backtest window: 28800 M5 candles
+2026-04-04 11:48:18 | INFO    |   Progress 0/28800 (0%) | balance=10000 trades=0
+2026-04-04 11:48:19 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87338.6 SL=87138.5228 TP=87734.5 R:R=1.98 | mode=SIDEWAY score=4
+2026-04-04 11:48:19 | INFO    |   CLOSE TP | BUY BTC | entry=87338.6 exit=87734.5 pnl=+2.27% (+2.27 USDT) | bal=10002
+2026-04-04 11:48:19 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88035.7 SL=88223.3714 TP=87702.07 R:R=1.78 | mode=SIDEWAY score=4
+2026-04-04 11:48:19 | INFO    |   CLOSE SL | SELL BTC | entry=88035.7 exit=88223.3714 pnl=-1.07% (-1.07 USDT) | bal=10001
+2026-04-04 11:48:20 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87357.5 SL=87134.185 TP=87829.915 R:R=2.12 | mode=SIDEWAY score=3
+2026-04-04 11:48:20 | INFO    |   CLOSE SL | BUY BTC | entry=87357.5 exit=87134.185 pnl=-1.28% (-1.28 USDT) | bal=10000
+2026-04-04 11:48:20 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87062.6 SL=86827.4748 TP=87616.31 R:R=2.35 | mode=SIDEWAY score=4
+2026-04-04 11:48:20 | INFO    |   CLOSE SL | BUY BTC | entry=87062.6 exit=86827.4748 pnl=-1.35% (-1.35 USDT) | bal=9999
+2026-04-04 11:48:21 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88619.1 SL=88877.2382 TP=87376.795 R:R=4.81 | mode=SIDEWAY score=4
+2026-04-04 11:48:21 | INFO    |   CLOSE SL | SELL BTC | entry=88619.1 exit=88877.2382 pnl=-1.46% (-1.46 USDT) | bal=9997
+2026-04-04 11:48:21 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=89000.0 SL=89474.1 TP=87583.905 R:R=2.99 | mode=SIDEWAY score=4
+2026-04-04 11:48:21 | INFO    |   CLOSE SL | SELL BTC | entry=89000.0 exit=89474.1 pnl=-2.66% (-2.66 USDT) | bal=9994
+2026-04-04 11:48:22 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88523.9 SL=88334.8522 TP=88850.42 R:R=1.73 | mode=SIDEWAY score=4
+2026-04-04 11:48:22 | INFO    |   CLOSE SL | BUY BTC | entry=88523.9 exit=88334.8522 pnl=-1.07% (-1.07 USDT) | bal=9993
+2026-04-04 11:48:22 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87966.1 SL=87699.0678 TP=88796.65 R:R=3.11 | mode=SIDEWAY score=4
+2026-04-04 11:48:22 | INFO    |   CLOSE SL | BUY BTC | entry=87966.1 exit=87699.0678 pnl=-1.52% (-1.52 USDT) | bal=9992
+2026-04-04 11:48:22 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87344.4 SL=87127.8112 TP=88660.91 R:R=6.08 | mode=SIDEWAY score=4
+2026-04-04 11:48:22 | INFO    |   CLOSE SL | BUY BTC | entry=87344.4 exit=87127.8112 pnl=-1.24% (-1.24 USDT) | bal=9991
+2026-04-04 11:48:22 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87038.1 SL=86730.9238 TP=88497.54 R:R=4.75 | mode=SIDEWAY score=4
+2026-04-04 11:48:22 | INFO    |   CLOSE SL | BUY BTC | entry=87038.1 exit=86730.9238 pnl=-1.76% (-1.76 USDT) | bal=9989
+2026-04-04 11:48:34 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88319.4 SL=88511.1388 TP=87883.105 R:R=2.28 | mode=SIDEWAY score=4
+2026-04-04 11:48:34 | INFO    |   CLOSE TP | SELL BTC | entry=88319.4 exit=87883.105 pnl=+2.47% (+2.47 USDT) | bal=9991
+2026-04-04 11:48:34 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88841.5 SL=89077.683 TP=88188.215 R:R=2.77 | mode=SIDEWAY score=4
+2026-04-04 11:48:34 | INFO    |   CLOSE SL | SELL BTC | entry=88841.5 exit=89077.683 pnl=-1.33% (-1.33 USDT) | bal=9990
+2026-04-04 11:48:34 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=89240.1 SL=89448.4802 TP=88297.355 R:R=4.52 | mode=SIDEWAY score=4
+2026-04-04 11:48:34 | INFO    |   CLOSE SL | SELL BTC | entry=89240.1 exit=89448.4802 pnl=-1.17% (-1.17 USDT) | bal=9989
+2026-04-04 11:48:34 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=89893.2 SL=90080.7864 TP=89213.93 R:R=3.62 | mode=SIDEWAY score=4
+2026-04-04 11:48:34 | INFO    |   CLOSE SL | SELL BTC | entry=89893.2 exit=90080.7864 pnl=-1.04% (-1.04 USDT) | bal=9988
+2026-04-04 11:48:35 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88664.9 SL=88409.0702 TP=89513.38 R:R=3.32 | mode=SIDEWAY score=4
+2026-04-04 11:48:35 | INFO    |   CLOSE SL | BUY BTC | entry=88664.9 exit=88409.0702 pnl=-1.44% (-1.44 USDT) | bal=9986
+2026-04-04 11:48:35 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88194.0 SL=87955.412 TP=89396.18 R:R=5.04 | mode=SIDEWAY score=4
+2026-04-04 11:48:35 | INFO    |   CLOSE SL | BUY BTC | entry=88194.0 exit=87955.412 pnl=-1.35% (-1.35 USDT) | bal=9985
+2026-04-04 11:48:35 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87943.3 SL=87539.7134 TP=89239.505 R:R=3.21 | mode=SIDEWAY score=4
+2026-04-04 11:48:35 | INFO    |   CLOSE SL | BUY BTC | entry=87943.3 exit=87539.7134 pnl=-2.29% (-2.29 USDT) | bal=9983
+2026-04-04 11:48:36 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=87929.6 SL=88174.6592 TP=87364.25 R:R=2.31 | mode=SIDEWAY score=3
+2026-04-04 11:48:36 | INFO    |   CLOSE TP | SELL BTC | entry=87929.6 exit=87364.25 pnl=+3.21% (+3.21 USDT) | bal=9986
+2026-04-04 11:48:39 | INFO    |   Progress 1440/28800 (5%) | balance=9986 trades=18
+2026-04-04 11:48:39 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88057.6 SL=88366.7152 TP=87509.69 R:R=1.77 | mode=SIDEWAY score=4
+2026-04-04 11:48:39 | INFO    |   CLOSE SL | SELL BTC | entry=88057.6 exit=88366.7152 pnl=-1.76% (-1.75 USDT) | bal=9984
+2026-04-04 11:48:39 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88296.4 SL=88476.5928 TP=88022.475 R:R=1.52 | mode=SIDEWAY score=4
+2026-04-04 11:48:39 | INFO    |   CLOSE SL | SELL BTC | entry=88296.4 exit=88476.5928 pnl=-1.02% (-1.02 USDT) | bal=9983
+2026-04-04 11:48:39 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88831.4 SL=89153.9628 TP=88112.155 R:R=2.23 | mode=SIDEWAY score=4
+2026-04-04 11:48:39 | INFO    |   CLOSE SL | SELL BTC | entry=88831.4 exit=89153.9628 pnl=-1.82% (-1.81 USDT) | bal=9981
+2026-04-04 11:48:44 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87432.7 SL=87175.6346 TP=87910.125 R:R=1.86 | mode=SIDEWAY score=4
+2026-04-04 11:48:44 | INFO    |   CLOSE TP | BUY BTC | entry=87432.7 exit=87910.125 pnl=+2.73% (+2.73 USDT) | bal=9984
+2026-04-04 11:48:49 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88397.5 SL=88590.795 TP=87999.825 R:R=2.06 | mode=SIDEWAY score=4
+2026-04-04 11:48:49 | INFO    |   CLOSE SL | SELL BTC | entry=88397.5 exit=88590.795 pnl=-1.09% (-1.09 USDT) | bal=9983
+2026-04-04 11:48:50 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88926.7 SL=89122.8534 TP=88538.01 R:R=1.98 | mode=SIDEWAY score=4
+2026-04-04 11:48:50 | INFO    |   CLOSE TP | SELL BTC | entry=88926.7 exit=88538.01 pnl=+2.19% (+2.18 USDT) | bal=9985
+2026-04-04 11:48:51 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=89445.1 SL=89646.8902 TP=89111.5 R:R=1.65 | mode=SIDEWAY score=4
+2026-04-04 11:48:51 | INFO    |   CLOSE SL | SELL BTC | entry=89445.1 exit=89646.8902 pnl=-1.13% (-1.13 USDT) | bal=9984
+2026-04-04 11:48:51 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=89805.3 SL=89989.4106 TP=89241.045 R:R=3.06 | mode=SIDEWAY score=4
+2026-04-04 11:48:51 | INFO    |   CLOSE TP | SELL BTC | entry=89805.3 exit=89241.045 pnl=+3.14% (+3.14 USDT) | bal=9987
+2026-04-04 11:48:51 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88801.1 SL=88512.3978 TP=89376.385 R:R=1.99 | mode=SIDEWAY score=4
+2026-04-04 11:48:51 | INFO    |   CLOSE SL | BUY BTC | entry=88801.1 exit=88512.3978 pnl=-1.63% (-1.62 USDT) | bal=9986
+2026-04-04 11:48:52 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=89974.8 SL=89491.563 TP=90699.6555 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:48:52 | INFO    |   CLOSE TP | BUY BTC | entry=89974.8 exit=90699.6555 pnl=+4.03% (+4.02 USDT) | bal=9990
+2026-04-04 11:48:52 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=90260.3 SL=90738.2508 TP=89543.3739 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:48:52 | INFO    |   CLOSE TP | SELL BTC | entry=90260.3 exit=89543.3739 pnl=+3.97% (+3.97 USDT) | bal=9994
+2026-04-04 11:48:54 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=89375.6 SL=89187.2488 TP=89863.22 R:R=2.59 | mode=SIDEWAY score=4
+2026-04-04 11:48:54 | INFO    |   CLOSE TP | BUY BTC | entry=89375.6 exit=89863.22 pnl=+2.73% (+2.73 USDT) | bal=9996
+2026-04-04 11:48:57 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=91372.7 SL=91631.7454 TP=90652.935 R:R=2.78 | mode=SIDEWAY score=4
+2026-04-04 11:48:57 | INFO    |   Progress 2880/28800 (10%) | balance=9996 trades=30
+2026-04-04 11:48:57 | INFO    |   CLOSE SL | SELL BTC | entry=91372.7 exit=91631.7454 pnl=-1.42% (-1.42 USDT) | bal=9995
+2026-04-04 11:48:57 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=91647.6 SL=91291.381 TP=92181.9285 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:48:57 | INFO    |   CLOSE SL | BUY BTC | entry=91647.6 exit=91291.381 pnl=-1.94% (-1.94 USDT) | bal=9993
+2026-04-04 11:49:01 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=91866.3 SL=91425.4343 TP=92527.5986 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:49:01 | INFO    |   CLOSE TP | BUY BTC | entry=91866.3 exit=92527.5986 pnl=+3.60% (+3.60 USDT) | bal=9996
+2026-04-04 11:49:01 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=92907.9 SL=92369.6302 TP=93715.3046 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:49:01 | INFO    |   CLOSE SL | BUY BTC | entry=92907.9 exit=92369.6302 pnl=-2.90% (-2.90 USDT) | bal=9994
+2026-04-04 11:49:02 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=92581.8 SL=92278.6455 TP=93036.5318 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:49:02 | INFO    |   CLOSE TP | BUY BTC | entry=92581.8 exit=93036.5318 pnl=+2.46% (+2.45 USDT) | bal=9996
+2026-04-04 11:49:03 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=93415.4 SL=92870.4615 TP=94232.8077 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:49:03 | INFO    |   CLOSE TP | BUY BTC | entry=93415.4 exit=94232.8077 pnl=+4.38% (+4.37 USDT) | bal=10000
+2026-04-04 11:49:03 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=94362.9 SL=93978.2927 TP=94939.8109 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:49:03 | INFO    |   CLOSE SL | BUY BTC | entry=94362.9 exit=93978.2927 pnl=-2.04% (-2.04 USDT) | bal=9998
+2026-04-04 11:49:04 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=93736.0 SL=93464.46 TP=94143.31 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:49:04 | INFO    |   CLOSE SL | BUY BTC | entry=93736.0 exit=93464.46 pnl=-1.45% (-1.45 USDT) | bal=9997
+2026-04-04 11:49:04 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=93359.9 SL=93045.3003 TP=93831.7996 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:49:04 | INFO    |   CLOSE TP | BUY BTC | entry=93359.9 exit=93831.7996 pnl=+2.53% (+2.53 USDT) | bal=9999
+2026-04-04 11:49:05 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=93884.6 SL=93524.1885 TP=94425.2173 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:49:05 | INFO    |   CLOSE SL | BUY BTC | entry=93884.6 exit=93524.1885 pnl=-1.92% (-1.92 USDT) | bal=9998
+2026-04-04 11:49:05 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=92575.9 SL=92183.0602 TP=93165.1596 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:49:05 | INFO    |   CLOSE SL | BUY BTC | entry=92575.9 exit=92183.0602 pnl=-2.12% (-2.12 USDT) | bal=9995
+2026-04-04 11:49:06 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=92987.8 SL=92648.8305 TP=93496.2543 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:49:06 | INFO    |   CLOSE SL | BUY BTC | entry=92987.8 exit=92648.8305 pnl=-1.82% (-1.82 USDT) | bal=9994
+2026-04-04 11:49:06 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=92559.8 SL=92170.5005 TP=93143.7493 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:49:06 | INFO    |   CLOSE SL | BUY BTC | entry=92559.8 exit=92170.5005 pnl=-2.10% (-2.10 USDT) | bal=9992
+2026-04-04 11:49:06 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=91908.7 SL=91716.1826 TP=92660.895 R:R=3.91 | mode=SIDEWAY score=4
+2026-04-04 11:49:06 | INFO    |   CLOSE SL | BUY BTC | entry=91908.7 exit=91716.1826 pnl=-1.05% (-1.05 USDT) | bal=9990
+2026-04-04 11:49:07 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=91470.3 SL=91273.2594 TP=91935.095 R:R=2.36 | mode=SIDEWAY score=4
+2026-04-04 11:49:07 | INFO    |   CLOSE TP | BUY BTC | entry=91470.3 exit=91935.095 pnl=+2.54% (+2.54 USDT) | bal=9993
+2026-04-04 11:49:07 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=91125.0 SL=90804.75 TP=91722.905 R:R=1.87 | mode=SIDEWAY score=4
+2026-04-04 11:49:07 | INFO    |   CLOSE TP | BUY BTC | entry=91125.0 exit=91722.905 pnl=+3.28% (+3.28 USDT) | bal=9996
+2026-04-04 11:49:09 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=90888.0 SL=90658.224 TP=91301.28 R:R=1.8 | mode=SIDEWAY score=4
+2026-04-04 11:49:09 | INFO    |   CLOSE SL | BUY BTC | entry=90888.0 exit=90658.224 pnl=-1.26% (-1.26 USDT) | bal=9995
+2026-04-04 11:49:09 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=90287.2 SL=90030.4256 TP=90886.99 R:R=2.34 | mode=SIDEWAY score=4
+2026-04-04 11:49:09 | INFO    |   CLOSE SL | BUY BTC | entry=90287.2 exit=90030.4256 pnl=-1.42% (-1.42 USDT) | bal=9994
+2026-04-04 11:49:10 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=89390.0 SL=89132.02 TP=89834.455 R:R=1.72 | mode=SIDEWAY score=4
+2026-04-04 11:49:10 | INFO    |   CLOSE TP | BUY BTC | entry=89390.0 exit=89834.455 pnl=+2.49% (+2.48 USDT) | bal=9996
+2026-04-04 11:49:12 | INFO    |   Progress 4320/28800 (15%) | balance=9996 trades=49
+2026-04-04 11:49:13 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=90520.0 SL=90235.46 TP=90969.18 R:R=1.58 | mode=SIDEWAY score=4
+2026-04-04 11:49:13 | INFO    |   CLOSE SL | BUY BTC | entry=90520.0 exit=90235.46 pnl=-1.57% (-1.57 USDT) | bal=9995
+2026-04-04 11:49:13 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=89680.0 SL=89453.44 TP=90655.605 R:R=4.31 | mode=SIDEWAY score=4
+2026-04-04 11:49:13 | INFO    |   CLOSE TP | BUY BTC | entry=89680.0 exit=90655.605 pnl=+5.44% (+5.44 USDT) | bal=10000
+2026-04-04 11:49:23 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=90395.7 SL=90186.0086 TP=90741.71 R:R=1.65 | mode=SIDEWAY score=3
+2026-04-04 11:49:23 | INFO    |   CLOSE TP | BUY BTC | entry=90395.7 exit=90741.71 pnl=+1.91% (+1.91 USDT) | bal=10002
+2026-04-04 11:49:24 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=91590.1 SL=91855.7802 TP=90945.35 R:R=2.43 | mode=SIDEWAY score=4
+2026-04-04 11:49:24 | INFO    |   CLOSE SL | SELL BTC | entry=91590.1 exit=91855.7802 pnl=-1.45% (-1.45 USDT) | bal=10000
+2026-04-04 11:49:24 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=92163.7 SL=92362.0274 TP=91557.95 R:R=3.05 | mode=SIDEWAY score=4
+2026-04-04 11:49:24 | INFO    |   CLOSE SL | SELL BTC | entry=92163.7 exit=92362.0274 pnl=-1.08% (-1.08 USDT) | bal=9999
+2026-04-04 11:49:25 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=91367.9 SL=91159.2642 TP=91768.54 R:R=1.92 | mode=SIDEWAY score=4
+2026-04-04 11:49:25 | INFO    |   CLOSE SL | BUY BTC | entry=91367.9 exit=91159.2642 pnl=-1.14% (-1.14 USDT) | bal=9998
+2026-04-04 11:49:25 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=90736.0 SL=90378.228 TP=91519.4 R:R=2.19 | mode=SIDEWAY score=4
+2026-04-04 11:49:25 | INFO    |   CLOSE SL | BUY BTC | entry=90736.0 exit=90378.228 pnl=-1.97% (-1.97 USDT) | bal=9996
+2026-04-04 11:49:26 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=91180.0 SL=91377.36 TP=90677.395 R:R=2.55 | mode=SIDEWAY score=4
+2026-04-04 11:49:26 | INFO    |   CLOSE SL | SELL BTC | entry=91180.0 exit=91377.36 pnl=-1.08% (-1.08 USDT) | bal=9995
+2026-04-04 11:49:27 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=92170.3 SL=92369.6406 TP=91370.645 R:R=4.01 | mode=SIDEWAY score=4
+2026-04-04 11:49:27 | INFO    |   CLOSE TP | SELL BTC | entry=92170.3 exit=91370.645 pnl=+4.34% (+4.34 USDT) | bal=9999
+2026-04-04 11:49:27 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=90919.1 SL=90688.1618 TP=91388.6 R:R=2.03 | mode=SIDEWAY score=3
+2026-04-04 11:49:27 | INFO    |   CLOSE TP | BUY BTC | entry=90919.1 exit=91388.6 pnl=+2.58% (+2.58 USDT) | bal=10002
+2026-04-04 11:49:29 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=91711.4 SL=91902.6228 TP=91404.61 R:R=1.6 | mode=SIDEWAY score=4
+2026-04-04 11:49:29 | INFO    |   CLOSE SL | SELL BTC | entry=91711.4 exit=91902.6228 pnl=-1.04% (-1.04 USDT) | bal=10001
+2026-04-04 11:49:29 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=92141.8 SL=92404.2836 TP=91483.495 R:R=2.51 | mode=SIDEWAY score=4
+2026-04-04 11:49:29 | INFO    |   CLOSE SL | SELL BTC | entry=92141.8 exit=92404.2836 pnl=-1.42% (-1.42 USDT) | bal=10000
+2026-04-04 11:49:30 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=92684.8 SL=92985.3696 TP=92115.81 R:R=1.89 | mode=SIDEWAY score=4
+2026-04-04 11:49:30 | INFO    |   CLOSE TP | SELL BTC | entry=92684.8 exit=92115.81 pnl=+3.07% (+3.07 USDT) | bal=10003
+2026-04-04 11:49:30 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=93088.0 SL=93285.176 TP=92514.065 R:R=2.91 | mode=SIDEWAY score=4
+2026-04-04 11:49:30 | INFO    |   CLOSE SL | SELL BTC | entry=93088.0 exit=93285.176 pnl=-1.06% (-1.06 USDT) | bal=10002
+2026-04-04 11:49:30 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=93535.8 SL=93852.9716 TP=92647.28 R:R=2.8 | mode=SIDEWAY score=4
+2026-04-04 11:49:30 | INFO    |   CLOSE SL | SELL BTC | entry=93535.8 exit=93852.9716 pnl=-1.70% (-1.70 USDT) | bal=10000
+2026-04-04 11:49:30 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=93986.7 SL=94233.7734 TP=93594.395 R:R=1.59 | mode=SIDEWAY score=3
+2026-04-04 11:49:30 | INFO    |   CLOSE SL | SELL BTC | entry=93986.7 exit=94233.7734 pnl=-1.31% (-1.31 USDT) | bal=9999
+2026-04-04 11:49:31 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=95389.0 SL=94830.4275 TP=96226.8588 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:49:31 | INFO    |   Progress 5760/28800 (20%) | balance=9999 trades=65
+2026-04-04 11:49:31 | INFO    |   CLOSE SL | BUY BTC | entry=95389.0 exit=94830.4275 pnl=-2.93% (-2.93 USDT) | bal=9996
+2026-04-04 11:49:33 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=96843.5 SL=96456.1913 TP=97424.4631 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:49:33 | INFO    |   CLOSE SL | BUY BTC | entry=96843.5 exit=96456.1913 pnl=-2.00% (-2.00 USDT) | bal=9994
+2026-04-04 11:49:33 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=97410.2 SL=96701.4745 TP=98473.2882 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:49:33 | INFO    |   CLOSE SL | BUY BTC | entry=97410.2 exit=96701.4745 pnl=-3.64% (-3.64 USDT) | bal=9990
+2026-04-04 11:49:37 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=97081.7 SL=96757.2958 TP=97568.3064 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:49:37 | INFO    |   CLOSE SL | BUY BTC | entry=97081.7 exit=96757.2958 pnl=-1.67% (-1.67 USDT) | bal=9988
+2026-04-04 11:49:38 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=95835.5 SL=95409.8112 TP=96474.0331 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:49:38 | INFO    |   CLOSE SL | BUY BTC | entry=95835.5 exit=95409.8112 pnl=-2.22% (-2.22 USDT) | bal=9986
+2026-04-04 11:49:40 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=95649.9 SL=95376.1753 TP=96060.4871 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:49:40 | INFO    |   CLOSE SL | BUY BTC | entry=95649.9 exit=95376.1753 pnl=-1.43% (-1.43 USDT) | bal=9985
+2026-04-04 11:49:41 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=95669.7 SL=95062.2257 TP=96580.9114 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:49:41 | INFO    |   CLOSE SL | BUY BTC | entry=95669.7 exit=95062.2257 pnl=-3.17% (-3.17 USDT) | bal=9982
+2026-04-04 11:49:41 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=94521.8 SL=94160.9564 TP=95248.21 R:R=2.01 | mode=SIDEWAY score=4
+2026-04-04 11:49:41 | INFO    |   CLOSE TP | BUY BTC | entry=94521.8 exit=95248.21 pnl=+3.84% (+3.84 USDT) | bal=9985
+2026-04-04 11:49:41 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=95517.1 SL=95718.4342 TP=95006.39 R:R=2.54 | mode=SIDEWAY score=4
+2026-04-04 11:49:41 | INFO    |   CLOSE TP | SELL BTC | entry=95517.1 exit=95006.39 pnl=+2.67% (+2.67 USDT) | bal=9988
+2026-04-04 11:49:49 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=94974.0 SL=94757.252 TP=95374.65 R:R=1.85 | mode=SIDEWAY score=4
+2026-04-04 11:49:49 | INFO    |   CLOSE SL | BUY BTC | entry=94974.0 exit=94757.252 pnl=-1.14% (-1.14 USDT) | bal=9987
+2026-04-04 11:49:49 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=94561.1 SL=94317.2778 TP=95270.465 R:R=2.91 | mode=SIDEWAY score=4
+2026-04-04 11:49:49 | INFO    |   CLOSE SL | BUY BTC | entry=94561.1 exit=94317.2778 pnl=-1.29% (-1.29 USDT) | bal=9986
+2026-04-04 11:49:49 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=93685.4 SL=93484.8292 TP=94965.665 R:R=6.38 | mode=SIDEWAY score=4
+2026-04-04 11:49:49 | INFO    |   CLOSE SL | BUY BTC | entry=93685.4 exit=93484.8292 pnl=-1.07% (-1.07 USDT) | bal=9985
+2026-04-04 11:49:49 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=92827.3 SL=92422.8454 TP=94620.455 R:R=4.43 | mode=SIDEWAY score=4
+2026-04-04 11:49:49 | INFO    |   CLOSE SL | BUY BTC | entry=92827.3 exit=92422.8454 pnl=-2.18% (-2.18 USDT) | bal=9982
+2026-04-04 11:49:50 | INFO    |   Progress 7200/28800 (25%) | balance=9982 trades=78
+2026-04-04 11:49:50 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=93148.6 SL=93378.4972 TP=92664.95 R:R=2.1 | mode=SIDEWAY score=4
+2026-04-04 11:49:50 | INFO    |   CLOSE TP | SELL BTC | entry=93148.6 exit=92664.95 pnl=+2.60% (+2.59 USDT) | bal=9985
+2026-04-04 11:49:52 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=92615.8 SL=92909.1395 TP=92175.7908 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:49:52 | INFO    |   CLOSE TP | SELL BTC | entry=92615.8 exit=92175.7908 pnl=+2.38% (+2.37 USDT) | bal=9987
+2026-04-04 11:49:52 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=91552.6 SL=92025.5815 TP=90843.1278 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:49:52 | INFO    |   CLOSE TP | SELL BTC | entry=91552.6 exit=90843.1278 pnl=+3.87% (+3.87 USDT) | bal=9991
+2026-04-04 11:49:52 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=90855.8 SL=91201.1395 TP=90337.7908 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:49:52 | INFO    |   CLOSE SL | SELL BTC | entry=90855.8 exit=91201.1395 pnl=-1.90% (-1.90 USDT) | bal=9989
+2026-04-04 11:49:53 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=90777.6 SL=91262.944 TP=90049.584 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:49:53 | INFO    |   CLOSE SL | SELL BTC | entry=90777.6 exit=91262.944 pnl=-2.67% (-2.67 USDT) | bal=9987
+2026-04-04 11:49:53 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=90428.5 SL=90926.0712 TP=89682.1431 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:49:53 | INFO    |   CLOSE SL | SELL BTC | entry=90428.5 exit=90926.0712 pnl=-2.75% (-2.75 USDT) | bal=9984
+2026-04-04 11:49:53 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=89702.9 SL=90093.0572 TP=89117.6641 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:49:53 | INFO    |   CLOSE TP | SELL BTC | entry=89702.9 exit=89117.6641 pnl=+3.26% (+3.26 USDT) | bal=9987
+2026-04-04 11:49:53 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=88400.0 SL=88860.3 TP=87709.55 R:R=1.5 | mode=DOWNTREND score=5
+2026-04-04 11:49:53 | INFO    |   CLOSE SL | SELL BTC | entry=88400.0 exit=88860.3 pnl=-2.60% (-2.60 USDT) | bal=9985
+2026-04-04 11:49:54 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=89535.7 SL=89845.5393 TP=89070.9411 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:49:54 | INFO    |   CLOSE SL | SELL BTC | entry=89535.7 exit=89845.5393 pnl=-1.73% (-1.73 USDT) | bal=9983
+2026-04-04 11:49:54 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=89582.8 SL=89868.657 TP=89154.0145 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:49:54 | INFO    |   CLOSE TP | SELL BTC | entry=89582.8 exit=89154.0145 pnl=+2.39% (+2.39 USDT) | bal=9985
+2026-04-04 11:49:56 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=89863.9 SL=90378.2598 TP=89092.3604 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:49:56 | INFO    |   CLOSE SL | SELL BTC | entry=89863.9 exit=90378.2598 pnl=-2.86% (-2.86 USDT) | bal=9982
+2026-04-04 11:49:56 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=90058.7 SL=90402.3467 TP=89543.2299 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:49:56 | INFO    |   CLOSE TP | SELL BTC | entry=90058.7 exit=89543.2299 pnl=+2.86% (+2.86 USDT) | bal=9985
+2026-04-04 11:49:59 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=89613.2 SL=89924.133 TP=89146.8005 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:49:59 | INFO    |   CLOSE TP | SELL BTC | entry=89613.2 exit=89146.8005 pnl=+2.60% (+2.60 USDT) | bal=9988
+2026-04-04 11:49:59 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=89055.0 SL=89574.9375 TP=88275.0938 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:49:59 | INFO    |   CLOSE SL | SELL BTC | entry=89055.0 exit=89574.9375 pnl=-2.92% (-2.92 USDT) | bal=9985
+2026-04-04 11:49:59 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=89222.1 SL=89559.4552 TP=88716.0671 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:49:59 | INFO    |   CLOSE SL | SELL BTC | entry=89222.1 exit=89559.4552 pnl=-1.89% (-1.89 USDT) | bal=9983
+2026-04-04 11:50:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=89764.6 SL=90042.6115 TP=89347.5828 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:50:00 | INFO    |   CLOSE SL | SELL BTC | entry=89764.6 exit=90042.6115 pnl=-1.55% (-1.55 USDT) | bal=9981
+2026-04-04 11:50:02 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=90945.1 SL=91150.2902 TP=90010.43 R:R=4.56 | mode=SIDEWAY score=4
+2026-04-04 11:50:02 | INFO    |   CLOSE SL | SELL BTC | entry=90945.1 exit=91150.2902 pnl=-1.13% (-1.13 USDT) | bal=9980
+2026-04-04 11:50:04 | INFO    |   Progress 8640/28800 (30%) | balance=9980 trades=95
+2026-04-04 11:50:08 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88268.0 SL=88043.464 TP=88610.84 R:R=1.53 | mode=SIDEWAY score=4
+2026-04-04 11:50:08 | INFO    |   CLOSE TP | BUY BTC | entry=88268.0 exit=88610.84 pnl=+1.94% (+1.94 USDT) | bal=9982
+2026-04-04 11:50:09 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88024.7 SL=87723.9506 TP=88572.39 R:R=1.82 | mode=SIDEWAY score=4
+2026-04-04 11:50:09 | INFO    |   CLOSE SL | BUY BTC | entry=88024.7 exit=87723.9506 pnl=-1.71% (-1.71 USDT) | bal=9981
+2026-04-04 11:50:10 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87297.7 SL=87114.4046 TP=87802.625 R:R=2.75 | mode=SIDEWAY score=4
+2026-04-04 11:50:10 | INFO    |   CLOSE SL | BUY BTC | entry=87297.7 exit=87114.4046 pnl=-1.05% (-1.05 USDT) | bal=9980
+2026-04-04 11:50:10 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=86692.5 SL=86326.615 TP=87447.75 R:R=2.06 | mode=SIDEWAY score=4
+2026-04-04 11:50:10 | INFO    |   CLOSE SL | BUY BTC | entry=86692.5 exit=86326.615 pnl=-2.11% (-2.11 USDT) | bal=9977
+2026-04-04 11:50:11 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=87239.7 SL=87644.0992 TP=86633.1011 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:50:11 | INFO    |   CLOSE SL | SELL BTC | entry=87239.7 exit=87644.0992 pnl=-2.32% (-2.31 USDT) | bal=9975
+2026-04-04 11:50:11 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=87625.5 SL=87918.0638 TP=87186.6544 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:11 | INFO    |   CLOSE SL | SELL BTC | entry=87625.5 exit=87918.0638 pnl=-1.67% (-1.67 USDT) | bal=9973
+2026-04-04 11:50:12 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=87710.2 SL=87988.8755 TP=87292.1867 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:12 | INFO    |   CLOSE SL | SELL BTC | entry=87710.2 exit=87988.8755 pnl=-1.59% (-1.58 USDT) | bal=9972
+2026-04-04 11:50:13 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=87800.1 SL=88073.2002 TP=87390.4496 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:50:13 | INFO    |   CLOSE SL | SELL BTC | entry=87800.1 exit=88073.2002 pnl=-1.56% (-1.55 USDT) | bal=9970
+2026-04-04 11:50:13 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88673.4 SL=88991.2468 TP=87958.235 R:R=2.25 | mode=SIDEWAY score=4
+2026-04-04 11:50:13 | INFO    |   CLOSE TP | SELL BTC | entry=88673.4 exit=87958.235 pnl=+4.03% (+4.02 USDT) | bal=9974
+2026-04-04 11:50:15 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=88596.3 SL=88814.5926 TP=88159.195 R:R=2.0 | mode=SIDEWAY score=3
+2026-04-04 11:50:15 | INFO    |   CLOSE TP | SELL BTC | entry=88596.3 exit=88159.195 pnl=+2.47% (+2.46 USDT) | bal=9977
+2026-04-04 11:50:24 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=89542.6 SL=89733.6852 TP=89075.095 R:R=2.45 | mode=SIDEWAY score=4
+2026-04-04 11:50:24 | INFO    |   CLOSE SL | SELL BTC | entry=89542.6 exit=89733.6852 pnl=-1.07% (-1.06 USDT) | bal=9976
+2026-04-04 11:50:24 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=90016.1 SL=90268.0322 TP=89451.83 R:R=2.24 | mode=SIDEWAY score=4
+2026-04-04 11:50:24 | INFO    |   CLOSE SL | SELL BTC | entry=90016.1 exit=90268.0322 pnl=-1.40% (-1.40 USDT) | bal=9974
+2026-04-04 11:50:27 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88594.4 SL=88410.4112 TP=88965.015 R:R=2.01 | mode=SIDEWAY score=4
+2026-04-04 11:50:27 | INFO    |   CLOSE SL | BUY BTC | entry=88594.4 exit=88410.4112 pnl=-1.04% (-1.04 USDT) | bal=9973
+2026-04-04 11:50:27 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=88109.6 SL=87911.4808 TP=88656.79 R:R=2.76 | mode=SIDEWAY score=4
+2026-04-04 11:50:27 | INFO    |   CLOSE SL | BUY BTC | entry=88109.6 exit=87911.4808 pnl=-1.12% (-1.12 USDT) | bal=9972
+2026-04-04 11:50:27 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87750.3 SL=87502.4994 TP=88530.795 R:R=3.15 | mode=SIDEWAY score=4
+2026-04-04 11:50:27 | INFO    |   Progress 10080/28800 (35%) | balance=9972 trades=109
+2026-04-04 11:50:27 | INFO    |   CLOSE SL | BUY BTC | entry=87750.3 exit=87502.4994 pnl=-1.41% (-1.41 USDT) | bal=9971
+2026-04-04 11:50:28 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=87423.0 SL=87206.954 TP=87912.78 R:R=2.27 | mode=SIDEWAY score=4
+2026-04-04 11:50:28 | INFO    |   CLOSE SL | BUY BTC | entry=87423.0 exit=87206.954 pnl=-1.24% (-1.23 USDT) | bal=9970
+2026-04-04 11:50:28 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=85039.6 SL=84706.701 TP=85538.9485 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:50:28 | INFO    |   CLOSE SL | BUY BTC | entry=85039.6 exit=84706.701 pnl=-1.96% (-1.95 USDT) | bal=9968
+2026-04-04 11:50:29 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=83517.1 SL=84008.7927 TP=82779.5609 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:50:29 | INFO    |   CLOSE SL | SELL BTC | entry=83517.1 exit=84008.7927 pnl=-2.94% (-2.93 USDT) | bal=9965
+2026-04-04 11:50:29 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=84031.3 SL=84381.4783 TP=83506.0326 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:29 | INFO    |   CLOSE SL | SELL BTC | entry=84031.3 exit=84381.4783 pnl=-2.08% (-2.08 USDT) | bal=9963
+2026-04-04 11:50:30 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=84321.3 SL=84608.3032 TP=83890.7951 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:50:30 | INFO    |   CLOSE TP | SELL BTC | entry=84321.3 exit=83890.7951 pnl=+2.55% (+2.54 USDT) | bal=9965
+2026-04-04 11:50:37 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=83941.3 SL=84181.2532 TP=83581.3701 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:50:37 | INFO    |   CLOSE TP | SELL BTC | entry=83941.3 exit=83581.3701 pnl=+2.14% (+2.14 USDT) | bal=9967
+2026-04-04 11:50:37 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=83433.1 SL=83740.9827 TP=82971.2759 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:50:37 | INFO    |   CLOSE TP | SELL BTC | entry=83433.1 exit=82971.2759 pnl=+2.77% (+2.76 USDT) | bal=9970
+2026-04-04 11:50:37 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=83031.1 SL=83396.9777 TP=82482.2834 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:50:37 | INFO    |   CLOSE TP | SELL BTC | entry=83031.1 exit=82482.2834 pnl=+3.30% (+3.29 USDT) | bal=9973
+2026-04-04 11:50:37 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=82505.5 SL=82895.5638 TP=81920.4044 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:50:37 | INFO    |   CLOSE SL | SELL BTC | entry=82505.5 exit=82895.5638 pnl=-2.36% (-2.36 USDT) | bal=9971
+2026-04-04 11:50:38 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=80300.0 SL=80707.65 TP=79688.525 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:50:38 | INFO    |   CLOSE TP | SELL BTC | entry=80300.0 exit=79688.525 pnl=+3.81% (+3.80 USDT) | bal=9975
+2026-04-04 11:50:38 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=78555.0 SL=79183.44 TP=77455.235 R:R=1.75 | mode=DOWNTREND score=3
+2026-04-04 11:50:38 | INFO    |   CLOSE SL | SELL BTC | entry=78555.0 exit=79183.44 pnl=-4.00% (-3.99 USDT) | bal=9971
+2026-04-04 11:50:39 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=77870.4 SL=78387.676 TP=77094.486 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:39 | INFO    |   CLOSE SL | SELL BTC | entry=77870.4 exit=78387.676 pnl=-3.32% (-3.31 USDT) | bal=9967
+2026-04-04 11:50:39 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=77660.1 SL=78281.3808 TP=76700.0246 R:R=1.55 | mode=DOWNTREND score=3
+2026-04-04 11:50:39 | INFO    |   CLOSE SL | SELL BTC | entry=77660.1 exit=78281.3808 pnl=-4.00% (-3.99 USDT) | bal=9963
+2026-04-04 11:50:40 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=78971.6 SL=79275.129 TP=78516.3065 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:40 | INFO    |   CLOSE TP | SELL BTC | entry=78971.6 exit=78516.3065 pnl=+2.88% (+2.87 USDT) | bal=9966
+2026-04-04 11:50:41 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=78815.2 SL=79107.238 TP=78377.143 R:R=1.5 | mode=DOWNTREND score=5
+2026-04-04 11:50:41 | INFO    |   CLOSE TP | SELL BTC | entry=78815.2 exit=78377.143 pnl=+2.78% (+2.77 USDT) | bal=9969
+2026-04-04 11:50:42 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=78381.3 SL=78635.0533 TP=78000.6701 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:42 | INFO    |   CLOSE SL | SELL BTC | entry=78381.3 exit=78635.0533 pnl=-1.62% (-1.61 USDT) | bal=9967
+2026-04-04 11:50:43 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=77118.4 SL=77735.3472 TP=76160.956 R:R=1.55 | mode=DOWNTREND score=3
+2026-04-04 11:50:43 | INFO    |   CLOSE SL | SELL BTC | entry=77118.4 exit=77735.3472 pnl=-4.00% (-3.99 USDT) | bal=9963
+2026-04-04 11:50:43 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=77492.0 SL=77920.43 TP=76849.355 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:43 | INFO    |   CLOSE SL | SELL BTC | entry=77492.0 exit=77920.43 pnl=-2.76% (-2.75 USDT) | bal=9961
+2026-04-04 11:50:44 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=77771.2 SL=78268.328 TP=77025.508 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:50:44 | INFO    |   CLOSE TP | SELL BTC | entry=77771.2 exit=77025.508 pnl=+4.79% (+4.78 USDT) | bal=9965
+2026-04-04 11:50:46 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=75484.4 SL=76075.911 TP=74597.1335 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:46 | INFO    |   CLOSE SL | SELL BTC | entry=75484.4 exit=76075.911 pnl=-3.92% (-3.90 USDT) | bal=9962
+2026-04-04 11:50:48 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=77796.8 SL=78105.692 TP=77333.462 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:50:48 | INFO    |   CLOSE SL | SELL BTC | entry=77796.8 exit=78105.692 pnl=-1.99% (-1.98 USDT) | bal=9960
+2026-04-04 11:50:52 | INFO    |   Progress 11520/28800 (40%) | balance=9960 trades=131
+2026-04-04 11:50:54 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=77570.0 SL=78190.56 TP=76632.4625 R:R=1.51 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:50:54 | INFO    |   CLOSE TP | SELL BTC | entry=77570.0 exit=76632.4625 pnl=+6.04% (+6.02 USDT) | bal=9966
+2026-04-04 11:50:55 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=74346.6 SL=74941.3728 TP=73377.0503 R:R=1.63 | mode=DOWNTREND score=6
+2026-04-04 11:50:55 | INFO    |   CLOSE TP | SELL BTC | entry=74346.6 exit=73377.0503 pnl=+6.52% (+6.50 USDT) | bal=9972
+2026-04-04 11:50:55 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=73111.7 SL=73661.6793 TP=72286.7311 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:55 | INFO    |   CLOSE SL | SELL BTC | entry=73111.7 exit=73661.6793 pnl=-3.76% (-3.75 USDT) | bal=9968
+2026-04-04 11:50:55 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=75908.3 SL=76229.8708 TP=75425.9439 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:55 | INFO    |   CLOSE TP | SELL BTC | entry=75908.3 exit=75425.9439 pnl=+3.18% (+3.17 USDT) | bal=9972
+2026-04-04 11:50:56 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=76348.8 SL=76688.072 TP=75839.892 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:56 | INFO    |   CLOSE SL | SELL BTC | entry=76348.8 exit=76688.072 pnl=-2.22% (-2.22 USDT) | bal=9969
+2026-04-04 11:50:58 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=75730.0 SL=76104.525 TP=75168.2125 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:50:58 | INFO    |   CLOSE TP | SELL BTC | entry=75730.0 exit=75168.2125 pnl=+3.71% (+3.70 USDT) | bal=9973
+2026-04-04 11:50:58 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=74838.4 SL=75385.796 TP=74017.306 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:50:58 | INFO    |   CLOSE SL | SELL BTC | entry=74838.4 exit=75385.796 pnl=-3.66% (-3.65 USDT) | bal=9969
+2026-04-04 11:50:58 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=75264.0 SL=75732.16 TP=74561.76 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:58 | INFO    |   CLOSE SL | SELL BTC | entry=75264.0 exit=75732.16 pnl=-3.11% (-3.10 USDT) | bal=9966
+2026-04-04 11:50:58 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=73868.3 SL=74360.5707 TP=73129.8939 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:50:58 | INFO    |   CLOSE TP | SELL BTC | entry=73868.3 exit=73129.8939 pnl=+5.00% (+4.98 USDT) | bal=9971
+2026-04-04 11:50:58 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=73609.1 SL=74030.2228 TP=72977.4159 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:58 | INFO    |   CLOSE TP | SELL BTC | entry=73609.1 exit=72977.4159 pnl=+4.29% (+4.28 USDT) | bal=9976
+2026-04-04 11:50:58 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=72270.7 SL=72848.8656 TP=71266.9349 R:R=1.74 | mode=DOWNTREND score=4
+2026-04-04 11:50:58 | INFO    |   CLOSE SL | SELL BTC | entry=72270.7 exit=72848.8656 pnl=-4.00% (-3.99 USDT) | bal=9972
+2026-04-04 11:50:58 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=72559.8 SL=73111.3995 TP=71732.4008 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:58 | INFO    |   CLOSE SL | SELL BTC | entry=72559.8 exit=73111.3995 pnl=-3.80% (-3.79 USDT) | bal=9968
+2026-04-04 11:50:59 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=72837.8 SL=73187.2945 TP=72313.5583 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:50:59 | INFO    |   CLOSE TP | SELL BTC | entry=72837.8 exit=72313.5583 pnl=+3.60% (+3.59 USDT) | bal=9971
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71555.4 SL=71994.9885 TP=70896.0172 R:R=1.5 | mode=DOWNTREND score=5
+2026-04-04 11:51:00 | INFO    |   CLOSE TP | SELL BTC | entry=71555.4 exit=70896.0172 pnl=+4.61% (+4.59 USDT) | bal=9976
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70917.4 SL=71484.7392 TP=69924.5574 R:R=1.75 | mode=DOWNTREND score=4
+2026-04-04 11:51:00 | INFO    |   CLOSE SL | SELL BTC | entry=70917.4 exit=71484.7392 pnl=-4.00% (-3.99 USDT) | bal=9972
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=71023.7 SL=71350.6593 TP=70533.2611 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:00 | INFO    |   CLOSE SL | SELL BTC | entry=71023.7 exit=71350.6593 pnl=-2.30% (-2.30 USDT) | bal=9970
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71315.5 SL=71689.2888 TP=70754.8169 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:00 | INFO    |   CLOSE SL | SELL BTC | entry=71315.5 exit=71689.2888 pnl=-2.62% (-2.61 USDT) | bal=9967
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=71569.9 SL=71958.0248 TP=70987.7129 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:00 | INFO    |   CLOSE TP | SELL BTC | entry=71569.9 exit=70987.7129 pnl=+4.07% (+4.05 USDT) | bal=9971
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70030.6 SL=70503.6765 TP=69320.9853 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:51:00 | INFO    |   CLOSE SL | SELL BTC | entry=70030.6 exit=70503.6765 pnl=-3.38% (-3.37 USDT) | bal=9968
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70208.3 SL=70723.9207 TP=69434.8689 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:00 | INFO    |   CLOSE TP | SELL BTC | entry=70208.3 exit=69434.8689 pnl=+5.51% (+5.49 USDT) | bal=9973
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69340.5 SL=69895.224 TP=68463.3731 R:R=1.58 | mode=DOWNTREND score=3
+2026-04-04 11:51:00 | INFO    |   CLOSE SL | SELL BTC | entry=69340.5 exit=69895.224 pnl=-4.00% (-3.99 USDT) | bal=9969
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66933.6 SL=67469.0688 TP=65996.5336 R:R=1.75 | mode=DOWNTREND score=4
+2026-04-04 11:51:00 | INFO    |   CLOSE SL | SELL BTC | entry=66933.6 exit=67469.0688 pnl=-4.00% (-3.99 USDT) | bal=9965
+2026-04-04 11:51:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67651.6 SL=68192.8128 TP=66704.4816 R:R=1.75 | mode=DOWNTREND score=3
+2026-04-04 11:51:00 | INFO    |   CLOSE SL | SELL BTC | entry=67651.6 exit=68192.8128 pnl=-4.00% (-3.99 USDT) | bal=9961
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66213.8 SL=66684.2345 TP=65508.1483 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:01 | INFO    |   CLOSE TP | SELL BTC | entry=66213.8 exit=65508.1483 pnl=+5.33% (+5.31 USDT) | bal=9967
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66116.9 SL=66645.8352 TP=65191.2669 R:R=1.75 | mode=DOWNTREND score=3
+2026-04-04 11:51:01 | INFO    |   CLOSE TP | SELL BTC | entry=66116.9 exit=65191.2669 pnl=+7.00% (+6.98 USDT) | bal=9974
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65237.4 SL=65573.7935 TP=64732.8098 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:51:01 | INFO    |   CLOSE SL | SELL BTC | entry=65237.4 exit=65573.7935 pnl=-2.58% (-2.57 USDT) | bal=9971
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65021.1 SL=65541.2688 TP=64110.8011 R:R=1.75 | mode=DOWNTREND score=4
+2026-04-04 11:51:01 | INFO    |   CLOSE TP | SELL BTC | entry=65021.1 exit=64110.8011 pnl=+7.00% (+6.98 USDT) | bal=9978
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=63640.6 SL=64149.7248 TP=62749.6306 R:R=1.75 | mode=DOWNTREND score=6
+2026-04-04 11:51:01 | INFO    |   CLOSE TP | SELL BTC | entry=63640.6 exit=62749.6306 pnl=+7.00% (+6.98 USDT) | bal=9985
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=63490.0 SL=63997.92 TP=62296.79 R:R=2.35 | mode=DOWNTREND score=3
+2026-04-04 11:51:01 | INFO    |   CLOSE SL | SELL BTC | entry=63490.0 exit=63997.92 pnl=-4.00% (-3.99 USDT) | bal=9981
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=63634.2 SL=64143.2736 TP=62856.0217 R:R=1.53 | mode=DOWNTREND score=3
+2026-04-04 11:51:01 | INFO    |   CLOSE TP | SELL BTC | entry=63634.2 exit=62856.0217 pnl=+6.11% (+6.10 USDT) | bal=9987
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=63920.1 SL=64431.4608 TP=62857.6496 R:R=2.08 | mode=DOWNTREND score=4
+2026-04-04 11:51:01 | INFO    |   CLOSE TP | SELL BTC | entry=63920.1 exit=62857.6496 pnl=+8.31% (+8.30 USDT) | bal=9995
+2026-04-04 11:51:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=60003.9 SL=60483.9312 TP=59163.8439 R:R=1.75 | mode=DOWNTREND score=4
+2026-04-04 11:51:01 | INFO    |   CLOSE SL | SELL BTC | entry=60003.9 exit=60483.9312 pnl=-4.00% (-4.00 USDT) | bal=9991
+2026-04-04 11:51:03 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=64846.0 SL=65321.615 TP=64132.5775 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:03 | INFO    |   CLOSE SL | SELL BTC | entry=64846.0 exit=65321.615 pnl=-3.67% (-3.66 USDT) | bal=9988
+2026-04-04 11:51:03 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66330.1 SL=66563.9253 TP=65979.3621 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:03 | INFO    |   CLOSE SL | SELL BTC | entry=66330.1 exit=66563.9253 pnl=-1.76% (-1.76 USDT) | bal=9986
+2026-04-04 11:51:07 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69066.1 SL=69505.6653 TP=68406.7521 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:07 | INFO    |   CLOSE TP | SELL BTC | entry=69066.1 exit=68406.7521 pnl=+4.77% (+4.77 USDT) | bal=9991
+2026-04-04 11:51:07 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69286.9 SL=69841.1952 TP=68366.0241 R:R=1.66 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:07 | INFO    |   Progress 12960/28800 (45%) | balance=9991 trades=166
+2026-04-04 11:51:07 | INFO    |   CLOSE SL | SELL BTC | entry=69286.9 exit=69841.1952 pnl=-4.00% (-4.00 USDT) | bal=9987
+2026-04-04 11:51:08 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70712.1 SL=71073.4802 TP=70170.0296 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:08 | INFO    |   CLOSE SL | SELL BTC | entry=70712.1 exit=71073.4802 pnl=-2.56% (-2.55 USDT) | bal=9984
+2026-04-04 11:51:08 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=71045.6 SL=71442.214 TP=70450.679 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:51:08 | INFO    |   CLOSE SL | SELL BTC | entry=71045.6 exit=71442.214 pnl=-2.79% (-2.79 USDT) | bal=9981
+2026-04-04 11:51:09 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70550.0 SL=70853.875 TP=70094.1875 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:51:09 | INFO    |   CLOSE SL | SELL BTC | entry=70550.0 exit=70853.875 pnl=-2.15% (-2.15 USDT) | bal=9979
+2026-04-04 11:51:13 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69832.2 SL=70166.1805 TP=69331.2292 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:13 | INFO    |   CLOSE TP | SELL BTC | entry=69832.2 exit=69331.2292 pnl=+3.59% (+3.58 USDT) | bal=9983
+2026-04-04 11:51:13 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=68872.8 SL=68595.818 TP=69288.273 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:13 | INFO    |   CLOSE SL | BUY BTC | entry=68872.8 exit=68595.818 pnl=-2.01% (-2.01 USDT) | bal=9981
+2026-04-04 11:51:13 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68490.9 SL=68930.6272 TP=67831.3091 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:51:13 | INFO    |   CLOSE SL | SELL BTC | entry=68490.9 exit=68930.6272 pnl=-3.21% (-3.20 USDT) | bal=9978
+2026-04-04 11:51:13 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=69309.9 SL=68755.4208 TP=70798.7901 R:R=2.69 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:51:13 | INFO    |   CLOSE TP | BUY BTC | entry=69309.9 exit=70798.7901 pnl=+10.74% (+10.72 USDT) | bal=9988
+2026-04-04 11:51:14 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=70379.9 SL=70030.4502 TP=70904.0746 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:14 | INFO    |   CLOSE TP | BUY BTC | entry=70379.9 exit=70904.0746 pnl=+3.72% (+3.72 USDT) | bal=9992
+2026-04-04 11:51:15 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70334.2 SL=70565.7355 TP=69986.8967 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:15 | INFO    |   CLOSE TP | SELL BTC | entry=70334.2 exit=69986.8967 pnl=+2.47% (+2.47 USDT) | bal=9994
+2026-04-04 11:51:15 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=69936.2 SL=69618.4595 TP=70412.8108 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:15 | INFO    |   CLOSE TP | BUY BTC | entry=69936.2 exit=70412.8108 pnl=+3.41% (+3.41 USDT) | bal=9998
+2026-04-04 11:51:16 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69175.0 SL=69426.7375 TP=68797.3937 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:16 | INFO    |   CLOSE TP | SELL BTC | entry=69175.0 exit=68797.3937 pnl=+2.73% (+2.73 USDT) | bal=10001
+2026-04-04 11:51:17 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68906.1 SL=68652.7348 TP=69286.1479 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:17 | INFO    |   CLOSE TP | BUY BTC | entry=68906.1 exit=69286.1479 pnl=+2.76% (+2.76 USDT) | bal=10003
+2026-04-04 11:51:17 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69281.7 SL=69025.7958 TP=69665.5564 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:17 | INFO    |   CLOSE SL | BUY BTC | entry=69281.7 exit=69025.7958 pnl=-1.85% (-1.85 USDT) | bal=10002
+2026-04-04 11:51:17 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68663.3 SL=68234.7418 TP=69306.1374 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:51:17 | INFO    |   CLOSE TP | BUY BTC | entry=68663.3 exit=69306.1374 pnl=+4.68% (+4.68 USDT) | bal=10006
+2026-04-04 11:51:18 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=69642.0 SL=69084.864 TP=70921.6575 R:R=2.3 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:51:18 | INFO    |   CLOSE SL | BUY BTC | entry=69642.0 exit=69084.864 pnl=-4.00% (-4.00 USDT) | bal=10002
+2026-04-04 11:51:20 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69113.1 SL=69415.0828 TP=68660.1259 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:51:20 | INFO    |   CLOSE TP | SELL BTC | entry=69113.1 exit=68660.1259 pnl=+3.28% (+3.28 USDT) | bal=10005
+2026-04-04 11:51:21 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=67160.1 SL=66882.0997 TP=67577.1004 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:21 | INFO    |   CLOSE SL | BUY BTC | entry=67160.1 exit=66882.0997 pnl=-2.07% (-2.07 USDT) | bal=10003
+2026-04-04 11:51:21 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66962.0 SL=67214.005 TP=66583.9925 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:21 | INFO    |   CLOSE TP | SELL BTC | entry=66962.0 exit=66583.9925 pnl=+2.82% (+2.82 USDT) | bal=10006
+2026-04-04 11:51:21 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66636.5 SL=66861.5912 TP=66298.8631 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:51:21 | INFO    |   CLOSE SL | SELL BTC | entry=66636.5 exit=66861.5912 pnl=-1.69% (-1.69 USDT) | bal=10005
+2026-04-04 11:51:22 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67974.3 SL=68235.7358 TP=67582.1464 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:51:22 | INFO    |   CLOSE TP | SELL BTC | entry=67974.3 exit=67582.1464 pnl=+2.88% (+2.89 USDT) | bal=10007
+2026-04-04 11:51:22 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66141.2 SL=66670.3296 TP=65303.0705 R:R=1.58 | mode=DOWNTREND score=4
+2026-04-04 11:51:22 | INFO    |   CLOSE SL | SELL BTC | entry=66141.2 exit=66670.3296 pnl=-4.00% (-4.00 USDT) | bal=10003
+2026-04-04 11:51:24 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67646.2 SL=67869.1155 TP=67311.8267 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:24 | INFO    |   CLOSE SL | SELL BTC | entry=67646.2 exit=67869.1155 pnl=-1.65% (-1.65 USDT) | bal=10002
+2026-04-04 11:51:24 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66863.5 SL=67227.1588 TP=66318.0119 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:51:24 | INFO    |   CLOSE SL | SELL BTC | entry=66863.5 exit=67227.1588 pnl=-2.72% (-2.72 USDT) | bal=9999
+2026-04-04 11:51:28 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67909.4 SL=68246.5735 TP=67403.6397 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:51:28 | INFO    |   CLOSE SL | SELL BTC | entry=67909.4 exit=68246.5735 pnl=-2.48% (-2.48 USDT) | bal=9997
+2026-04-04 11:51:28 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68031.8 SL=68311.6795 TP=67611.9807 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:28 | INFO    |   CLOSE SL | SELL BTC | entry=68031.8 exit=68311.6795 pnl=-2.06% (-2.06 USDT) | bal=9995
+2026-04-04 11:51:29 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65559.4 SL=65834.8985 TP=65146.1522 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:29 | INFO    |   CLOSE SL | SELL BTC | entry=65559.4 exit=65834.8985 pnl=-2.10% (-2.10 USDT) | bal=9992
+2026-04-04 11:51:31 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66409.1 SL=66616.0228 TP=66098.7159 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:51:31 | INFO    |   Progress 14400/28800 (50%) | balance=9992 trades=193
+2026-04-04 11:51:31 | INFO    |   CLOSE TP | SELL BTC | entry=66409.1 exit=66098.7159 pnl=+2.34% (+2.34 USDT) | bal=9995
+2026-04-04 11:51:32 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66631.0 SL=66864.1775 TP=66281.2337 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:51:32 | INFO    |   CLOSE SL | SELL BTC | entry=66631.0 exit=66864.1775 pnl=-1.75% (-1.75 USDT) | bal=9993
+2026-04-04 11:51:34 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68933.5 SL=69313.3338 TP=68363.7494 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:34 | INFO    |   CLOSE SL | SELL BTC | entry=68933.5 exit=69313.3338 pnl=-2.76% (-2.75 USDT) | bal=9990
+2026-04-04 11:51:34 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68920.8 SL=69350.002 TP=68276.997 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:34 | INFO    |   CLOSE SL | SELL BTC | entry=68920.8 exit=69350.002 pnl=-3.11% (-3.11 USDT) | bal=9987
+2026-04-04 11:51:34 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69086.7 SL=69347.2168 TP=68695.9249 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:34 | INFO    |   CLOSE TP | SELL BTC | entry=69086.7 exit=68695.9249 pnl=+2.83% (+2.82 USDT) | bal=9990
+2026-04-04 11:51:34 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68795.4 SL=68560.5115 TP=69147.7327 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:34 | INFO    |   CLOSE TP | BUY BTC | entry=68795.4 exit=69147.7327 pnl=+2.56% (+2.56 USDT) | bal=9993
+2026-04-04 11:51:34 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=69212.3 SL=69356.4246 TP=68900.565 R:R=2.16 | mode=SIDEWAY score=4
+2026-04-04 11:51:34 | INFO    |   CLOSE SL | SELL BTC | entry=69212.3 exit=69356.4246 pnl=-1.04% (-1.04 USDT) | bal=9991
+2026-04-04 11:51:34 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=69524.8 SL=69713.9496 TP=69040.325 R:R=2.56 | mode=SIDEWAY score=4
+2026-04-04 11:51:34 | INFO    |   CLOSE SL | SELL BTC | entry=69524.8 exit=69713.9496 pnl=-1.36% (-1.36 USDT) | bal=9990
+2026-04-04 11:51:40 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70642.5 SL=70382.5938 TP=71032.3594 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:51:40 | INFO    |   CLOSE SL | BUY BTC | entry=70642.5 exit=70382.5938 pnl=-1.84% (-1.84 USDT) | bal=9988
+2026-04-04 11:51:48 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=68925.7 SL=69072.8514 TP=68628.955 R:R=2.02 | mode=SIDEWAY score=3
+2026-04-04 11:51:48 | INFO    |   CLOSE TP | SELL BTC | entry=68925.7 exit=68628.955 pnl=+2.15% (+2.15 USDT) | bal=9990
+2026-04-04 11:51:48 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=69467.4 SL=69725.8348 TP=68741.16 R:R=2.81 | mode=SIDEWAY score=4
+2026-04-04 11:51:48 | INFO    |   CLOSE SL | SELL BTC | entry=69467.4 exit=69725.8348 pnl=-1.86% (-1.86 USDT) | bal=9989
+2026-04-04 11:51:49 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67933.4 SL=67692.6665 TP=68294.5002 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:49 | INFO    |   CLOSE TP | BUY BTC | entry=67933.4 exit=68294.5002 pnl=+2.66% (+2.65 USDT) | bal=9991
+2026-04-04 11:51:50 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68600.7 SL=68870.4017 TP=68196.1474 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:50 | INFO    |   CLOSE SL | SELL BTC | entry=68600.7 exit=68870.4017 pnl=-1.97% (-1.96 USDT) | bal=9989
+2026-04-04 11:51:51 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69035.1 SL=68764.0122 TP=69441.7316 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:51 | INFO    |   CLOSE SL | BUY BTC | entry=69035.1 exit=68764.0122 pnl=-1.96% (-1.96 USDT) | bal=9987
+2026-04-04 11:51:53 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67757.2 SL=67604.4856 TP=67994.735 R:R=1.56 | mode=SIDEWAY score=3
+2026-04-04 11:51:53 | INFO    |   CLOSE TP | BUY BTC | entry=67757.2 exit=67994.735 pnl=+1.75% (+1.75 USDT) | bal=9989
+2026-04-04 11:51:56 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67438.9 SL=67204.5027 TP=67790.4959 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:56 | INFO    |   CLOSE SL | BUY BTC | entry=67438.9 exit=67204.5027 pnl=-1.74% (-1.74 USDT) | bal=9987
+2026-04-04 11:51:56 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67085.5 SL=66916.929 TP=67429.5 R:R=2.04 | mode=SIDEWAY score=4
+2026-04-04 11:51:56 | INFO    |   CLOSE SL | BUY BTC | entry=67085.5 exit=66916.929 pnl=-1.26% (-1.25 USDT) | bal=9986
+2026-04-04 11:51:57 | INFO    |   Progress 15840/28800 (55%) | balance=9986 trades=210
+2026-04-04 11:51:57 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=68139.0 SL=68326.478 TP=67821.91 R:R=1.69 | mode=SIDEWAY score=4
+2026-04-04 11:51:57 | INFO    |   CLOSE SL | SELL BTC | entry=68139.0 exit=68326.478 pnl=-1.38% (-1.37 USDT) | bal=9985
+2026-04-04 11:51:58 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67136.1 SL=66967.0278 TP=67963.19 R:R=4.89 | mode=SIDEWAY score=4
+2026-04-04 11:51:58 | INFO    |   CLOSE SL | BUY BTC | entry=67136.1 exit=66967.0278 pnl=-1.26% (-1.26 USDT) | bal=9983
+2026-04-04 11:51:59 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67103.5 SL=66869.4413 TP=67454.5881 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:59 | INFO    |   CLOSE SL | BUY BTC | entry=67103.5 exit=66869.4413 pnl=-1.74% (-1.74 USDT) | bal=9982
+2026-04-04 11:51:59 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66798.3 SL=66433.8043 TP=67345.0436 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:51:59 | INFO    |   CLOSE SL | BUY BTC | entry=66798.3 exit=66433.8043 pnl=-2.73% (-2.72 USDT) | bal=9979
+2026-04-04 11:51:59 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66203.0 SL=65959.4925 TP=66568.2613 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:51:59 | INFO    |   CLOSE TP | BUY BTC | entry=66203.0 exit=66568.2613 pnl=+2.76% (+2.75 USDT) | bal=9982
+2026-04-04 11:52:01 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=67092.9 SL=67264.3858 TP=66813.22 R:R=1.63 | mode=SIDEWAY score=4
+2026-04-04 11:52:01 | INFO    |   CLOSE SL | SELL BTC | entry=67092.9 exit=67264.3858 pnl=-1.28% (-1.28 USDT) | bal=9980
+2026-04-04 11:52:02 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=66483.9 SL=66298.1322 TP=66808.395 R:R=1.75 | mode=SIDEWAY score=4
+2026-04-04 11:52:02 | INFO    |   CLOSE SL | BUY BTC | entry=66483.9 exit=66298.1322 pnl=-1.40% (-1.39 USDT) | bal=9979
+2026-04-04 11:52:03 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65882.5 SL=66166.0063 TP=65457.2406 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:52:03 | INFO    |   CLOSE SL | SELL BTC | entry=65882.5 exit=66166.0063 pnl=-2.15% (-2.15 USDT) | bal=9977
+2026-04-04 11:52:04 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66969.0 SL=67214.7225 TP=66600.4162 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:04 | INFO    |   CLOSE SL | SELL BTC | entry=66969.0 exit=67214.7225 pnl=-1.83% (-1.83 USDT) | bal=9975
+2026-04-04 11:52:05 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=67868.5 SL=68010.537 TP=67283.445 R:R=4.12 | mode=SIDEWAY score=4
+2026-04-04 11:52:05 | INFO    |   CLOSE SL | SELL BTC | entry=67868.5 exit=68010.537 pnl=-1.05% (-1.04 USDT) | bal=9974
+2026-04-04 11:52:06 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67417.7 SL=67255.2646 TP=67954.655 R:R=3.31 | mode=SIDEWAY score=4
+2026-04-04 11:52:06 | INFO    |   CLOSE SL | BUY BTC | entry=67417.7 exit=67255.2646 pnl=-1.20% (-1.20 USDT) | bal=9973
+2026-04-04 11:52:06 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=66849.4 SL=66666.0012 TP=67287.21 R:R=2.39 | mode=SIDEWAY score=4
+2026-04-04 11:52:06 | INFO    |   CLOSE SL | BUY BTC | entry=66849.4 exit=66666.0012 pnl=-1.37% (-1.37 USDT) | bal=9971
+2026-04-04 11:52:06 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=66600.0 SL=66274.9 TP=67209.905 R:R=1.88 | mode=SIDEWAY score=4
+2026-04-04 11:52:06 | INFO    |   CLOSE TP | BUY BTC | entry=66600.0 exit=67209.905 pnl=+4.58% (+4.57 USDT) | bal=9976
+2026-04-04 11:52:07 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67589.9 SL=67928.8747 TP=67081.4379 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:07 | INFO    |   CLOSE TP | SELL BTC | entry=67589.9 exit=67081.4379 pnl=+3.76% (+3.75 USDT) | bal=9980
+2026-04-04 11:52:07 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67572.5 SL=67968.9312 TP=66977.8531 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:07 | INFO    |   CLOSE SL | SELL BTC | entry=67572.5 exit=67968.9312 pnl=-2.93% (-2.93 USDT) | bal=9977
+2026-04-04 11:52:07 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67727.6 SL=67983.119 TP=67344.3215 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:07 | INFO    |   CLOSE SL | SELL BTC | entry=67727.6 exit=67983.119 pnl=-1.89% (-1.88 USDT) | bal=9975
+2026-04-04 11:52:11 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=68242.7 SL=68386.3854 TP=67938.765 R:R=2.12 | mode=SIDEWAY score=4
+2026-04-04 11:52:11 | INFO    |   CLOSE TP | SELL BTC | entry=68242.7 exit=67938.765 pnl=+2.23% (+2.22 USDT) | bal=9977
+2026-04-04 11:52:11 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=68504.5 SL=68669.409 TP=68233.515 R:R=1.64 | mode=SIDEWAY score=4
+2026-04-04 11:52:11 | INFO    |   CLOSE SL | SELL BTC | entry=68504.5 exit=68669.409 pnl=-1.20% (-1.20 USDT) | bal=9976
+2026-04-04 11:52:13 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67914.5 SL=67764.971 TP=68208.335 R:R=1.97 | mode=SIDEWAY score=3
+2026-04-04 11:52:13 | INFO    |   CLOSE SL | BUY BTC | entry=67914.5 exit=67764.971 pnl=-1.10% (-1.10 USDT) | bal=9975
+2026-04-04 11:52:17 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67610.7 SL=67460.4786 TP=67933.965 R:R=2.15 | mode=SIDEWAY score=4
+2026-04-04 11:52:17 | INFO    |   CLOSE SL | BUY BTC | entry=67610.7 exit=67460.4786 pnl=-1.11% (-1.11 USDT) | bal=9974
+2026-04-04 11:52:19 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67232.3 SL=67097.8354 TP=67500.475 R:R=1.99 | mode=SIDEWAY score=4
+2026-04-04 11:52:19 | INFO    |   CLOSE TP | BUY BTC | entry=67232.3 exit=67500.475 pnl=+1.99% (+1.99 USDT) | bal=9976
+2026-04-04 11:52:20 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67273.3 SL=67117.3534 TP=67534.895 R:R=1.68 | mode=SIDEWAY score=4
+2026-04-04 11:52:20 | INFO    |   CLOSE SL | BUY BTC | entry=67273.3 exit=67117.3534 pnl=-1.16% (-1.16 USDT) | bal=9975
+2026-04-04 11:52:20 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=66705.8 SL=66546.6884 TP=67407.21 R:R=4.41 | mode=SIDEWAY score=4
+2026-04-04 11:52:20 | INFO    |   CLOSE SL | BUY BTC | entry=66705.8 exit=66546.6884 pnl=-1.19% (-1.19 USDT) | bal=9973
+2026-04-04 11:52:20 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=64903.7 SL=65146.8593 TP=64538.9611 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:20 | INFO    |   Progress 17280/28800 (60%) | balance=9973 trades=233
+2026-04-04 11:52:20 | INFO    |   CLOSE SL | SELL BTC | entry=64903.7 exit=65146.8593 pnl=-1.87% (-1.87 USDT) | bal=9972
+2026-04-04 11:52:21 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=65006.3 SL=64725.7843 TP=65427.0736 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:21 | INFO    |   CLOSE TP | BUY BTC | entry=65006.3 exit=65427.0736 pnl=+3.24% (+3.23 USDT) | bal=9975
+2026-04-04 11:52:21 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65707.9 SL=65983.1698 TP=65294.9954 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:21 | INFO    |   CLOSE SL | SELL BTC | entry=65707.9 exit=65983.1698 pnl=-2.09% (-2.09 USDT) | bal=9973
+2026-04-04 11:52:22 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66297.8 SL=66627.8445 TP=65802.7332 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:52:22 | INFO    |   CLOSE TP | SELL BTC | entry=66297.8 exit=65802.7332 pnl=+3.73% (+3.72 USDT) | bal=9976
+2026-04-04 11:52:22 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65399.0 SL=65829.4975 TP=64753.2538 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:52:22 | INFO    |   CLOSE TP | SELL BTC | entry=65399.0 exit=64753.2538 pnl=+4.94% (+4.93 USDT) | bal=9981
+2026-04-04 11:52:22 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=64336.9 SL=64751.1423 TP=63715.5366 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:52:22 | INFO    |   CLOSE SL | SELL BTC | entry=64336.9 exit=64751.1423 pnl=-3.22% (-3.21 USDT) | bal=9978
+2026-04-04 11:52:22 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=64165.3 SL=64510.8132 TP=63647.0301 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:52:22 | INFO    |   CLOSE SL | SELL BTC | entry=64165.3 exit=64510.8132 pnl=-2.69% (-2.69 USDT) | bal=9975
+2026-04-04 11:52:27 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65921.0 SL=66374.1025 TP=65241.3462 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:52:27 | INFO    |   CLOSE TP | SELL BTC | entry=65921.0 exit=65241.3462 pnl=+5.16% (+5.14 USDT) | bal=9981
+2026-04-04 11:52:28 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66081.7 SL=66418.1042 TP=65577.0936 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:52:28 | INFO    |   CLOSE SL | SELL BTC | entry=66081.7 exit=66418.1042 pnl=-2.55% (-2.54 USDT) | bal=9978
+2026-04-04 11:52:29 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68843.9 SL=69140.7098 TP=68398.6854 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:29 | INFO    |   CLOSE SL | SELL BTC | entry=68843.9 exit=69140.7098 pnl=-2.16% (-2.15 USDT) | bal=9976
+2026-04-04 11:52:30 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=68996.8 SL=68734.208 TP=69390.688 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:30 | INFO    |   CLOSE SL | BUY BTC | entry=68996.8 exit=68734.208 pnl=-1.90% (-1.90 USDT) | bal=9974
+2026-04-04 11:52:30 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68993.8 SL=68727.5155 TP=69393.2268 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:30 | INFO    |   CLOSE SL | BUY BTC | entry=68993.8 exit=68727.5155 pnl=-1.93% (-1.92 USDT) | bal=9972
+2026-04-04 11:52:31 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68625.5 SL=68404.5363 TP=68956.9456 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:52:31 | INFO    |   CLOSE SL | BUY BTC | entry=68625.5 exit=68404.5363 pnl=-1.61% (-1.61 USDT) | bal=9970
+2026-04-04 11:52:32 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68412.6 SL=68176.0685 TP=68767.3973 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:52:32 | INFO    |   CLOSE SL | BUY BTC | entry=68412.6 exit=68176.0685 pnl=-1.73% (-1.72 USDT) | bal=9969
+2026-04-04 11:52:32 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67010.5 SL=66498.4738 TP=67778.5394 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:52:32 | INFO    |   CLOSE SL | BUY BTC | entry=67010.5 exit=66498.4738 pnl=-3.82% (-3.81 USDT) | bal=9965
+2026-04-04 11:52:34 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67041.1 SL=66761.3972 TP=67460.6541 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:34 | INFO    |   CLOSE TP | BUY BTC | entry=67041.1 exit=67460.6541 pnl=+3.13% (+3.12 USDT) | bal=9968
+2026-04-04 11:52:34 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67723.7 SL=67485.7908 TP=68080.5639 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:52:34 | INFO    |   CLOSE SL | BUY BTC | entry=67723.7 exit=67485.7908 pnl=-1.76% (-1.75 USDT) | bal=9966
+2026-04-04 11:52:35 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67277.0 SL=67110.446 TP=67830.385 R:R=3.32 | mode=SIDEWAY score=4
+2026-04-04 11:52:35 | INFO    |   CLOSE SL | BUY BTC | entry=67277.0 exit=67110.446 pnl=-1.24% (-1.23 USDT) | bal=9965
+2026-04-04 11:52:35 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66772.9 SL=66494.3678 TP=67190.6984 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:52:35 | INFO    |   CLOSE SL | BUY BTC | entry=66772.9 exit=66494.3678 pnl=-2.09% (-2.08 USDT) | bal=9963
+2026-04-04 11:52:35 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66211.5 SL=65834.3712 TP=66777.1931 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:52:35 | INFO    |   CLOSE SL | BUY BTC | entry=66211.5 exit=65834.3712 pnl=-2.85% (-2.84 USDT) | bal=9960
+2026-04-04 11:52:35 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=65807.1 SL=65524.4823 TP=66231.0266 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:35 | INFO    |   CLOSE TP | BUY BTC | entry=65807.1 exit=66231.0266 pnl=+3.22% (+3.21 USDT) | bal=9963
+2026-04-04 11:52:38 | INFO    |   Progress 18720/28800 (65%) | balance=9963 trades=254
+2026-04-04 11:52:38 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=63535.1 SL=63197.2622 TP=64041.8566 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:38 | INFO    |   CLOSE TP | BUY BTC | entry=63535.1 exit=64041.8566 pnl=+3.99% (+3.97 USDT) | bal=9967
+2026-04-04 11:52:39 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=64778.7 SL=65296.9296 TP=63846.9787 R:R=1.8 | mode=DOWNTREND score=4
+2026-04-04 11:52:39 | INFO    |   CLOSE SL | SELL BTC | entry=64778.7 exit=65296.9296 pnl=-4.00% (-3.99 USDT) | bal=9963
+2026-04-04 11:52:39 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66959.5 SL=67197.3987 TP=66602.6519 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:39 | INFO    |   CLOSE TP | SELL BTC | entry=66959.5 exit=66602.6519 pnl=+2.66% (+2.65 USDT) | bal=9966
+2026-04-04 11:52:40 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67726.3 SL=68268.1104 TP=66853.2764 R:R=1.61 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:40 | INFO    |   CLOSE TP | SELL BTC | entry=67726.3 exit=66853.2764 pnl=+6.45% (+6.42 USDT) | bal=9972
+2026-04-04 11:52:40 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66956.3 SL=66752.1092 TP=67262.5861 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:40 | INFO    |   CLOSE TP | BUY BTC | entry=66956.3 exit=67262.5861 pnl=+2.29% (+2.28 USDT) | bal=9975
+2026-04-04 11:52:40 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66393.1 SL=65994.4172 TP=66991.1241 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:40 | INFO    |   CLOSE TP | BUY BTC | entry=66393.1 exit=66991.1241 pnl=+4.50% (+4.49 USDT) | bal=9979
+2026-04-04 11:52:40 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66874.9 SL=67141.9873 TP=66474.2691 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:40 | INFO    |   CLOSE SL | SELL BTC | entry=66874.9 exit=67141.9873 pnl=-2.00% (-1.99 USDT) | bal=9977
+2026-04-04 11:52:41 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=66155.7 SL=65901.7108 TP=66536.6839 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:41 | INFO    |   CLOSE SL | BUY BTC | entry=66155.7 exit=65901.7108 pnl=-1.92% (-1.92 USDT) | bal=9975
+2026-04-04 11:52:41 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66034.0 SL=65735.715 TP=66481.4275 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:41 | INFO    |   CLOSE TP | BUY BTC | entry=66034.0 exit=66481.4275 pnl=+3.39% (+3.38 USDT) | bal=9979
+2026-04-04 11:52:41 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=65889.2 SL=65616.477 TP=66298.2845 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:41 | INFO    |   CLOSE SL | BUY BTC | entry=65889.2 exit=65616.477 pnl=-2.07% (-2.07 USDT) | bal=9977
+2026-04-04 11:52:41 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=65394.5 SL=65682.3862 TP=64962.6706 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:41 | INFO    |   CLOSE SL | SELL BTC | entry=65394.5 exit=65682.3862 pnl=-2.20% (-2.20 USDT) | bal=9974
+2026-04-04 11:52:41 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66093.4 SL=65785.1665 TP=66555.7502 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:41 | INFO    |   CLOSE SL | BUY BTC | entry=66093.4 exit=65785.1665 pnl=-2.33% (-2.33 USDT) | bal=9972
+2026-04-04 11:52:41 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=65672.7 SL=65147.3184 TP=66590.3273 R:R=1.75 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:41 | INFO    |   CLOSE TP | BUY BTC | entry=65672.7 exit=66590.3273 pnl=+6.99% (+6.97 USDT) | bal=9979
+2026-04-04 11:52:41 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66543.9 SL=66835.8598 TP=66105.9604 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:41 | INFO    |   CLOSE TP | SELL BTC | entry=66543.9 exit=66105.9604 pnl=+3.29% (+3.28 USDT) | bal=9982
+2026-04-04 11:52:42 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66714.5 SL=67020.8863 TP=66254.9206 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:42 | INFO    |   CLOSE TP | SELL BTC | entry=66714.5 exit=66254.9206 pnl=+3.44% (+3.44 USDT) | bal=9986
+2026-04-04 11:52:42 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66132.2 SL=65857.1695 TP=66544.7457 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:42 | INFO    |   CLOSE SL | BUY BTC | entry=66132.2 exit=65857.1695 pnl=-2.08% (-2.08 USDT) | bal=9984
+2026-04-04 11:52:42 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=65719.2 SL=65344.702 TP=66280.947 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:52:42 | INFO    |   CLOSE TP | BUY BTC | entry=65719.2 exit=66280.947 pnl=+4.27% (+4.27 USDT) | bal=9988
+2026-04-04 11:52:43 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=65405.9 SL=65156.3852 TP=65780.1721 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:52:43 | INFO    |   CLOSE TP | BUY BTC | entry=65405.9 exit=65780.1721 pnl=+2.86% (+2.86 USDT) | bal=9991
+2026-04-04 11:52:43 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69234.2 SL=69761.0855 TP=68443.8717 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:43 | INFO    |   CLOSE SL | SELL BTC | entry=69234.2 exit=69761.0855 pnl=-3.81% (-3.80 USDT) | bal=9987
+2026-04-04 11:52:43 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69794.3 SL=70274.4858 TP=69074.0214 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:43 | INFO    |   CLOSE TP | SELL BTC | entry=69794.3 exit=69074.0214 pnl=+5.16% (+5.15 USDT) | bal=9992
+2026-04-04 11:52:43 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68862.5 SL=68515.8438 TP=69382.4844 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:43 | INFO    |   CLOSE TP | BUY BTC | entry=68862.5 exit=69382.4844 pnl=+3.78% (+3.77 USDT) | bal=9996
+2026-04-04 11:52:43 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=69141.0 SL=68854.6475 TP=69570.5287 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:52:43 | INFO    |   CLOSE SL | BUY BTC | entry=69141.0 exit=68854.6475 pnl=-2.07% (-2.07 USDT) | bal=9994
+2026-04-04 11:52:46 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67498.1 SL=67999.6453 TP=66745.7821 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:52:46 | INFO    |   CLOSE SL | SELL BTC | entry=67498.1 exit=67999.6453 pnl=-3.72% (-3.71 USDT) | bal=9990
+2026-04-04 11:52:46 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68428.4 SL=68736.571 TP=67966.1435 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:46 | INFO    |   CLOSE SL | SELL BTC | entry=68428.4 exit=68736.571 pnl=-2.25% (-2.25 USDT) | bal=9988
+2026-04-04 11:52:46 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68343.3 SL=68820.8583 TP=67626.9626 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:46 | INFO    |   CLOSE SL | SELL BTC | entry=68343.3 exit=68820.8583 pnl=-3.49% (-3.49 USDT) | bal=9984
+2026-04-04 11:52:47 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68020.0 SL=67722.75 TP=68465.875 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:52:47 | INFO    |   CLOSE TP | BUY BTC | entry=68020.0 exit=68465.875 pnl=+3.28% (+3.27 USDT) | bal=9988
+2026-04-04 11:52:47 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68250.9 SL=67962.8727 TP=68682.9409 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:47 | INFO    |   CLOSE TP | BUY BTC | entry=68250.9 exit=68682.9409 pnl=+3.17% (+3.16 USDT) | bal=9991
+2026-04-04 11:52:47 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68417.4 SL=68721.8435 TP=67960.7347 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:47 | INFO    |   CLOSE TP | SELL BTC | entry=68417.4 exit=67960.7347 pnl=+3.34% (+3.33 USDT) | bal=9994
+2026-04-04 11:52:47 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67596.0 SL=67306.71 TP=68029.935 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:47 | INFO    |   CLOSE TP | BUY BTC | entry=67596.0 exit=68029.935 pnl=+3.21% (+3.21 USDT) | bal=9997
+2026-04-04 11:52:48 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69499.9 SL=69239.0503 TP=69891.1746 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:52:48 | INFO    |   CLOSE TP | BUY BTC | entry=69499.9 exit=69891.1746 pnl=+2.81% (+2.81 USDT) | bal=10000
+2026-04-04 11:52:48 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71001.9 SL=70578.8953 TP=71636.4071 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:52:48 | INFO    |   CLOSE TP | BUY BTC | entry=71001.9 exit=71636.4071 pnl=+4.47% (+4.47 USDT) | bal=10005
+2026-04-04 11:52:48 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71157.3 SL=70727.3068 TP=71802.2899 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:52:48 | INFO    |   CLOSE SL | BUY BTC | entry=71157.3 exit=70727.3068 pnl=-3.02% (-3.02 USDT) | bal=10002
+2026-04-04 11:52:48 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71327.2 SL=71042.382 TP=71754.427 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:52:48 | INFO    |   CLOSE TP | BUY BTC | entry=71327.2 exit=71754.427 pnl=+2.99% (+3.00 USDT) | bal=10005
+2026-04-04 11:52:49 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=72930.9 SL=72347.4528 TP=73951.9291 R:R=1.75 | mode=UPTREND score=5
+2026-04-04 11:52:49 | INFO    |   CLOSE TP | BUY BTC | entry=72930.9 exit=73951.9291 pnl=+7.00% (+7.00 USDT) | bal=10012
+2026-04-04 11:52:50 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=72592.9 SL=72334.5177 TP=72980.4734 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:52:50 | INFO    |   CLOSE SL | BUY BTC | entry=72592.9 exit=72334.5177 pnl=-1.78% (-1.78 USDT) | bal=10010
+2026-04-04 11:52:50 | INFO    |   Progress 20160/28800 (70%) | balance=10010 trades=289
+2026-04-04 11:52:51 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=72563.2 SL=72285.392 TP=72979.912 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:51 | INFO    |   CLOSE TP | BUY BTC | entry=72563.2 exit=72979.912 pnl=+2.87% (+2.87 USDT) | bal=10013
+2026-04-04 11:52:56 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68434.1 SL=68050.9147 TP=69008.8779 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:56 | INFO    |   CLOSE SL | BUY BTC | entry=68434.1 exit=68050.9147 pnl=-2.80% (-2.80 USDT) | bal=10010
+2026-04-04 11:52:56 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=68396.2 SL=68064.5095 TP=68893.7357 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:52:56 | INFO    |   CLOSE SL | BUY BTC | entry=68396.2 exit=68064.5095 pnl=-2.42% (-2.43 USDT) | bal=10008
+2026-04-04 11:52:58 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=68487.4 SL=68661.8748 TP=68225.685 R:R=1.5 | mode=SIDEWAY score=3
+2026-04-04 11:52:58 | INFO    |   CLOSE TP | SELL BTC | entry=68487.4 exit=68225.685 pnl=+1.91% (+1.91 USDT) | bal=10009
+2026-04-04 11:52:59 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67665.7 SL=67514.6686 TP=67909.135 R:R=1.61 | mode=SIDEWAY score=4
+2026-04-04 11:52:59 | INFO    |   CLOSE SL | BUY BTC | entry=67665.7 exit=67514.6686 pnl=-1.12% (-1.12 USDT) | bal=10008
+2026-04-04 11:53:03 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67276.9 SL=67613.1922 TP=66772.4616 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:53:03 | INFO    |   CLOSE TP | SELL BTC | entry=67276.9 exit=66772.4616 pnl=+3.75% (+3.75 USDT) | bal=10012
+2026-04-04 11:53:03 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=66884.3 SL=67168.6107 TP=66457.8339 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:53:03 | INFO    |   CLOSE SL | SELL BTC | entry=66884.3 exit=67168.6107 pnl=-2.13% (-2.13 USDT) | bal=10010
+2026-04-04 11:53:08 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66200.0 SL=66507.6 TP=65738.6 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:53:08 | INFO    |   CLOSE SL | SELL BTC | entry=66200.0 exit=66507.6 pnl=-2.32% (-2.33 USDT) | bal=10008
+2026-04-04 11:53:10 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67792.8 SL=68207.882 TP=67170.177 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:10 | INFO    |   CLOSE TP | SELL BTC | entry=67792.8 exit=67170.177 pnl=+4.59% (+4.60 USDT) | bal=10012
+2026-04-04 11:53:10 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67693.8 SL=68017.5345 TP=67208.1982 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:10 | INFO    |   CLOSE SL | SELL BTC | entry=67693.8 exit=68017.5345 pnl=-2.39% (-2.39 USDT) | bal=10010
+2026-04-04 11:53:10 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67850.0 SL=68118.125 TP=67447.8125 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:10 | INFO    |   CLOSE TP | SELL BTC | entry=67850.0 exit=67447.8125 pnl=+2.96% (+2.97 USDT) | bal=10013
+2026-04-04 11:53:12 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68928.9 SL=69360.3222 TP=68281.7666 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:12 | INFO    |   CLOSE TP | SELL BTC | entry=68928.9 exit=68281.7666 pnl=+4.69% (+4.70 USDT) | bal=10017
+2026-04-04 11:53:12 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68462.8 SL=68202.743 TP=68852.8855 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:12 | INFO    |   CLOSE TP | BUY BTC | entry=68462.8 exit=68852.8855 pnl=+2.85% (+2.85 USDT) | bal=10020
+2026-04-04 11:53:13 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68952.8 SL=69272.582 TP=68473.127 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:13 | INFO    |   CLOSE TP | SELL BTC | entry=68952.8 exit=68473.127 pnl=+3.48% (+3.49 USDT) | bal=10024
+2026-04-04 11:53:13 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=68495.1 SL=68264.1622 TP=68841.5066 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:13 | INFO    |   CLOSE TP | BUY BTC | entry=68495.1 exit=68841.5066 pnl=+2.53% (+2.53 USDT) | bal=10026
+2026-04-04 11:53:13 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69229.0 SL=69535.9725 TP=68768.5413 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:13 | INFO    |   CLOSE SL | SELL BTC | entry=69229.0 exit=69535.9725 pnl=-2.22% (-2.22 USDT) | bal=10024
+2026-04-04 11:53:13 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69477.6 SL=69164.806 TP=69946.791 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:13 | INFO    |   CLOSE TP | BUY BTC | entry=69477.6 exit=69946.791 pnl=+3.38% (+3.38 USDT) | bal=10028
+2026-04-04 11:53:13 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69911.1 SL=69625.5223 TP=70339.4666 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:13 | INFO    |   Progress 21600/28800 (75%) | balance=10028 trades=306
+2026-04-04 11:53:13 | INFO    |   CLOSE TP | BUY BTC | entry=69911.1 exit=70339.4666 pnl=+3.06% (+3.07 USDT) | bal=10031
+2026-04-04 11:53:14 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70294.2 SL=70550.8355 TP=69909.2467 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:14 | INFO    |   CLOSE SL | SELL BTC | entry=70294.2 exit=70550.8355 pnl=-1.83% (-1.83 USDT) | bal=10029
+2026-04-04 11:53:15 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69588.4 SL=70145.1072 TP=68531.9935 R:R=1.9 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:53:15 | INFO    |   CLOSE SL | SELL BTC | entry=69588.4 exit=70145.1072 pnl=-4.00% (-4.01 USDT) | bal=10025
+2026-04-04 11:53:16 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70243.5 SL=70551.0087 TP=69782.2369 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:16 | INFO    |   CLOSE TP | SELL BTC | entry=70243.5 exit=69782.2369 pnl=+3.28% (+3.29 USDT) | bal=10028
+2026-04-04 11:53:16 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69697.5 SL=69328.7563 TP=70250.6156 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:53:16 | INFO    |   CLOSE SL | BUY BTC | entry=69697.5 exit=69328.7563 pnl=-2.65% (-2.65 USDT) | bal=10025
+2026-04-04 11:53:16 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=69144.0 SL=68959.712 TP=69479.885 R:R=1.82 | mode=SIDEWAY score=4
+2026-04-04 11:53:16 | INFO    |   CLOSE SL | BUY BTC | entry=69144.0 exit=68959.712 pnl=-1.33% (-1.34 USDT) | bal=10024
+2026-04-04 11:53:16 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69247.5 SL=69801.48 TP=68278.0375 R:R=1.75 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:53:16 | INFO    |   CLOSE SL | SELL BTC | entry=69247.5 exit=69801.48 pnl=-4.00% (-4.01 USDT) | bal=10020
+2026-04-04 11:53:16 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70410.5 SL=70973.784 TP=69534.4105 R:R=1.56 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:53:16 | INFO    |   CLOSE SL | SELL BTC | entry=70410.5 exit=70973.784 pnl=-4.00% (-4.01 USDT) | bal=10016
+2026-04-04 11:53:16 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70721.0 SL=71106.8025 TP=70142.2962 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:16 | INFO    |   CLOSE TP | SELL BTC | entry=70721.0 exit=70142.2962 pnl=+4.09% (+4.10 USDT) | bal=10020
+2026-04-04 11:53:17 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70150.0 SL=69917.325 TP=70499.0125 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:53:17 | INFO    |   CLOSE SL | BUY BTC | entry=70150.0 exit=69917.325 pnl=-1.66% (-1.66 USDT) | bal=10018
+2026-04-04 11:53:17 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=69864.2 SL=69693.4716 TP=70162.94 R:R=1.75 | mode=SIDEWAY score=4
+2026-04-04 11:53:17 | INFO    |   CLOSE SL | BUY BTC | entry=69864.2 exit=69693.4716 pnl=-1.22% (-1.22 USDT) | bal=10017
+2026-04-04 11:53:17 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=69383.2 SL=69216.4336 TP=69760.215 R:R=2.26 | mode=SIDEWAY score=4
+2026-04-04 11:53:17 | INFO    |   CLOSE SL | BUY BTC | entry=69383.2 exit=69216.4336 pnl=-1.20% (-1.20 USDT) | bal=10016
+2026-04-04 11:53:18 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=69806.3 SL=69958.4126 TP=69509.97 R:R=1.95 | mode=SIDEWAY score=3
+2026-04-04 11:53:18 | INFO    |   CLOSE SL | SELL BTC | entry=69806.3 exit=69958.4126 pnl=-1.09% (-1.09 USDT) | bal=10015
+2026-04-04 11:53:18 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=70239.3 SL=70447.6786 TP=69798.195 R:R=2.12 | mode=SIDEWAY score=4
+2026-04-04 11:53:18 | INFO    |   CLOSE SL | SELL BTC | entry=70239.3 exit=70447.6786 pnl=-1.48% (-1.49 USDT) | bal=10013
+2026-04-04 11:53:18 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69455.0 SL=69130.1625 TP=69942.2562 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:53:18 | INFO    |   CLOSE TP | BUY BTC | entry=69455.0 exit=69942.2562 pnl=+3.51% (+3.51 USDT) | bal=10017
+2026-04-04 11:53:19 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69983.1 SL=70208.8577 TP=69644.4634 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:19 | INFO    |   CLOSE SL | SELL BTC | entry=69983.1 exit=70208.8577 pnl=-1.61% (-1.62 USDT) | bal=10015
+2026-04-04 11:53:20 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71540.6 SL=71917.4515 TP=70975.3227 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:20 | INFO    |   CLOSE TP | SELL BTC | entry=71540.6 exit=70975.3227 pnl=+3.95% (+3.96 USDT) | bal=10019
+2026-04-04 11:53:20 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=71120.9 SL=71392.0022 TP=70714.2466 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:53:20 | INFO    |   CLOSE SL | SELL BTC | entry=71120.9 exit=71392.0022 pnl=-1.91% (-1.91 USDT) | bal=10017
+2026-04-04 11:53:20 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71298.6 SL=71021.7535 TP=71713.8698 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:53:20 | INFO    |   CLOSE TP | BUY BTC | entry=71298.6 exit=71713.8698 pnl=+2.91% (+2.92 USDT) | bal=10020
+2026-04-04 11:53:20 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=72220.4 SL=71910.849 TP=72684.7265 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:53:20 | INFO    |   CLOSE TP | BUY BTC | entry=72220.4 exit=72684.7265 pnl=+3.21% (+3.22 USDT) | bal=10024
+2026-04-04 11:53:20 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73151.6 SL=72787.121 TP=73698.3185 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:53:20 | INFO    |   CLOSE SL | BUY BTC | entry=73151.6 exit=72787.121 pnl=-2.49% (-2.50 USDT) | bal=10021
+2026-04-04 11:53:21 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73496.9 SL=73120.7578 TP=74061.1134 R:R=1.5 | mode=UPTREND score=6
+2026-04-04 11:53:21 | INFO    |   CLOSE SL | BUY BTC | entry=73496.9 exit=73120.7578 pnl=-2.56% (-2.56 USDT) | bal=10018
+2026-04-04 11:53:21 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=71167.2 SL=70785.082 TP=71740.377 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:21 | INFO    |   CLOSE SL | BUY BTC | entry=71167.2 exit=70785.082 pnl=-2.68% (-2.69 USDT) | bal=10016
+2026-04-04 11:53:22 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70850.6 SL=70642.3735 TP=71162.9398 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:22 | INFO    |   CLOSE SL | BUY BTC | entry=70850.6 exit=70642.3735 pnl=-1.47% (-1.47 USDT) | bal=10014
+2026-04-04 11:53:22 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71050.0 SL=70849.375 TP=71350.9375 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:53:22 | INFO    |   CLOSE SL | BUY BTC | entry=71050.0 exit=70849.375 pnl=-1.41% (-1.41 USDT) | bal=10013
+2026-04-04 11:53:25 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=71150.1 SL=71301.0002 TP=70814.6 R:R=2.22 | mode=SIDEWAY score=4
+2026-04-04 11:53:25 | INFO    |   CLOSE SL | SELL BTC | entry=71150.1 exit=71301.0002 pnl=-1.06% (-1.06 USDT) | bal=10012
+2026-04-04 11:53:26 | INFO    |   Progress 23040/28800 (80%) | balance=10012 trades=332
+2026-04-04 11:53:26 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=71815.6 SL=71993.6312 TP=71524.05 R:R=1.64 | mode=SIDEWAY score=4
+2026-04-04 11:53:26 | INFO    |   CLOSE TP | SELL BTC | entry=71815.6 exit=71524.05 pnl=+2.03% (+2.03 USDT) | bal=10014
+2026-04-04 11:53:27 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=71934.2 SL=72115.6684 TP=71462.39 R:R=2.6 | mode=SIDEWAY score=4
+2026-04-04 11:53:27 | INFO    |   CLOSE TP | SELL BTC | entry=71934.2 exit=71462.39 pnl=+3.28% (+3.28 USDT) | bal=10017
+2026-04-04 11:53:28 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=71937.4 SL=72093.8748 TP=71637.42 R:R=1.92 | mode=SIDEWAY score=4
+2026-04-04 11:53:28 | INFO    |   CLOSE SL | SELL BTC | entry=71937.4 exit=72093.8748 pnl=-1.09% (-1.09 USDT) | bal=10016
+2026-04-04 11:53:28 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=72073.7 SL=72247.7474 TP=71692.57 R:R=2.19 | mode=SIDEWAY score=4
+2026-04-04 11:53:28 | INFO    |   CLOSE SL | SELL BTC | entry=72073.7 exit=72247.7474 pnl=-1.21% (-1.21 USDT) | bal=10015
+2026-04-04 11:53:28 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=72461.4 SL=72654.3228 TP=71970.31 R:R=2.55 | mode=SIDEWAY score=4
+2026-04-04 11:53:28 | INFO    |   CLOSE SL | SELL BTC | entry=72461.4 exit=72654.3228 pnl=-1.33% (-1.33 USDT) | bal=10014
+2026-04-04 11:53:28 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=72715.6 SL=72962.0312 TP=72074.32 R:R=2.6 | mode=SIDEWAY score=4
+2026-04-04 11:53:28 | INFO    |   CLOSE SL | SELL BTC | entry=72715.6 exit=72962.0312 pnl=-1.69% (-1.70 USDT) | bal=10012
+2026-04-04 11:53:29 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73655.5 SL=73367.0612 TP=74088.1581 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:53:29 | INFO    |   CLOSE TP | BUY BTC | entry=73655.5 exit=74088.1581 pnl=+2.94% (+2.94 USDT) | bal=10015
+2026-04-04 11:53:31 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=73940.5 SL=73686.7487 TP=74321.1269 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:53:31 | INFO    |   CLOSE TP | BUY BTC | entry=73940.5 exit=74321.1269 pnl=+2.57% (+2.58 USDT) | bal=10017
+2026-04-04 11:53:32 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74434.5 SL=74025.3138 TP=75048.2794 R:R=1.5 | mode=UPTREND score=5
+2026-04-04 11:53:32 | INFO    |   CLOSE TP | BUY BTC | entry=74434.5 exit=75048.2794 pnl=+4.12% (+4.13 USDT) | bal=10021
+2026-04-04 11:53:32 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=74999.3 SL=74691.9017 TP=75460.3974 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:53:32 | INFO    |   CLOSE TP | BUY BTC | entry=74999.3 exit=75460.3974 pnl=+3.07% (+3.08 USDT) | bal=10025
+2026-04-04 11:53:32 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=75851.9 SL=75552.2703 TP=76301.3446 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:53:32 | INFO    |   CLOSE SL | BUY BTC | entry=75851.9 exit=75552.2703 pnl=-1.98% (-1.98 USDT) | bal=10023
+2026-04-04 11:53:32 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=75584.7 SL=75270.9382 TP=76055.3426 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:53:32 | INFO    |   CLOSE SL | BUY BTC | entry=75584.7 exit=75270.9382 pnl=-2.08% (-2.08 USDT) | bal=10021
+2026-04-04 11:53:33 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=73984.8 SL=73740.638 TP=74351.043 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:33 | INFO    |   CLOSE TP | BUY BTC | entry=73984.8 exit=74351.043 pnl=+2.48% (+2.48 USDT) | bal=10023
+2026-04-04 11:53:33 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74357.1 SL=74094.1073 TP=74751.5891 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:33 | INFO    |   CLOSE SL | BUY BTC | entry=74357.1 exit=74094.1073 pnl=-1.77% (-1.77 USDT) | bal=10021
+2026-04-04 11:53:33 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74355.3 SL=73978.9117 TP=74919.8824 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:33 | INFO    |   CLOSE SL | BUY BTC | entry=74355.3 exit=73978.9117 pnl=-2.53% (-2.54 USDT) | bal=10019
+2026-04-04 11:53:33 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73890.1 SL=73607.0747 TP=74314.6379 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:33 | INFO    |   CLOSE SL | BUY BTC | entry=73890.1 exit=73607.0747 pnl=-1.92% (-1.92 USDT) | bal=10017
+2026-04-04 11:53:33 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=73721.7 SL=73382.7958 TP=74230.0564 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:53:33 | INFO    |   CLOSE TP | BUY BTC | entry=73721.7 exit=74230.0564 pnl=+3.45% (+3.45 USDT) | bal=10020
+2026-04-04 11:53:35 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=74720.5 SL=74394.4987 TP=75209.5019 R:R=1.5 | mode=UPTREND score=3
+2026-04-04 11:53:35 | INFO    |   CLOSE SL | BUY BTC | entry=74720.5 exit=74394.4987 pnl=-2.18% (-2.19 USDT) | bal=10018
+2026-04-04 11:53:37 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=74103.9 SL=73866.6402 TP=74459.7896 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:53:37 | INFO    |   CLOSE SL | BUY BTC | entry=74103.9 exit=73866.6402 pnl=-1.60% (-1.60 USDT) | bal=10016
+2026-04-04 11:53:38 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=72893.8 SL=72606.5655 TP=73324.6518 R:R=1.5 | mode=UPTREND score=4
+2026-04-04 11:53:38 | INFO    |   CLOSE SL | BUY BTC | entry=72893.8 exit=72606.5655 pnl=-1.97% (-1.97 USDT) | bal=10014
+2026-04-04 11:53:39 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=71320.0 SL=70995.5 TP=71806.75 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:39 | INFO    |   CLOSE TP | BUY BTC | entry=71320.0 exit=71806.75 pnl=+3.41% (+3.42 USDT) | bal=10018
+2026-04-04 11:53:43 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70029.3 SL=70263.0733 TP=69678.6401 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:53:43 | INFO    |   CLOSE SL | SELL BTC | entry=70029.3 exit=70263.0733 pnl=-1.67% (-1.67 USDT) | bal=10016
+2026-04-04 11:53:44 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69980.8 SL=70216.152 TP=69627.772 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:53:44 | INFO    |   CLOSE TP | SELL BTC | entry=69980.8 exit=69627.772 pnl=+2.52% (+2.53 USDT) | bal=10019
+2026-04-04 11:53:44 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69264.6 SL=69533.4615 TP=68861.3078 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:53:44 | INFO    |   CLOSE SL | SELL BTC | entry=69264.6 exit=69533.4615 pnl=-1.94% (-1.94 USDT) | bal=10017
+2026-04-04 11:53:45 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=69183.5 SL=69466.4588 TP=68759.0619 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:53:45 | INFO    |   CLOSE TP | SELL BTC | entry=69183.5 exit=68759.0619 pnl=+3.07% (+3.07 USDT) | bal=10020
+2026-04-04 11:53:46 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70025.6 SL=70360.064 TP=69523.904 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:53:46 | INFO    |   CLOSE SL | SELL BTC | entry=70025.6 exit=70360.064 pnl=-2.39% (-2.39 USDT) | bal=10017
+2026-04-04 11:53:50 | INFO    |   Progress 24480/28800 (85%) | balance=10017 trades=358
+2026-04-04 11:53:50 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=70538.4 SL=70800.046 TP=70145.931 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:53:50 | INFO    |   CLOSE SL | SELL BTC | entry=70538.4 exit=70800.046 pnl=-1.85% (-1.86 USDT) | bal=10016
+2026-04-04 11:53:54 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70165.9 SL=70400.4147 TP=69814.1279 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:54 | INFO    |   CLOSE TP | SELL BTC | entry=70165.9 exit=69814.1279 pnl=+2.51% (+2.51 USDT) | bal=10018
+2026-04-04 11:53:54 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70510.7 SL=70896.8768 TP=69931.4349 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:53:54 | INFO    |   CLOSE SL | SELL BTC | entry=70510.7 exit=70896.8768 pnl=-2.74% (-2.74 USDT) | bal=10015
+2026-04-04 11:53:57 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=69547.0 SL=69395.106 TP=70176.695 R:R=4.15 | mode=SIDEWAY score=4
+2026-04-04 11:53:57 | INFO    |   CLOSE SL | BUY BTC | entry=69547.0 exit=69395.106 pnl=-1.09% (-1.09 USDT) | bal=10014
+2026-04-04 11:53:58 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=68881.5 SL=68373.537 TP=70046.135 R:R=2.29 | mode=SIDEWAY score=4
+2026-04-04 11:53:58 | INFO    |   CLOSE SL | BUY BTC | entry=68881.5 exit=68373.537 pnl=-3.69% (-3.69 USDT) | bal=10011
+2026-04-04 11:53:59 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69361.6 SL=69666.604 TP=68904.094 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:53:59 | INFO    |   CLOSE TP | SELL BTC | entry=69361.6 exit=68904.094 pnl=+3.30% (+3.30 USDT) | bal=10014
+2026-04-04 11:54:00 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=68601.1 SL=68815.7027 TP=68279.1959 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:54:00 | INFO    |   CLOSE TP | SELL BTC | entry=68601.1 exit=68279.1959 pnl=+2.35% (+2.35 USDT) | bal=10016
+2026-04-04 11:54:02 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68635.0 SL=68878.0875 TP=68270.3688 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:54:02 | INFO    |   CLOSE TP | SELL BTC | entry=68635.0 exit=68270.3688 pnl=+2.66% (+2.66 USDT) | bal=10019
+2026-04-04 11:54:03 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68126.2 SL=68544.1155 TP=67499.3267 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:54:03 | INFO    |   CLOSE TP | SELL BTC | entry=68126.2 exit=67499.3267 pnl=+4.60% (+4.61 USDT) | bal=10023
+2026-04-04 11:54:04 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67965.5 SL=68300.5138 TP=67462.9794 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:54:04 | INFO    |   CLOSE TP | SELL BTC | entry=67965.5 exit=67462.9794 pnl=+3.70% (+3.71 USDT) | bal=10027
+2026-04-04 11:54:09 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=71408.3 SL=71746.2207 TP=70901.4189 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:09 | INFO    |   CLOSE TP | SELL BTC | entry=71408.3 exit=70901.4189 pnl=+3.55% (+3.56 USDT) | bal=10031
+2026-04-04 11:54:09 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70755.1 SL=71088.0877 TP=70255.6184 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:09 | INFO    |   CLOSE TP | SELL BTC | entry=70755.1 exit=70255.6184 pnl=+3.53% (+3.54 USDT) | bal=10034
+2026-04-04 11:54:09 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=70440.0 SL=70167.7 TP=70848.45 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:09 | INFO    |   CLOSE TP | BUY BTC | entry=70440.0 exit=70848.45 pnl=+2.90% (+2.91 USDT) | bal=10037
+2026-04-04 11:54:13 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=70170.5 SL=70017.559 TP=70445.575 R:R=1.8 | mode=SIDEWAY score=4
+2026-04-04 11:54:13 | INFO    |   CLOSE TP | BUY BTC | entry=70170.5 exit=70445.575 pnl=+1.96% (+1.97 USDT) | bal=10039
+2026-04-04 11:54:13 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=70759.1 SL=70921.2182 TP=70374.065 R:R=2.38 | mode=SIDEWAY score=4
+2026-04-04 11:54:13 | INFO    |   CLOSE SL | SELL BTC | entry=70759.1 exit=70921.2182 pnl=-1.15% (-1.15 USDT) | bal=10038
+2026-04-04 11:54:13 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=70894.8 SL=71141.7896 TP=70467.895 R:R=1.73 | mode=SIDEWAY score=4
+2026-04-04 11:54:13 | INFO    |   CLOSE SL | SELL BTC | entry=70894.8 exit=71141.7896 pnl=-1.74% (-1.75 USDT) | bal=10036
+2026-04-04 11:54:15 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=70578.8 SL=70431.4424 TP=70954.045 R:R=2.55 | mode=SIDEWAY score=4
+2026-04-04 11:54:15 | INFO    |   CLOSE SL | BUY BTC | entry=70578.8 exit=70431.4424 pnl=-1.04% (-1.05 USDT) | bal=10035
+2026-04-04 11:54:15 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=70284.6 SL=70051.8308 TP=70805.505 R:R=2.24 | mode=SIDEWAY score=4
+2026-04-04 11:54:15 | INFO    |   CLOSE SL | BUY BTC | entry=70284.6 exit=70051.8308 pnl=-1.66% (-1.66 USDT) | bal=10034
+2026-04-04 11:54:17 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=69562.6 SL=69805.3065 TP=69198.5403 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:17 | INFO    |   CLOSE SL | SELL BTC | entry=69562.6 exit=69805.3065 pnl=-1.74% (-1.75 USDT) | bal=10032
+2026-04-04 11:54:18 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=70037.2 SL=70308.193 TP=69630.7105 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:54:18 | INFO    |   CLOSE SL | SELL BTC | entry=70037.2 exit=70308.193 pnl=-1.93% (-1.94 USDT) | bal=10030
+2026-04-04 11:54:18 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70253.7 SL=69995.3657 TP=70641.2014 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:18 | INFO    |   CLOSE TP | BUY BTC | entry=70253.7 exit=70641.2014 pnl=+2.76% (+2.77 USDT) | bal=10033
+2026-04-04 11:54:18 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=70621.6 SL=70348.446 TP=71031.331 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:18 | INFO    |   Progress 25920/28800 (90%) | balance=10033 trades=379
+2026-04-04 11:54:18 | INFO    |   CLOSE TP | BUY BTC | entry=70621.6 exit=71031.331 pnl=+2.90% (+2.91 USDT) | bal=10036
+2026-04-04 11:54:18 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=71209.6 SL=71462.3192 TP=70815.61 R:R=1.56 | mode=SIDEWAY score=4
+2026-04-04 11:54:18 | INFO    |   CLOSE TP | SELL BTC | entry=71209.6 exit=70815.61 pnl=+2.77% (+2.78 USDT) | bal=10038
+2026-04-04 11:54:19 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=71658.2 SL=71803.3164 TP=71387.97 R:R=1.86 | mode=SIDEWAY score=4
+2026-04-04 11:54:19 | INFO    |   CLOSE SL | SELL BTC | entry=71658.2 exit=71803.3164 pnl=-1.01% (-1.02 USDT) | bal=10037
+2026-04-04 11:54:20 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=70891.2 SL=70709.3176 TP=71419.195 R:R=2.9 | mode=SIDEWAY score=4
+2026-04-04 11:54:20 | INFO    |   CLOSE SL | BUY BTC | entry=70891.2 exit=70709.3176 pnl=-1.28% (-1.29 USDT) | bal=10036
+2026-04-04 11:54:21 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=70873.1 SL=70631.2172 TP=71235.9241 R:R=1.5 | mode=VOLATILE_RANGE score=4
+2026-04-04 11:54:21 | INFO    |   CLOSE SL | BUY BTC | entry=70873.1 exit=70631.2172 pnl=-1.71% (-1.71 USDT) | bal=10034
+2026-04-04 11:54:23 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=70904.8 SL=70730.9904 TP=71213.41 R:R=1.78 | mode=SIDEWAY score=4
+2026-04-04 11:54:23 | INFO    |   CLOSE SL | BUY BTC | entry=70904.8 exit=70730.9904 pnl=-1.23% (-1.23 USDT) | bal=10033
+2026-04-04 11:54:25 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=70278.9 SL=70112.4422 TP=70670.415 R:R=2.35 | mode=SIDEWAY score=4
+2026-04-04 11:54:25 | INFO    |   CLOSE SL | BUY BTC | entry=70278.9 exit=70112.4422 pnl=-1.18% (-1.19 USDT) | bal=10032
+2026-04-04 11:54:25 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=69988.7 SL=69766.2226 TP=70578.85 R:R=2.65 | mode=SIDEWAY score=4
+2026-04-04 11:54:25 | INFO    |   CLOSE SL | BUY BTC | entry=69988.7 exit=69766.2226 pnl=-1.59% (-1.59 USDT) | bal=10030
+2026-04-04 11:54:25 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=69428.0 SL=69261.244 TP=69904.31 R:R=2.86 | mode=SIDEWAY score=4
+2026-04-04 11:54:25 | INFO    |   CLOSE SL | BUY BTC | entry=69428.0 exit=69261.244 pnl=-1.20% (-1.20 USDT) | bal=10029
+2026-04-04 11:54:27 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=68922.1 SL=68668.9558 TP=69478.33 R:R=2.2 | mode=SIDEWAY score=4
+2026-04-04 11:54:27 | INFO    |   CLOSE SL | BUY BTC | entry=68922.1 exit=68668.9558 pnl=-1.84% (-1.84 USDT) | bal=10027
+2026-04-04 11:54:27 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=68683.0 SL=68526.734 TP=68942.45 R:R=1.66 | mode=SIDEWAY score=4
+2026-04-04 11:54:27 | INFO    |   CLOSE SL | BUY BTC | entry=68683.0 exit=68526.734 pnl=-1.14% (-1.14 USDT) | bal=10026
+2026-04-04 11:54:28 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=69133.6 SL=68869.566 TP=69529.651 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:28 | INFO    |   CLOSE SL | BUY BTC | entry=69133.6 exit=68869.566 pnl=-1.91% (-1.91 USDT) | bal=10024
+2026-04-04 11:54:31 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=68296.0 SL=68120.608 TP=68776.475 R:R=2.74 | mode=SIDEWAY score=4
+2026-04-04 11:54:31 | INFO    |   CLOSE TP | BUY BTC | entry=68296.0 exit=68776.475 pnl=+3.52% (+3.53 USDT) | bal=10028
+2026-04-04 11:54:32 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=68200.9 SL=68044.5982 TP=68590.005 R:R=2.49 | mode=SIDEWAY score=4
+2026-04-04 11:54:32 | INFO    |   CLOSE SL | BUY BTC | entry=68200.9 exit=68044.5982 pnl=-1.15% (-1.15 USDT) | bal=10027
+2026-04-04 11:54:32 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67780.5 SL=67441.539 TP=68473.42 R:R=2.04 | mode=SIDEWAY score=4
+2026-04-04 11:54:32 | INFO    |   CLOSE SL | BUY BTC | entry=67780.5 exit=67441.539 pnl=-2.50% (-2.51 USDT) | bal=10024
+2026-04-04 11:54:32 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66707.1 SL=66927.7677 TP=66376.0984 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:54:32 | INFO    |   CLOSE TP | SELL BTC | entry=66707.1 exit=66376.0984 pnl=+2.48% (+2.49 USDT) | bal=10027
+2026-04-04 11:54:33 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65943.5 SL=66222.8587 TP=65524.4619 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:54:33 | INFO    |   CLOSE SL | SELL BTC | entry=65943.5 exit=66222.8587 pnl=-2.12% (-2.12 USDT) | bal=10024
+2026-04-04 11:54:34 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65618.0 SL=65875.845 TP=65231.2325 R:R=1.5 | mode=DOWNTREND score=4
+2026-04-04 11:54:34 | INFO    |   CLOSE SL | SELL BTC | entry=65618.0 exit=65875.845 pnl=-1.96% (-1.97 USDT) | bal=10022
+2026-04-04 11:54:38 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66427.0 SL=66621.5675 TP=66135.1487 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:54:38 | INFO    |   CLOSE TP | SELL BTC | entry=66427.0 exit=66135.1487 pnl=+2.20% (+2.20 USDT) | bal=10025
+2026-04-04 11:54:42 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=66735.9 SL=66991.9398 TP=66351.8404 R:R=1.5 | mode=DOWNTREND score=6
+2026-04-04 11:54:42 | INFO    |   CLOSE TP | SELL BTC | entry=66735.9 exit=66351.8404 pnl=+2.88% (+2.88 USDT) | bal=10028
+2026-04-04 11:54:51 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=65995.6 SL=66515.389 TP=65215.9165 R:R=1.5 | mode=DOWNTREND score=3
+2026-04-04 11:54:51 | INFO    |   CLOSE SL | SELL BTC | entry=65995.6 exit=66515.389 pnl=-3.94% (-3.95 USDT) | bal=10024
+2026-04-04 11:54:52 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67139.8 SL=67367.7495 TP=66797.8758 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:54:52 | INFO    |   CLOSE SL | SELL BTC | entry=67139.8 exit=67367.7495 pnl=-1.70% (-1.70 USDT) | bal=10022
+2026-04-04 11:54:52 | INFO    |   Progress 27360/28800 (95%) | balance=10022 trades=401
+2026-04-04 11:54:53 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=67750.1 SL=67902.7002 TP=67353.3 R:R=2.6 | mode=SIDEWAY score=4
+2026-04-04 11:54:53 | INFO    |   CLOSE SL | SELL BTC | entry=67750.1 exit=67902.7002 pnl=-1.13% (-1.13 USDT) | bal=10021
+2026-04-04 11:54:56 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67099.9 SL=66929.7002 TP=67608.94 R:R=2.99 | mode=SIDEWAY score=4
+2026-04-04 11:54:56 | INFO    |   CLOSE TP | BUY BTC | entry=67099.9 exit=67608.94 pnl=+3.79% (+3.80 USDT) | bal=10025
+2026-04-04 11:55:00 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=67222.3 SL=67410.4446 TP=66727.255 R:R=2.63 | mode=SIDEWAY score=4
+2026-04-04 11:55:00 | INFO    |   CLOSE SL | SELL BTC | entry=67222.3 exit=67410.4446 pnl=-1.40% (-1.40 USDT) | bal=10023
+2026-04-04 11:55:01 | INFO    |   OPEN SELL BTC | setup=bearish_pinbar entry=67870.0 SL=68135.675 TP=67471.4875 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:55:01 | INFO    |   CLOSE TP | SELL BTC | entry=67870.0 exit=67471.4875 pnl=+2.94% (+2.94 USDT) | bal=10026
+2026-04-04 11:55:02 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=67014.7 SL=66870.9706 TP=67291.755 R:R=1.93 | mode=SIDEWAY score=4
+2026-04-04 11:55:02 | INFO    |   CLOSE SL | BUY BTC | entry=67014.7 exit=66870.9706 pnl=-1.07% (-1.08 USDT) | bal=10025
+2026-04-04 11:55:02 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=66745.1 SL=66601.5098 TP=67197.065 R:R=3.15 | mode=SIDEWAY score=4
+2026-04-04 11:55:02 | INFO    |   CLOSE SL | BUY BTC | entry=66745.1 exit=66601.5098 pnl=-1.08% (-1.08 USDT) | bal=10024
+2026-04-04 11:55:03 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=66391.2 SL=66147.222 TP=66757.167 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:55:03 | INFO    |   CLOSE TP | BUY BTC | entry=66391.2 exit=66757.167 pnl=+2.76% (+2.76 USDT) | bal=10027
+2026-04-04 11:55:03 | INFO    |   OPEN BUY BTC | setup=bullish_engulfing entry=66858.0 SL=66524.755 TP=67357.8675 R:R=1.5 | mode=VOLATILE_RANGE score=5
+2026-04-04 11:55:03 | INFO    |   CLOSE TP | BUY BTC | entry=66858.0 exit=67357.8675 pnl=+3.74% (+3.75 USDT) | bal=10030
+2026-04-04 11:55:03 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=67144.6 SL=67452.4615 TP=66682.8078 R:R=1.5 | mode=VOLATILE_RANGE score=6
+2026-04-04 11:55:03 | INFO    |   CLOSE SL | SELL BTC | entry=67144.6 exit=67452.4615 pnl=-2.29% (-2.30 USDT) | bal=10028
+2026-04-04 11:55:03 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66893.2 SL=66561.667 TP=67390.4995 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:55:03 | INFO    |   CLOSE TP | BUY BTC | entry=66893.2 exit=67390.4995 pnl=+3.72% (+3.73 USDT) | bal=10032
+2026-04-04 11:55:05 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=67623.8 SL=67389.6405 TP=67975.0393 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:55:05 | INFO    |   CLOSE TP | BUY BTC | entry=67623.8 exit=67975.0393 pnl=+2.60% (+2.61 USDT) | bal=10035
+2026-04-04 11:55:06 | INFO    |   OPEN SELL BTC | setup=bearish_engulfing entry=68418.2 SL=68655.9455 TP=68061.5818 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:55:06 | INFO    |   CLOSE SL | SELL BTC | entry=68418.2 exit=68655.9455 pnl=-1.74% (-1.74 USDT) | bal=10033
+2026-04-04 11:55:09 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=68494.3 SL=68631.3886 TP=68161.815 R:R=2.43 | mode=SIDEWAY score=4
+2026-04-04 11:55:09 | INFO    |   CLOSE SL | SELL BTC | entry=68494.3 exit=68631.3886 pnl=-1.00% (-1.00 USDT) | bal=10032
+2026-04-04 11:55:10 | INFO    |   OPEN BUY BTC | setup=bullish_pinbar entry=66255.2 SL=66006.162 TP=66628.757 R:R=1.5 | mode=VOLATILE_RANGE score=3
+2026-04-04 11:55:10 | INFO    |   CLOSE TP | BUY BTC | entry=66255.2 exit=66628.757 pnl=+2.82% (+2.83 USDT) | bal=10035
+2026-04-04 11:55:11 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=66825.4 SL=67160.5508 TP=66140.76 R:R=2.04 | mode=SIDEWAY score=4
+2026-04-04 11:55:11 | INFO    |   CLOSE SL | SELL BTC | entry=66825.4 exit=67160.5508 pnl=-2.51% (-2.52 USDT) | bal=10032
+2026-04-04 11:55:13 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=66484.6 SL=66317.0308 TP=66783.895 R:R=1.79 | mode=SIDEWAY score=3
+2026-04-04 11:55:13 | INFO    |   CLOSE SL | BUY BTC | entry=66484.6 exit=66317.0308 pnl=-1.26% (-1.26 USDT) | bal=10031
+2026-04-04 11:55:13 | INFO    |   OPEN BUY BTC | setup=setup_E_bb_mean_reversion entry=66267.3 SL=66131.5654 TP=66600.705 R:R=2.46 | mode=SIDEWAY score=4
+2026-04-04 11:55:13 | INFO    |   CLOSE TP | BUY BTC | entry=66267.3 exit=66600.705 pnl=+2.52% (+2.52 USDT) | bal=10033
+2026-04-04 11:55:14 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=66913.2 SL=67050.2264 TP=66688.905 R:R=1.64 | mode=SIDEWAY score=3
+2026-04-04 11:55:14 | INFO    |   CLOSE SL | SELL BTC | entry=66913.2 exit=67050.2264 pnl=-1.02% (-1.03 USDT) | bal=10032
+2026-04-04 11:55:14 | INFO    |   OPEN SELL BTC | setup=setup_E_bb_mean_reversion entry=67240.6 SL=67392.4812 TP=66879.78 R:R=2.38 | mode=SIDEWAY score=4
+2026-04-04 11:55:14 | INFO    |   CLOSE TP | SELL BTC | entry=67240.6 exit=66879.78 pnl=+2.68% (+2.69 USDT) | bal=10035
+2026-04-04 11:55:21 | INFO    | 
+============================================================
+2026-04-04 11:55:21 | INFO    | BACKTEST RESULTS — BTC 100d
+2026-04-04 11:55:21 | INFO    | ============================================================
+2026-04-04 11:55:21 | INFO    |   symbol                    BTC
+2026-04-04 11:55:21 | INFO    |   days                      100
+2026-04-04 11:55:21 | INFO    |   total_trades              420
+2026-04-04 11:55:21 | INFO    |   wins                      161
+2026-04-04 11:55:21 | INFO    |   losses                    259
+2026-04-04 11:55:21 | INFO    |   win_rate_pct              38.3
+2026-04-04 11:55:21 | INFO    |   total_pnl_usdt            34.99
+2026-04-04 11:55:21 | INFO    |   avg_win_usdt              3.51
+2026-04-04 11:55:21 | INFO    |   avg_loss_usdt             -2.04
+2026-04-04 11:55:21 | INFO    |   profit_factor             1.07
+2026-04-04 11:55:21 | INFO    |   max_drawdown_pct          -0.47
+2026-04-04 11:55:21 | INFO    |   sharpe_ratio              0.91
+2026-04-04 11:55:21 | INFO    |   final_balance             10034.99
+2026-04-04 11:55:21 | INFO    | ============================================================
+2026-04-04 11:55:21 | INFO    | 
+Setup breakdown:
+2026-04-04 11:55:21 | INFO    |   bearish_engulfing         81 trades  31/81 wins  pnl=-6.26
+2026-04-04 11:55:21 | INFO    |   bearish_pinbar            89 trades  41/89 wins  pnl=20.42
+2026-04-04 11:55:21 | INFO    |   bullish_engulfing         40 trades  19/40 wins  pnl=31.25
+2026-04-04 11:55:21 | INFO    |   bullish_pinbar            73 trades  35/73 wins  pnl=30.17
+2026-04-04 11:55:21 | INFO    |   setup_E_bb_mean_reversion 137 trades  35/137 wins  pnl=-40.59
+2026-04-04 11:55:21 | INFO    | Trade log also saved to C:\Users\Dustin\Projects\energy-forcaster\backend\trading\logs\backtest_BTC_100d_20260404_0455.csv

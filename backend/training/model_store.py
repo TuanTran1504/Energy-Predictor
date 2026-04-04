@@ -30,28 +30,22 @@ from typing import Optional
 
 log = logging.getLogger(__name__)
 
-# ── Constants ──────────────────────────────────────────────────────────────────
 EXPERIMENT_NAME   = "trading-signals"
 REDIS_TTL_SECONDS = 86_400        # 24h
 SYMBOLS           = ["BTC", "ETH"]
 HORIZONS          = [1, 7]        # days — one model trained per horizon
 MODEL_DIR         = Path(__file__).parent / "models"
 
-# Artifact paths tried in order — matches what train.py logs
-# train.py logs:  {symbol}-bundle  (custom joblib dict)
-#                 {symbol}-model   (mlflow xgboost format)
+# Tried in order: custom joblib bundle first, raw MLflow model as fallback
 BUNDLE_ARTIFACT_NAMES = ["{symbol}-bundle", "{symbol}-model"]
 
 
-# ── Lazy env helpers ───────────────────────────────────────────────────────────
 def _redis_url():   return os.getenv("REDIS_URL", "")
 def _mlflow_uri():  return os.getenv("MLFLOW_TRACKING_URI", "")
 def _mlflow_user(): return os.getenv("MLFLOW_TRACKING_USERNAME", "")
 def _mlflow_pw():   return os.getenv("MLFLOW_TRACKING_PASSWORD", "")
 
 
-# ── Configure MLflow at import time ───────────────────────────────────────────
-# Runs immediately when model_store is imported (after load_dotenv in main.py)
 _uri = _mlflow_uri()
 if _uri:
     os.environ["MLFLOW_TRACKING_USERNAME"] = _mlflow_user()
@@ -62,7 +56,6 @@ else:
     log.warning("MLFLOW_TRACKING_URI not set — DagsHub loading disabled")
 
 
-# ── Redis ──────────────────────────────────────────────────────────────────────
 def _redis_client() -> Optional[redis.Redis]:
     url = _redis_url()
     if not url:
@@ -124,7 +117,6 @@ def _save_to_redis(symbol: str, horizon: int, model, r: redis.Redis, trained_at:
         log.warning(f"[{key}] Redis write failed (non-fatal): {e}")
 
 
-# ── DagsHub ────────────────────────────────────────────────────────────────────
 def _extract_model_from_artifact(artifact_dir: Path, symbol: str):
     """
     Handles two artifact formats that train.py produces:
@@ -140,18 +132,15 @@ def _extract_model_from_artifact(artifact_dir: Path, symbol: str):
         model.xgb
       We use mlflow.xgboost.load_model() on the directory.
     """
-    # Format A: find a .pkl file
     pkl_files = list(artifact_dir.rglob("*.pkl"))
     if pkl_files:
         bundle = joblib.load(pkl_files[0])
         if isinstance(bundle, dict) and "model" in bundle:
             log.info(f"[{symbol}] Extracted XGBClassifier from custom bundle dict")
             return bundle["model"], bundle.get("trained_at_utc")
-        # It's already a raw model (unlikely but handle it)
         log.info(f"[{symbol}] Loaded raw model from .pkl artifact")
         return bundle, None
 
-    # Format B: MLflow model directory
     mlmodel_file = artifact_dir / "MLmodel"
     if mlmodel_file.exists():
         model = mlflow.xgboost.load_model(str(artifact_dir))
@@ -186,7 +175,7 @@ def _load_from_dagshub(symbol: str, horizon: int = 1):
     client = mlflow.tracking.MlflowClient()
     key = _model_key(symbol, horizon)
 
-    # ── Priority 1: @champion alias on registered model ────────────────────────
+    # Priority 1: @champion alias on registered model
     model_name = f"{symbol.lower()}-direction-{horizon}d"
     try:
         mv = client.get_model_version_by_alias(model_name, "champion")
@@ -211,7 +200,7 @@ def _load_from_dagshub(symbol: str, horizon: int = 1):
     except Exception as e:
         log.info(f"[{key}] No @champion alias found ({e}) — falling back to run search")
 
-    # ── Priority 2: most recent FINISHED run by run name ───────────────────────
+    # Priority 2: most recent FINISHED run by run name
     exp = client.get_experiment_by_name(EXPERIMENT_NAME)
     if exp is None:
         raise RuntimeError(f"Experiment '{EXPERIMENT_NAME}' not found on DagsHub")
@@ -265,7 +254,6 @@ def _load_from_dagshub(symbol: str, horizon: int = 1):
     return model, trained_at
 
 
-# ── Local disk ─────────────────────────────────────────────────────────────────
 def _load_from_disk(symbol: str):
     path = MODEL_DIR / f"{symbol.lower()}_model.pkl"
     if not path.exists():
@@ -273,7 +261,6 @@ def _load_from_disk(symbol: str):
 
     data = joblib.load(path)
 
-    # Handle both raw model and custom bundle dict
     if isinstance(data, dict) and "model" in data:
         log.info(f"[{symbol}] Loaded bundle dict from disk, extracting model")
         return data["model"], data.get("trained_at_utc")
@@ -282,7 +269,6 @@ def _load_from_disk(symbol: str):
     return data, None
 
 
-# ── Public API ─────────────────────────────────────────────────────────────────
 def load_all_models() -> tuple[dict[str, object], dict[str, str]]:
     """
     Loads models for every (symbol, horizon) combination.
@@ -300,19 +286,16 @@ def load_all_models() -> tuple[dict[str, object], dict[str, str]]:
             model = None
             ts = None
 
-            # 1. Redis
-            if r is not None:
+            if r is not None:  # 1. Redis
                 model, ts = _load_from_redis(symbol, horizon, r)
 
-            # 2. DagsHub
-            if model is None and _mlflow_uri():
+            if model is None and _mlflow_uri():  # 2. DagsHub
                 try:
                     model, ts = _load_from_dagshub(symbol, horizon)
                 except Exception as e:
                     log.warning(f"[{key}] DagsHub load failed: {e}")
 
-            # 3. Local disk — only meaningful for horizon=1 (legacy pkl)
-            if model is None and horizon == 1:
+            if model is None and horizon == 1:  # 3. local disk (horizon=1 only)
                 try:
                     model, ts = _load_from_disk(symbol)
                 except Exception as e:

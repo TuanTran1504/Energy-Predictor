@@ -33,7 +33,6 @@ from strategy_core import (
     detect_candle_pattern, detect_bb_mean_reversion, classify_trend,
 )
 
-# ── Logging ────────────────────────────────────────────────────────────────────
 LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
@@ -48,7 +47,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("backtest")
 
-# ── Constants ──────────────────────────────────────────────────────────────────
 BINANCE_BASE  = "https://fapi.binance.com"
 LEVERAGE      = 5
 SL_MAX_PCT    = 0.008    # 0.8%
@@ -59,7 +57,6 @@ INITIAL_BALANCE = 10_000.0
 SCORE_THRESHOLD  = 3
 
 
-# ── Binance historical data ────────────────────────────────────────────────────
 def fetch_binance_klines(symbol: str, interval: str,
                          start_ms: int, end_ms: int) -> pd.DataFrame:
     """
@@ -87,7 +84,7 @@ def fetch_binance_klines(symbol: str, interval: str,
         cur_start = int(data[-1][0]) + 1
         if len(data) < 1500:
             break
-        time.sleep(0.1)   # rate limit courtesy
+        time.sleep(0.1)   # Binance rate limit
 
     if not all_rows:
         return pd.DataFrame(columns=cols)
@@ -119,7 +116,6 @@ def load_historical_data(symbol: str, days: int) -> dict[str, pd.DataFrame]:
     return result
 
 
-# ── Rule-based signal generation ──────────────────────────────────────────────
 def generate_signal(df_m5: pd.DataFrame, idx: int, context: dict) -> dict | None:
     """
     Rule-based pattern check at candle idx in df_m5.
@@ -140,20 +136,17 @@ def generate_signal(df_m5: pd.DataFrame, idx: int, context: dict) -> dict | None
     allowed  = context.get("allowed_direction", "BOTH")
     range_bias = context.get("range_bias", "MIDDLE")
 
-    # Direction filter
     if allowed == "BUY" and sig != "BUY":
         return None
     if allowed == "SELL" and sig != "SELL":
         return None
 
-    # Trend-direction alignment
     if not is_range:
         if h1 == "UPTREND" and sig != "BUY":
             return None
         if h1 == "DOWNTREND" and sig != "SELL":
             return None
 
-    # Range mode: only trade near S/R
     if is_range:
         if range_bias == "NEAR_SUPPORT" and sig != "BUY":
             return None
@@ -167,13 +160,11 @@ def generate_signal(df_m5: pd.DataFrame, idx: int, context: dict) -> dict | None
 
     if sig == "BUY":
         sl = min(float(df_m5["low"].iloc[idx]), entry) - entry * 0.0025
-        # Cap SL
         sl_dist = entry - sl
         if sl_dist / entry > SL_MAX_PCT:
             sl = entry * (1 - SL_MAX_PCT)
         if sl_dist / entry < SL_MIN_PCT:
             return None
-        # TP toward resistance
         resistance = sr.get("resistance", entry * 1.02)
         tp = min(resistance - entry * 0.001, entry + sl_dist * MIN_RR)
         if tp <= entry:
@@ -186,7 +177,7 @@ def generate_signal(df_m5: pd.DataFrame, idx: int, context: dict) -> dict | None
         if sl_dist / entry < SL_MIN_PCT:
             return None
         support = sr.get("support", entry * 0.98)
-        tp = max(support + entry * 0.001, entry - sl_dist * MIN_RR)
+        tp = max(support + entry * 0.001, entry - sl_dist * MIN_RR)  # TP toward support
         if tp >= entry:
             return None
 
@@ -247,7 +238,6 @@ def simulate_exit(df_m5: pd.DataFrame, signal_idx: int, signal: dict,
             "exit_idx": signal_idx + max_candles, "pnl_pct": pnl}
 
 
-# ── Main backtest loop ─────────────────────────────────────────────────────────
 def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
     log.info("=" * 60)
     log.info(f"BACKTEST  {symbol}  {days}d  started {datetime.now(UTC).isoformat()}")
@@ -258,7 +248,6 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
     df_m15 = data["15m"]
     df_m5  = data["5m"]
 
-    # Trim to actual backtest window (after warm-up)
     warmup_ts = int((datetime.now(UTC) - timedelta(days=days)).timestamp() * 1000)
     df_m5_bt  = df_m5[df_m5["timestamp"] >= warmup_ts].reset_index(drop=True)
     log.info(f"Backtest window: {len(df_m5_bt)} M5 candles")
@@ -266,9 +255,8 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
     trades       = []
     balance      = INITIAL_BALANCE
     equity_curve = [balance]
-    open_trade   = None   # {signal_idx, signal_dict, entry_ts}
+    open_trade   = None
 
-    # Progress
     total = len(df_m5_bt)
     step  = max(1, total // 20)
 
@@ -279,7 +267,6 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
 
         ts_ms = int(row["timestamp"])
 
-        # ── Check exit of open trade ──────────────────────────────────────────
         if open_trade is not None:
             sig    = open_trade["signal"]
             entry  = sig["entry"]
@@ -331,13 +318,11 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
                     f"entry={entry} exit={ep} pnl={pnl_pct*100:+.2f}% "
                     f"({pnl_usdt:+.2f} USDT) | bal={balance:.0f}"
                 )
-                continue   # don't look for new signal on the same candle
+                continue   # don't look for new entry on the same candle
 
-        # ── Only look for new signal if no open trade ─────────────────────────
         if open_trade is not None:
             continue
 
-        # ── Get H1 and M15 context at this timestamp ──────────────────────────
         h1_slice  = df_h1[df_h1["timestamp"] <= ts_ms].tail(150)
         m15_slice = df_m15[df_m15["timestamp"] <= ts_ms].tail(100)
         m5_slice  = df_m5[df_m5["timestamp"] <= ts_ms].tail(100)
@@ -352,14 +337,12 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
         )
         ctx["symbol"] = f"{symbol}/USDT"
 
-        # S/R
         ctx["sr"] = find_sr_levels(
             h1_slice.reset_index(drop=True),
             ctx["current_price"],
             m15_slice.reset_index(drop=True),
         )
 
-        # Score
         score, _ = compute_score(ctx)
         ctx["score"] = score
 
@@ -368,22 +351,20 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
 
         m5_local_idx = len(m5_slice) - 1
 
-        # ── Setup E: SIDEWAY path (skips trend-alignment gates) ───────────────
+        # SIDEWAY: use Setup E (BB mean reversion), skipping trend-alignment gates
         if ctx["market_mode"] == "SIDEWAY":
             signal = detect_bb_mean_reversion(
                 m5_slice.reset_index(drop=True), m5_local_idx, ctx
             )
         else:
-            # Technical gates
             tech_ok, _ = check_technical_gates(ctx)
             if not tech_ok:
                 continue
 
-            # Range bias
             if ctx["is_range"]:
                 ctx["range_bias"] = get_range_bias(ctx)
 
-            # Allowed direction (no ML in backtest — use trend bias)
+            # No ML in backtest — derive allowed direction from H1 trend
             if ctx["h1_trend"] == "UPTREND":
                 ctx["allowed_direction"] = "BUY"
             elif ctx["h1_trend"] == "DOWNTREND":
@@ -412,7 +393,6 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
             f"R:R={signal['rr']} | mode={ctx['market_mode']} score={score}"
         )
 
-    # ── Results ────────────────────────────────────────────────────────────────
     return _compute_results(trades, equity_curve, symbol, days, output_csv)
 
 
@@ -432,13 +412,11 @@ def _compute_results(trades: list, equity_curve: list,
     avg_loss     = losses["pnl_usdt"].mean()  if len(losses) > 0 else 0
     profit_factor = abs(wins["pnl_usdt"].sum() / losses["pnl_usdt"].sum()) if len(losses) > 0 else float("inf")
 
-    # Max drawdown
     eq = np.array(equity_curve)
     peak = np.maximum.accumulate(eq)
     dd   = (eq - peak) / peak * 100
     max_dd = float(dd.min())
 
-    # Sharpe (daily returns)
     daily_pnl = df.groupby(df["open_ts"].str[:10])["pnl_usdt"].sum()
     sharpe    = (daily_pnl.mean() / daily_pnl.std() * np.sqrt(252)
                  if daily_pnl.std() > 0 else 0)
@@ -459,7 +437,6 @@ def _compute_results(trades: list, equity_curve: list,
         "final_balance":  round(equity_curve[-1], 2),
     }
 
-    # ── Print summary ──────────────────────────────────────────────────────────
     log.info("\n" + "=" * 60)
     log.info(f"BACKTEST RESULTS — {symbol} {days}d")
     log.info("=" * 60)
@@ -475,13 +452,11 @@ def _compute_results(trades: list, equity_curve: list,
             log.info(f"  {setup:<25} {len(grp)} trades  {w}/{len(grp)} wins  "
                      f"pnl={grp['pnl_usdt'].sum():.2f}")
 
-    # ── CSV export ─────────────────────────────────────────────────────────────
     if output_csv:
         Path(output_csv).parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(output_csv, index=False)
         log.info(f"\nTrade log saved to {output_csv}")
 
-    # Always save to logs/
     default_csv = LOG_DIR / f"backtest_{symbol}_{days}d_{datetime.now(UTC).strftime('%Y%m%d_%H%M')}.csv"
     df.to_csv(default_csv, index=False)
     log.info(f"Trade log also saved to {default_csv}")
@@ -489,7 +464,6 @@ def _compute_results(trades: list, equity_curve: list,
     return results
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Backtest the 5-min strategy")
     parser.add_argument("--symbol", default="BTC", choices=["BTC", "ETH"],

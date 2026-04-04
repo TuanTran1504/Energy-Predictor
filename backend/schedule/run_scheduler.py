@@ -33,8 +33,6 @@ def get_conn():
     return psycopg2.connect(dsn)
 
 
-# ── Fear & Greed ──────────────────────────────────────────────────────────────
-
 def fetch_fear_greed():
     log.info("Fetching Fear & Greed index...")
     try:
@@ -66,8 +64,6 @@ def fetch_fear_greed():
     except Exception as e:
         log.error(f"Fear & Greed failed: {e}")
 
-
-# ── Funding Rates ─────────────────────────────────────────────────────────────
 
 def fetch_funding_rates():
     log.info("Fetching Binance funding rates...")
@@ -107,8 +103,6 @@ def fetch_funding_rates():
         except Exception as e:
             log.error(f"Funding rates {symbol} failed: {e}")
 
-
-# ── FRED Macro Events ─────────────────────────────────────────────────────────
 
 def fetch_fred():
     if not FRED_API_KEY:
@@ -222,8 +216,6 @@ def fetch_fred():
     conn.close()
     log.info(f"FRED: saved {saved} new macro events")
 
-
-# ── Scheduler loops ───────────────────────────────────────────────────────────
 
 def run_daily():
     """Runs immediately on startup, then every 24h."""

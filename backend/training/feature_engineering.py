@@ -202,7 +202,7 @@ def load_macro_features(dates: pd.Series) -> pd.DataFrame:
     rel_df["release_date"] = pd.to_datetime(rel_df["release_date"])
     rel_df["actual_date"] = pd.to_datetime(rel_df["actual_date"])
 
-    # ── FED rate ───────────────────────────────────────────────────────────────
+    # FED rate
     fed = (
         rel_df[rel_df["event_name"] == "FED_RATE"]
         .sort_values("release_date")
@@ -220,7 +220,7 @@ def load_macro_features(dates: pd.Series) -> pd.DataFrame:
         result["macro_fed_rate"] = 5.25
         result["macro_days_since_fed"] = 365
 
-    # ── CPI ────────────────────────────────────────────────────────────────────
+    # CPI
     cpi = (
         rel_df[rel_df["event_name"] == "CPI"]
         .sort_values("release_date")
@@ -236,7 +236,7 @@ def load_macro_features(dates: pd.Series) -> pd.DataFrame:
     else:
         result["macro_cpi_surprise"] = 0.0
 
-    # ── NFP ────────────────────────────────────────────────────────────────────
+    # NFP
     nfp = (
         rel_df[rel_df["event_name"] == "NFP"]
         .sort_values("release_date")
@@ -372,7 +372,6 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
     target_threshold = target_threshold_pct / 100.0
     dropped_neutral = 0
 
-    # ── Price data ─────────────────────────────────────────────────────────────
     crypto_df  = load_crypto_prices(symbol)
     other_sym  = "ETH" if symbol == "BTC" else "BTC"
     other_df   = load_crypto_prices(other_sym)[["date", "close_usd"]].rename(
@@ -382,11 +381,9 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
     crypto_df["other_close_usd"] = crypto_df["other_close_usd"].ffill().fillna(1.0)
     crypto_df = compute_technical_columns(crypto_df)
 
-    # ── External signals ───────────────────────────────────────────────────────
     fear_greed_df = load_fear_greed()
     funding_df    = load_funding_rates(symbol)
 
-    # Merge external signals — forward-fill gaps (weekends, missing days)
     if not fear_greed_df.empty:
         crypto_df = crypto_df.merge(fear_greed_df, on="date", how="left")
         crypto_df["fear_greed"] = crypto_df["fear_greed"].ffill().fillna(0.5)
@@ -399,7 +396,6 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
     else:
         crypto_df["funding_rate_avg"] = 0.0
 
-    # ── Macro releases (as-of join) ────────────────────────────────────────────
     macro_df = load_macro_features(crypto_df["date"])
     crypto_df = crypto_df.merge(macro_df, on="date", how="left")
     macro_defaults = {
@@ -412,7 +408,6 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
         if col in crypto_df.columns:
             crypto_df[col] = crypto_df[col].ffill().fillna(default)
 
-    # ── ETF flows (as-of rolling 7-day sum) ───────────────────────────────────
     etf_df = load_etf_flow_features(crypto_df["date"])
     crypto_df = crypto_df.merge(etf_df, on="date", how="left")
     crypto_df["macro_etf_flow_7d"] = crypto_df["macro_etf_flow_7d"].ffill().fillna(0.0)
@@ -428,13 +423,11 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
 
         close_today = float(today["close_usd"])
 
-        # ── Price momentum ─────────────────────────────────────────────────────
         ret_1d  = float(today["change_pct"]) / 100
         ret_3d  = close_today / float(crypto_df.iloc[i - 3]["close_usd"]) - 1
         ret_7d  = close_today / float(crypto_df.iloc[i - 7]["close_usd"]) - 1
         ret_14d = close_today / float(crypto_df.iloc[i - 14]["close_usd"]) - 1
 
-        # ── Volatility / volume / range ────────────────────────────────────────
         hl_range   = (float(today["high_usd"]) - float(today["low_usd"])) / close_today
         vol_today  = float(today["volume_usd"]) if today["volume_usd"] else 0
         vol_7d_avg = crypto_df.iloc[i - 7:i]["volume_usd"].astype(float).mean()
@@ -480,9 +473,7 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
         volume_ma30_ratio = (vol_today / volume_ma30 - 1) if volume_ma30 > 0 else 0.0
         volume_spike_2x = int(volume_ma7 > 0 and vol_today > 2 * volume_ma7)
 
-        # ── Fear & Greed ───────────────────────────────────────────────────────
-        # Captures crowd sentiment — extreme fear/greed signals potential reversals.
-        # 0 = extreme fear, 1 = extreme greed. Normalised from 0-100.
+        # Fear & Greed: 0=extreme fear, 1=extreme greed (normalised from 0-100)
         fg_today  = float(today["fear_greed"])
         fg_7d_avg = float(crypto_df.iloc[i - 7:i + 1]["fear_greed"].mean())
         fear_greed_feats = {
@@ -492,9 +483,7 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
             "fear_greed_extreme": int(fg_today < 0.2 or fg_today > 0.8),
         }
 
-        # ── Funding rate ───────────────────────────────────────────────────────
-        # Positive = longs paying (overleveraged long → likely correction).
-        # Negative = shorts paying (squeeze risk → price may pump).
+        # Funding rate: positive = longs paying (overcrowded), negative = shorts paying (squeeze risk)
         fr_today  = float(today["funding_rate_avg"])
         fr_7d_avg = float(crypto_df.iloc[i - 7:i + 1]["funding_rate_avg"].mean())
         funding_feats = {
@@ -506,9 +495,7 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
             "funding_extreme_short": int(fr_today < -0.0001),
         }
 
-        # ── BTC/ETH ratio ──────────────────────────────────────────────────────
-        # Rising ratio = BTC outperforming ETH (dominance rising) → ETH may lag.
-        # Falling ratio = ETH outperforming (alt season) → ETH may surge.
+        # BTC/ETH ratio: rising = BTC dominance up (ETH may lag), falling = alt season
         other_today  = float(today["other_close_usd"])
         other_7d_ago = float(crypto_df.iloc[i - 7]["other_close_usd"])
         ratio_today  = close_today / other_today if other_today > 0 else 1.0
@@ -521,19 +508,10 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
             if ratio_7d_ago != 0 else 0.0
         )
 
-        # ── Regime ────────────────────────────────────────────────────────────
-        # bull_regime: 1 when price is above the 200-day MA (bull market),
-        # 0 otherwise (bear market). The single most powerful regime filter
-        # in technical analysis — separates two fundamentally different
-        # distributions of daily returns.
+        # bull_regime: above 200-day MA = bull market; strongest single regime filter
         ma200 = today["ma_200"]
         bull_regime = int(pd.notna(ma200) and float(ma200) > 0 and close_today > float(ma200))
 
-        # ── Macro releases (as-of) ────────────────────────────────────────────
-        # Fed rate level: higher rates → tighter liquidity → crypto headwind.
-        # Days since last Fed change: freshness of the most recent decision.
-        # CPI/NFP surprise: positive = above consensus → risk-off pressure.
-        # ETF flow 7d: sustained inflows → demand pressure for BTC spot.
         macro_feats = {
             "macro_fed_rate":       float(today["macro_fed_rate"])       if pd.notna(today["macro_fed_rate"])       else 5.25,
             "macro_days_since_fed": float(today["macro_days_since_fed"]) if pd.notna(today["macro_days_since_fed"]) else 365.0,
@@ -542,7 +520,6 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
             "macro_etf_flow_7d":    float(today["macro_etf_flow_7d"])    if pd.notna(today["macro_etf_flow_7d"])    else 0.0,
         }
 
-        # ── Calendar ───────────────────────────────────────────────────────────
         calendar = {
             "day_of_week":  date.dayofweek,
             "month":        date.month,

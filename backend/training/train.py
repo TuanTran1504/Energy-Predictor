@@ -26,9 +26,6 @@ from sklearn.metrics import (
 from dotenv import load_dotenv
 
 
-# -----------------------------------------------------------------------------
-# Path resolution
-# -----------------------------------------------------------------------------
 THIS_FILE = Path(__file__).resolve()
 
 
@@ -51,23 +48,18 @@ def find_backend_dir(start: Path) -> Path:
 BACKEND_DIR = find_backend_dir(THIS_FILE)
 PROJECT_ROOT = BACKEND_DIR.parent
 
-# Put dotenv lookup on backend/.env first, then project root /.env as fallback
 backend_env = BACKEND_DIR / ".env"
 project_env = PROJECT_ROOT / ".env"
-load_dotenv(project_env)   # root .env first (lowest priority)
-load_dotenv(backend_env)   # backend/.env second — overrides root for duplicates
+load_dotenv(project_env)   # root first (lowest priority)
+load_dotenv(backend_env)   # backend overrides root for duplicates
 
-# Support both backend/training/train.py and backend/ml/training/train.py layouts
 TRAINING_PARENT = THIS_FILE.parent.parent
 if str(TRAINING_PARENT) not in sys.path:
     sys.path.append(str(TRAINING_PARENT))
 
 from feature_engineering import build_features, get_feature_columns  # noqa: E402
 
-
-# -----------------------------------------------------------------------------
-# Config
-# -----------------------------------------------------------------------------
+ 
 SYMBOLS = ["BTC", "ETH"]
 MIN_PROMOTION_IMPROVEMENT = 0.0
 LOOKAHEAD_DAYS = int(os.getenv("LOOKAHEAD_DAYS", "1"))
@@ -86,8 +78,7 @@ SYNC_CHAMPION_TO_LOCAL = os.getenv("SYNC_CHAMPION_TO_LOCAL", "false").strip().lo
     "1", "true", "yes", "y"
 }
 
-# Safety mode for experiment-only training:
-# SHADOW_TRAIN=true forces no registry promotion and no local model sync.
+# SHADOW_TRAIN disables registry promotion and local sync
 if SHADOW_TRAIN:
     REGISTER_MODELS = False
     SYNC_CHAMPION_TO_LOCAL = False
@@ -102,9 +93,6 @@ WALK_FORWARD_VAL_RATIO = float(os.getenv("WALK_FORWARD_VAL_RATIO", "0.2"))
 MIN_TRAIN_ROWS = int(os.getenv("MIN_TRAIN_ROWS", "300"))
 
 
-# -----------------------------------------------------------------------------
-# Training
-# -----------------------------------------------------------------------------
 def train_model(symbol: str) -> dict:
     """
     Train one symbol model using walk-forward validation, then fit final model
@@ -252,7 +240,7 @@ def train_model(symbol: str) -> dict:
         )
     )
 
-    # Fit final serving model on all samples after validation.
+    # Final model trained on all samples for serving
     model = make_model()
     model.fit(X, y, verbose=False)
 
@@ -286,9 +274,6 @@ def train_model(symbol: str) -> dict:
     }
 
 
-# -----------------------------------------------------------------------------
-# Bundle creation
-# -----------------------------------------------------------------------------
 def make_model_bundle(result: dict, run_id: str) -> dict:
     """
     Create the custom serving bundle expected by local inference.
@@ -312,9 +297,6 @@ def make_model_bundle(result: dict, run_id: str) -> dict:
     }
 
 
-# -----------------------------------------------------------------------------
-# Champion comparison
-# -----------------------------------------------------------------------------
 def get_metric_value_from_run(client: MlflowClient, run_id: str, metric_name: str) -> float:
     run = client.get_run(run_id)
     value = run.data.metrics.get(metric_name)
@@ -345,9 +327,6 @@ def should_promote_over_champion(
     return candidate_metric_value > (current_value + MIN_PROMOTION_IMPROVEMENT)
 
 
-# -----------------------------------------------------------------------------
-# Local sync
-# -----------------------------------------------------------------------------
 def sync_model_bundle_from_dagshub(
     symbol: str,
     local_dir: str,
@@ -443,9 +422,6 @@ def sync_model_bundle_from_dagshub(
     return metadata
 
 
-# -----------------------------------------------------------------------------
-# MLflow / DagsHub logging
-# -----------------------------------------------------------------------------
 def log_result_to_mlflow(result: dict, run_id: str) -> dict:
     """
     Log params, metrics, metadata, MLflow model, and custom bundle artifact.
@@ -563,7 +539,7 @@ def log_result_to_mlflow(result: dict, run_id: str) -> dict:
         traceback.print_exc()
         raise
 
-    # Log the custom serving bundle to DagsHub only
+    # Custom serving bundle (joblib dict — not a raw MLflow model)
     try:
         bundle = make_model_bundle(result, run_id)
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -630,9 +606,6 @@ def register_logged_model(run_id: str, symbol: str, result: dict) -> dict:
     }
 
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
 def main():
     mlflow_uri = os.getenv("MLFLOW_TRACKING_URI", "").strip()
     if mlflow_uri:

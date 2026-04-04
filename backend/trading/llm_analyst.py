@@ -17,7 +17,6 @@ import os
 import pandas as pd
 from openai import OpenAI
 
-# ── Client ─────────────────────────────────────────────────────────────────────
 def _get_client() -> OpenAI:
     return OpenAI(
         api_key=os.environ["GOOGLE_API_KEY"],
@@ -27,7 +26,6 @@ def _get_client() -> OpenAI:
 MODEL = "gemini-2.0-flash"
 
 
-# ── Pattern library ────────────────────────────────────────────────────────────
 PATTERN_LIBRARY = {
 
     "setup_A_buy": """
@@ -271,7 +269,6 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     ml_dir      = context.get("ml_direction", "—")
     ml_conf     = context.get("ml_confidence", 0)
 
-    # ── Select relevant patterns ───────────────────────────────────────────────
     if market_mode == "VOLATILE_RANGE":
         if range_bias == "NEAR_SUPPORT":
             patterns = [PATTERN_LIBRARY["setup_D_buy"], PATTERN_LIBRARY["wait"]]
@@ -283,7 +280,7 @@ def _build_prompt(context: dict) -> tuple[str, str]:
             patterns = [PATTERN_LIBRARY["wait"]]
             bias_note = "Price is in the middle of the range → WAIT."
     elif market_mode == "SIDEWAY" or h1 == "SIDEWAY":
-        # Setup E: mean reversion at BB extremes. Direction driven by RSI.
+        # Setup E: direction driven by RSI extreme at BB
         if rsi < 35:
             patterns = [PATTERN_LIBRARY["setup_E_buy"], PATTERN_LIBRARY["wait"]]
             bias_note = f"SIDEWAY + RSI={rsi:.1f} oversold → look for BUY mean reversion to SMA20."
@@ -455,7 +452,6 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
         raw    = response.choices[0].message.content
         result = _safe_parse(raw)
 
-        # Log analysis block
         if "analysis" in result:
             a = result["analysis"]
             print(f"    [AI] setup={a.get('setup_identified')}  signal={result.get('signal')}")
@@ -482,7 +478,6 @@ def _safe_parse(raw: str) -> dict:
         if text.startswith("json"):
             text = text[4:]
         text = text.strip()
-    # strip trailing non-JSON
     last = text.rfind("}")
     if last != -1:
         text = text[: last + 1]

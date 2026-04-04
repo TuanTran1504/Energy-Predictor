@@ -21,11 +21,9 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
-# ── Log directory ──────────────────────────────────────────────────────────────
 LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-# ── Formatters ─────────────────────────────────────────────────────────────────
 _DETAIL_FMT = logging.Formatter(
     "%(asctime)s | %(levelname)-7s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -45,14 +43,12 @@ def _make_handler(filename: str, fmt: logging.Formatter,
     return h
 
 
-# ── Loggers ────────────────────────────────────────────────────────────────────
 def _build_logger(name: str, filename: str, level=logging.INFO,
                   fmt: logging.Formatter = _DETAIL_FMT) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
     if not logger.handlers:
         logger.addHandler(_make_handler(filename, fmt))
-        # Also mirror to stdout
         sh = logging.StreamHandler()
         sh.setFormatter(fmt)
         logger.addHandler(sh)
@@ -70,8 +66,6 @@ def get_logger() -> logging.Logger:
     """Main cycle logger — use for general INFO/DEBUG messages."""
     return _cycle_log
 
-
-# ── Public helpers ─────────────────────────────────────────────────────────────
 
 def log_cycle_start(symbol: str, mode: str, score: int, score_max: int = 5):
     _cycle_log.info(

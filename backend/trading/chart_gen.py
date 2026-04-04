@@ -24,7 +24,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# ── Colour palette ─────────────────────────────────────────────────────────────
 BG         = "#0D1117"
 GRID       = "#21262D"
 SPINE      = "#30363D"
@@ -61,18 +60,15 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
     try:
         df = df_m5.tail(80).copy().reset_index(drop=True)
 
-        # ── Compute chart indicators locally ──────────────────────────────────
         df["ema34"]  = df["close"].ewm(span=34, adjust=False).mean()
         df["ema89"]  = df["close"].ewm(span=89, adjust=False).mean()
         df["vol_ma"] = df["volume"].rolling(20).mean()
 
-        # Bollinger Bands
         sma20        = df["close"].rolling(20).mean()
         std20        = df["close"].rolling(20).std()
         df["bb_up"]  = sma20 + 2 * std20
         df["bb_dn"]  = sma20 - 2 * std20
 
-        # ── Context values ────────────────────────────────────────────────────
         sr          = context.get("sr", {})
         score       = context.get("score", 0)
         h1_trend    = context.get("h1_trend", "?")
@@ -85,7 +81,6 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         ml_dir      = context.get("ml_direction", "—")
         ml_conf     = context.get("ml_confidence", 0)
 
-        # ── Figure layout ─────────────────────────────────────────────────────
         fig = plt.figure(figsize=(22, 12), facecolor=BG)
         gs  = gridspec.GridSpec(
             2, 1, height_ratios=[3, 1], hspace=0.04,
@@ -99,7 +94,6 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
 
         x = range(len(df))
 
-        # ── Candlesticks ──────────────────────────────────────────────────────
         price_range = df["high"].max() - df["low"].min()
         min_body    = price_range * 0.001
 
@@ -123,13 +117,11 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
             )
             ax_price.add_patch(rect)
 
-        # ── EMA lines ─────────────────────────────────────────────────────────
         ax_price.plot(x, df["ema34"], color=EMA34_C, linewidth=1.6,
                       label="EMA 34", zorder=4)
         ax_price.plot(x, df["ema89"], color=EMA89_C, linewidth=1.6,
                       label="EMA 89", zorder=4)
 
-        # ── Bollinger Bands ───────────────────────────────────────────────────
         valid = df["bb_up"].notna()
         x_arr = np.array(list(x))
         ax_price.plot(x_arr[valid], df["bb_up"][valid], color=BB_C,
@@ -142,7 +134,6 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
             color=BB_C, alpha=0.04, zorder=2,
         )
 
-        # ── S/R levels ────────────────────────────────────────────────────────
         if sr.get("resistance"):
             ax_price.axhline(sr["resistance"], color=RESIST_C, linewidth=1.3,
                              linestyle="--", alpha=0.85, zorder=5)
@@ -157,13 +148,11 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
                           f"  S {sr['support']}", color=SUPPORT_C,
                           fontsize=8, va="top", ha="right")
 
-        # ── Legend ────────────────────────────────────────────────────────────
         ax_price.legend(loc="upper left", fontsize=8,
                         facecolor="#161B22", edgecolor=SPINE, labelcolor=TEXT)
         ax_price.set_ylabel("Price (USDT)", color=TEXT, fontsize=9)
         ax_price.set_xlim(-1, len(df))
 
-        # ── Right Y-axis mirror ────────────────────────────────────────────────
         ax_r = ax_price.twinx()
         ax_r.set_facecolor(BG)
         ax_r.set_ylim(ax_price.get_ylim())
@@ -171,7 +160,6 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         for spine in ax_r.spines.values():
             spine.set_color(SPINE)
 
-        # ── Volume panel ──────────────────────────────────────────────────────
         vol_colors = [
             BULL_BODY if float(df["close"].iloc[i]) >= float(df["open"].iloc[i])
             else BEAR_BODY
@@ -185,7 +173,6 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         ax_volume.legend(loc="upper left", fontsize=8,
                          facecolor="#161B22", edgecolor=SPINE, labelcolor=TEXT)
 
-        # ── X-axis timestamps ─────────────────────────────────────────────────
         if "timestamp" in df.columns:
             step = max(1, len(df) // 10)
             ticks = list(range(0, len(df), step))
@@ -202,7 +189,6 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
 
         plt.setp(ax_price.get_xticklabels(), visible=False)
 
-        # ── Title ─────────────────────────────────────────────────────────────
         mode_color = {
             "UPTREND":        EMA34_C,
             "DOWNTREND":      RESIST_C,
@@ -219,7 +205,6 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         fig.suptitle(title, color=mode_color, fontsize=10,
                      fontweight="bold", y=0.975)
 
-        # ── Encode ────────────────────────────────────────────────────────────
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=110, bbox_inches="tight",
                     facecolor=BG)

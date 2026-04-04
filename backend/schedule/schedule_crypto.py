@@ -70,6 +70,8 @@ def save_crypto_30min():
                 low_p = float(candle[3])
                 close_p = float(candle[4])
                 volume = float(candle[5])
+                taker_buy_vol = float(candle[8])
+                trade_count = int(candle[10])  
                 change = ((close_p - open_p) / open_p) * 100 if open_p > 0 else 0
 
                 cur.execute("""

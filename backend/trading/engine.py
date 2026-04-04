@@ -42,13 +42,11 @@ from trade_logger   import (
     log_skip, log_error, log_cycle_summary,
 )
 
-# ── Env ────────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent.parent.parent
 load_dotenv(ROOT / ".env")
 
 log = get_logger()
 
-# ── Config ─────────────────────────────────────────────────────────────────────
 API_KEY      = os.getenv("BINANCE_FUTURES_API_KEY", "")
 API_SECRET   = os.getenv("BINANCE_FUTURES_SECRET_KEY", "")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -66,12 +64,10 @@ TESTNET_BASE    = "https://testnet.binancefuture.com"
 MONITOR_INTERVAL = 60  # seconds between DB↔Binance sync checks
 
 
-# ── Binance client ─────────────────────────────────────────────────────────────
 def get_client() -> UMFutures:
     return UMFutures(key=API_KEY, secret=API_SECRET, base_url=TESTNET_BASE)
 
 
-# ── DB helpers ─────────────────────────────────────────────────────────────────
 def _get_conn():
     return psycopg2.connect(DATABASE_URL, sslmode="require")
 
@@ -180,7 +176,6 @@ def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None
     return None
 
 
-# ── Background monitor — syncs DB ↔ Binance every 60s ────────────────────────
 def _monitor_loop(client: UMFutures):
     """
     Detects when a native Binance SL/TP has fired and records the close in DB.
@@ -192,12 +187,11 @@ def _monitor_loop(client: UMFutures):
             open_trades = db_get_open_trades()
             for trade in open_trades:
                 sym = trade["symbol"]
-                # Check if position still exists on Binance
                 pos = get_open_position(client, sym)
                 if pos is not None:
                     continue  # still open — nothing to do
 
-                # Position gone — SL/TP fired or manually closed
+                # SL/TP fired or manually closed
                 exit_price = _get_exit_price_from_binance(client, sym)
                 if exit_price is None:
                     try:
@@ -206,7 +200,6 @@ def _monitor_loop(client: UMFutures):
                     except Exception:
                         continue
 
-                # Determine close reason
                 sl = trade["stop_loss"]
                 tp = trade["take_profit"]
                 side = trade["side"]
@@ -228,7 +221,6 @@ def _monitor_loop(client: UMFutures):
         time.sleep(MONITOR_INTERVAL)
 
 
-# ── Redis ──────────────────────────────────────────────────────────────────────
 def _get_redis():
     url = REDIS_URL
     if not url:
@@ -288,7 +280,6 @@ def get_market_signals() -> dict:
     return signals
 
 
-# ── Binance data fetch ─────────────────────────────────────────────────────────
 import pandas as pd
 
 
@@ -340,7 +331,6 @@ def get_open_position(client: UMFutures, symbol: str) -> dict | None:
     return None
 
 
-# ── Position sizing ────────────────────────────────────────────────────────────
 def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float:
     risk_usdt     = balance * POSITION_RISK_PCT
     sl_distance   = abs(entry - sl)
@@ -352,7 +342,6 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     return round(qty, 3) if symbol == "BTC" else round(qty, 2)
 
 
-# ── Order execution ────────────────────────────────────────────────────────────
 def execute_trade(client: UMFutures, symbol: str, decision: dict,
                   balance: float, context: dict, dry_run: bool = False) -> bool:
     """
@@ -372,7 +361,6 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_error(f"[{symbol}] Invalid SL/TP from AI", e)
         return False
 
-    # Get current price
     try:
         ticker = client.ticker_price(symbol=f"{symbol}USDT")
         entry  = float(ticker["price"])
@@ -380,7 +368,6 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_error(f"[{symbol}] Ticker fetch failed", e)
         return False
 
-    # Direction sanity check
     if signal == "BUY" and not (ai_tp > entry > ai_sl):
         log_gate_fail("DIRECTION", f"BUY needs TP({ai_tp}) > entry({entry}) > SL({ai_sl})", symbol)
         return False
@@ -388,7 +375,6 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("DIRECTION", f"SELL needs SL({ai_sl}) > entry({entry}) > TP({ai_tp})", symbol)
         return False
 
-    # SL distance check
     risk_pct = abs(entry - ai_sl) / entry * 100
     if risk_pct < SL_MIN_PCT * 100:
         log_gate_fail("SL_MIN", f"SL {risk_pct:.3f}% < min {SL_MIN_PCT*100:.2f}%", symbol)
@@ -397,7 +383,6 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
         return False
 
-    # R:R check
     risk   = abs(entry - ai_sl)
     reward = abs(ai_tp - entry)
     rr     = reward / risk if risk > 0 else 0
@@ -426,10 +411,8 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     sym_pair = f"{symbol}USDT"
 
     try:
-        # Set leverage
         client.change_leverage(symbol=sym_pair, leverage=LEVERAGE)
 
-        # Entry
         order = client.new_order(
             symbol=sym_pair, side=side, type="MARKET", quantity=qty,
         )
@@ -439,7 +422,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
         time.sleep(0.5)
 
-        # Native SL
+        # SL
         try:
             client.new_order(
                 symbol=sym_pair, side=close_side, type="STOP_MARKET",
@@ -450,7 +433,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         except Exception as e:
             log_error(f"[{symbol}] SL placement failed — SET MANUALLY @ {ai_sl}", e)
 
-        # Native TP
+        # TP
         try:
             client.new_order(
                 symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
@@ -464,7 +447,6 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_trade_open(symbol, signal, actual_price, ai_sl, ai_tp, rr,
                        setup, reason, trade_id=order_id, context=context)
 
-        # ── Persist to DB for dashboard ───────────────────────────────────────
         try:
             db_save_trade(
                 symbol=symbol, side=signal,
@@ -484,7 +466,6 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         return False
 
 
-# ── Single symbol cycle ────────────────────────────────────────────────────────
 def run_symbol_cycle(client: UMFutures, symbol: str,
                      ml_preds: dict, market_signals: dict,
                      balance: float, dry_run: bool = False):
@@ -492,7 +473,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     log.info(f"\n{'─'*50}")
     log.info(f"  CYCLE  {symbol}  {datetime.now(UTC).strftime('%H:%M:%S UTC')}")
 
-    # ── Gate 0: open position? ─────────────────────────────────────────────────
     pos = get_open_position(client, symbol)
     if pos:
         upnl_pct = pos["upnl"] / (pos["entry_price"] * pos["amount"]) * 100
@@ -503,7 +483,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         )
         return
 
-    # ── Fetch OHLCV ───────────────────────────────────────────────────────────
     try:
         df_h1  = fetch_ohlcv(client, symbol, "1h",  200)
         df_m15 = fetch_ohlcv(client, symbol, "15m", 100)
@@ -514,7 +493,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_error(f"[{symbol}] OHLCV fetch failed", e)
         return
 
-    # ── Compute indicators ────────────────────────────────────────────────────
     ctx = compute_indicators(df_h1, df_m15, df_m5)
     ctx["symbol"] = f"{symbol}/USDT"
 
@@ -526,10 +504,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     else:
         ctx["btc_trend"] = ctx["h1_trend"]
 
-    # ── S/R levels ────────────────────────────────────────────────────────────
     ctx["sr"] = find_sr_levels(df_h1, ctx["current_price"], df_m15)
 
-    # ── Score ─────────────────────────────────────────────────────────────────
     score, score_details = compute_score(ctx)
     ctx["score"]        = score
     ctx["score_details"] = score_details
@@ -540,7 +516,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     log.info(f"  Score {score}/5: {', '.join(score_details) or 'none'}")
     log.info(f"  ADX={ctx['adx']:.1f} RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f}")
 
-    # ── Macro bias gate ───────────────────────────────────────────────────────
     ml_key      = f"{symbol}_1d"
     ml_pred     = ml_preds.get(ml_key, {})
     ml_dir      = ml_pred.get("direction", "")
@@ -563,7 +538,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         return
     log_gate_pass("MACRO", f"allowed={allowed_dir} ML={ml_dir}({ml_conf:.0%}) F&G={fear_greed}")
 
-    # ── BTC correlation gate ──────────────────────────────────────────────────
     if symbol != "BTC":
         btc_trend = ctx.get("btc_trend", "")
         h1        = ctx["h1_trend"]
@@ -573,7 +547,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             return
         log_gate_pass("BTC_CORR", f"BTC={btc_trend}")
 
-    # ── Technical gates (SIDEWAY bypasses to Setup E path) ───────────────────
+    # SIDEWAY bypasses trend-alignment gates and goes to Setup E (BB mean reversion)
     is_sideway = ctx["market_mode"] == "SIDEWAY"
 
     if is_sideway:
@@ -592,7 +566,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             return
         log_gate_pass("TECHNICAL", tech_reason)
 
-        # ── Range bias ────────────────────────────────────────────────────────
         if ctx["is_range"]:
             ctx["range_bias"] = get_range_bias(ctx)
             log.info(f"  Range bias: {ctx['range_bias']}")
@@ -600,7 +573,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
                 log_gate_fail("RANGE_POSITION", "price in middle of range — no edge", symbol, ctx)
                 return
 
-    # ── All gates passed — generate chart + call Gemini ───────────────────────
     log.info("  All gates passed → generating chart...")
     chart_b64 = generate_chart(df_m5, ctx)
 
@@ -624,7 +596,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_cycle_summary(symbol, "WAIT", False, balance)
         return
 
-    # ── For Setup E: override AI prices with math-validated levels ────────────
+    # For Setup E, override AI SL/TP with pre-validated levels
     if is_sideway and "setup_e_signal" in ctx:
         mr = ctx["setup_e_signal"]
         if signal == mr["signal"]:   # AI agrees with direction
@@ -633,12 +605,10 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             decision["entry_price"] = mr["entry"]
             log.info(f"  [SETUP_E] Using pre-computed SL={mr['sl']} TP={mr['tp']} R:R={mr['rr']}")
 
-    # ── Execute ────────────────────────────────────────────────────────────────
     executed = execute_trade(client, symbol, decision, balance, ctx, dry_run=dry_run)
     log_cycle_summary(symbol, signal, executed, balance)
 
 
-# ── Main loop ──────────────────────────────────────────────────────────────────
 def run_once(dry_run: bool = False):
     log.info("=" * 60)
     log.info(f"ENGINE V2  {'DRY RUN' if dry_run else 'LIVE'}  {datetime.now(UTC).isoformat()}")
@@ -664,13 +634,11 @@ def run_once(dry_run: bool = False):
 def run_loop(dry_run: bool = False):
     log.info("Engine V2 started — 5-min cycle loop")
 
-    # Ensure trades table exists
     try:
         db_ensure_trades_table()
     except Exception as e:
         log.warning(f"DB table init failed (will retry): {e}")
 
-    # Start background monitor thread
     client_monitor = get_client()
     t = threading.Thread(target=_monitor_loop, args=(client_monitor,), daemon=True)
     t.start()
@@ -684,7 +652,6 @@ def run_loop(dry_run: bool = False):
         time.sleep(CYCLE_INTERVAL)
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Energy Forecaster Trading Engine V2")
     parser.add_argument("--loop",    action="store_true", help="Run continuously every 5 min")
