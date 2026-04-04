@@ -417,7 +417,7 @@ def _build_candle_summary(df_m5: pd.DataFrame) -> str:
         wick_dn  = min(o, c) - lo
         vol      = float(row["volume"])
         lines.append(
-            f"  {color:5s}  O={o:.2f} H={h:.2f} L={l:.2f} C={c:.2f}  "
+            f"  {color:5s}  O={o:.2f} H={h:.2f} L={lo:.2f} C={c:.2f}  "
             f"body={body:.2f} wick↑={wick_up:.2f} wick↓={wick_dn:.2f}  vol={vol:.0f}"
         )
     return "\n".join(lines)
