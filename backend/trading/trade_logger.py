@@ -16,7 +16,8 @@ All public functions are thread-safe (RotatingFileHandler uses file locks).
 import json
 import logging
 import os
-from datetime import datetime, UTC
+from datetime import datetime, timezone
+UTC = timezone.utc
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional

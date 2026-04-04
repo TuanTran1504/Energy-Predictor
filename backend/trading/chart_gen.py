@@ -14,7 +14,8 @@ Returns base64-encoded PNG string ready for Gemini vision API.
 
 import base64
 import io
-from datetime import datetime, UTC
+from datetime import datetime, timezone
+UTC = timezone.utc
 
 import matplotlib
 matplotlib.use("Agg")   # non-interactive backend — safe for server/threads

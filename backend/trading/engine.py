@@ -21,7 +21,8 @@ import json
 import os
 import time
 import threading
-from datetime import datetime, UTC
+from datetime import datetime, timezone
+UTC = timezone.utc
 from pathlib import Path
 
 import psycopg2
