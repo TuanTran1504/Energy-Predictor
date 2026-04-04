@@ -281,10 +281,10 @@ def _build_prompt(context: dict) -> tuple[str, str]:
             bias_note = "Price is in the middle of the range → WAIT."
     elif market_mode == "SIDEWAY" or h1 == "SIDEWAY":
         # Setup E: direction driven by RSI extreme at BB
-        if rsi < 35:
+        if rsi < 40:
             patterns = [PATTERN_LIBRARY["setup_E_buy"], PATTERN_LIBRARY["wait"]]
             bias_note = f"SIDEWAY + RSI={rsi:.1f} oversold → look for BUY mean reversion to SMA20."
-        elif rsi > 65:
+        elif rsi > 60:
             patterns = [PATTERN_LIBRARY["setup_E_sell"], PATTERN_LIBRARY["wait"]]
             bias_note = f"SIDEWAY + RSI={rsi:.1f} overbought → look for SELL mean reversion to SMA20."
         else:
