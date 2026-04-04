@@ -560,7 +560,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
                 log.info(
                     f"  [BB] price={bb.get('price')} upper={bb.get('upper_bb')} "
                     f"lower={bb.get('lower_bb')} sma20={bb.get('sma20')} "
-                    f"RSI={bb.get('rsi')} near_lower={bb.get('near_lower')} near_upper={bb.get('near_upper')}"
+                    f"RSI={bb.get('rsi')} near_lower={bb.get('near_lower')} "
+                    f"near_upper={bb.get('near_upper')} side={bb.get('side','?')} R:R={bb.get('rr','?')}"
                 )
             return
         log_gate_pass("SETUP_E", f"BB MR: {mr_signal['signal']} entry={mr_signal['entry']} "

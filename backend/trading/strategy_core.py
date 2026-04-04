@@ -425,6 +425,7 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
 
     near_lower = close_now <= lower_bb * 1.005  # within 0.5% of lower band
     near_upper = close_now >= upper_bb * 0.995  # within 0.5% of upper band
+    SETUP_E_MIN_RR = 1.1  # relaxed vs trend setups — tight bands compress R:R
 
     context["_bb_debug"] = {
         "price": round(close_now, 4),
@@ -452,7 +453,9 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
             return None
 
         rr = (tp - close_now) / sl_dist
-        if rr < MIN_RR:
+        context["_bb_debug"]["rr"] = round(rr, 2)
+        context["_bb_debug"]["side"] = "BUY"
+        if rr < SETUP_E_MIN_RR:
             return None
 
         return {
@@ -480,7 +483,9 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
             return None
 
         rr = (close_now - tp) / sl_dist
-        if rr < MIN_RR:
+        context["_bb_debug"]["rr"] = round(rr, 2)
+        context["_bb_debug"]["side"] = "SELL"
+        if rr < SETUP_E_MIN_RR:
             return None
 
         return {
