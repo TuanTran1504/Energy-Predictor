@@ -118,6 +118,57 @@ def db_ensure_trades_table():
         conn.close()
 
 
+def db_create_pending(symbol: str, side: str, setup: str,
+                      confidence: float = 0.0) -> int:
+    """INSERT a PENDING record before placing the market order. Returns trade id."""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO trades
+                  (symbol, side, status, leverage, confidence, setup)
+                VALUES (%s,%s,'PENDING',%s,%s,%s)
+                RETURNING id
+            """, (symbol, side, LEVERAGE, confidence, setup))
+            tid = cur.fetchone()[0]
+        conn.commit()
+    finally:
+        conn.close()
+    return tid
+
+
+def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
+                    stop_loss: float, take_profit: float,
+                    order_id: str, notes: str):
+    """UPDATE PENDING → OPEN once entry + SL/TP are all confirmed on exchange."""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE trades SET
+                    status='OPEN', entry_price=%s, quantity=%s,
+                    stop_loss=%s, take_profit=%s,
+                    binance_order_id=%s, notes=%s
+                WHERE id=%s
+            """, (entry_price, quantity, stop_loss, take_profit,
+                  order_id, notes[:200], trade_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def db_cancel_pending(trade_id: int):
+    """DELETE a PENDING record when entry or SL/TP placement failed."""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM trades WHERE id=%s AND status='PENDING'",
+                        (trade_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def db_save_trade(symbol: str, side: str, entry_price: float, quantity: float,
                   stop_loss: float, take_profit: float, order_id: str,
                   setup: str, notes: str, confidence: float = 0.0) -> int:
@@ -184,6 +235,27 @@ def db_get_open_trades() -> list[dict]:
     except Exception as e:
         log.warning(f"[DB] get_open_trades failed: {e}")
         return []
+    finally:
+        conn.close()
+
+
+def db_cleanup_stale_pending(max_age_seconds: int = 120):
+    """Delete PENDING records older than max_age_seconds (crash mid-execution)."""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM trades
+                WHERE status='PENDING'
+                  AND opened_at < NOW() - INTERVAL '%s seconds'
+                RETURNING id, symbol
+            """, (max_age_seconds,))
+            rows = cur.fetchall()
+            for tid, sym in rows:
+                log.warning(f"[DB] Cleaned up stale PENDING record id={tid} symbol={sym}")
+        conn.commit()
+    except Exception as e:
+        log.warning(f"[DB] cleanup_stale_pending failed: {e}")
     finally:
         conn.close()
 
@@ -293,6 +365,7 @@ def _monitor_loop(client: UMFutures):
     log.info("[MONITOR] Background sync thread started (60s interval)")
     while True:
         try:
+            db_cleanup_stale_pending()
             open_trades = db_get_open_trades()
 
             # --- Phase 1: recover orphaned Binance positions ---
@@ -528,24 +601,34 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
                        trade_id="DRY_RUN", context=context)
         return True
 
-    side     = "BUY" if signal == "BUY" else "SELL"
-    pos_side = "LONG" if signal == "BUY" else "SHORT"
+    side       = "BUY" if signal == "BUY" else "SELL"
     close_side = "SELL" if signal == "BUY" else "BUY"
-    sym_pair = f"{symbol}USDT"
+    sym_pair   = f"{symbol}USDT"
+    confidence = context.get("ml_confidence", 0.0)
+
+    # --- Step 1: reserve DB slot before touching the exchange ---
+    pending_id = None
+    try:
+        pending_id = db_create_pending(symbol, signal, setup, confidence)
+        log.info(f"  [EXEC] PENDING record created id={pending_id}")
+    except Exception as e:
+        log_error(f"[{symbol}] Could not create PENDING record — aborting", e)
+        return False
 
     try:
         client.change_leverage(symbol=sym_pair, leverage=LEVERAGE)
 
+        # --- Step 2: entry order ---
         order = client.new_order(
             symbol=sym_pair, side=side, type="MARKET", quantity=qty,
         )
-        order_id    = str(order.get("orderId", ""))
+        order_id     = str(order.get("orderId", ""))
         actual_price = float(order.get("avgPrice", entry)) or entry
         log.info(f"  [EXEC] Entry filled @ {actual_price} orderId={order_id}")
 
         time.sleep(0.5)
 
-        # SL
+        # --- Step 3: SL — abort if it fails ---
         try:
             client.new_order(
                 symbol=sym_pair, side=close_side, type="STOP_MARKET",
@@ -554,9 +637,16 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             )
             log.info(f"  [EXEC] SL order placed @ {ai_sl}")
         except Exception as e:
-            log_error(f"[{symbol}] SL placement failed — SET MANUALLY @ {ai_sl}", e)
+            log_error(f"[{symbol}] SL placement failed — closing position to avoid unprotected trade", e)
+            try:
+                client.new_order(symbol=sym_pair, side=close_side, type="MARKET", quantity=qty)
+                log.info(f"  [EXEC] Position closed after SL failure")
+            except Exception as ce:
+                log_error(f"[{symbol}] Emergency close also failed — MANUAL ACTION REQUIRED", ce)
+            db_cancel_pending(pending_id)
+            return False
 
-        # TP
+        # --- Step 4: TP — abort if it fails ---
         try:
             client.new_order(
                 symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
@@ -565,27 +655,24 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             )
             log.info(f"  [EXEC] TP order placed @ {ai_tp}")
         except Exception as e:
-            log_error(f"[{symbol}] TP placement failed — SET MANUALLY @ {ai_tp}", e)
+            log_error(f"[{symbol}] TP placement failed — closing position to avoid unprotected trade", e)
+            try:
+                client.new_order(symbol=sym_pair, side=close_side, type="MARKET", quantity=qty)
+                log.info(f"  [EXEC] Position closed after TP failure")
+            except Exception as ce:
+                log_error(f"[{symbol}] Emergency close also failed — MANUAL ACTION REQUIRED", ce)
+            db_cancel_pending(pending_id)
+            return False
 
+        # --- Step 5: all confirmed — promote PENDING → OPEN ---
+        db_confirm_open(pending_id, actual_price, qty, ai_sl, ai_tp, order_id, reason)
         log_trade_open(symbol, signal, actual_price, ai_sl, ai_tp, rr,
                        setup, reason, trade_id=order_id, context=context)
-
-        try:
-            db_save_trade(
-                symbol=symbol, side=signal,
-                entry_price=actual_price, quantity=qty,
-                stop_loss=ai_sl, take_profit=ai_tp,
-                order_id=order_id, setup=setup,
-                notes=reason[:200],
-                confidence=context.get("ml_confidence", 0.0),
-            )
-        except Exception as db_err:
-            log.warning(f"[{symbol}] DB save failed (trade still live): {db_err}")
-
         return True
 
     except Exception as e:
         log_error(f"[{symbol}] Order execution failed", e)
+        db_cancel_pending(pending_id)
         return False
 
 
