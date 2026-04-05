@@ -442,12 +442,15 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_error(f"[{symbol}] Invalid SL/TP from AI", e)
         return False
 
-    try:
-        ticker = client.ticker_price(symbol=f"{symbol}USDT")
-        entry  = float(ticker["price"])
-    except Exception as e:
-        log_error(f"[{symbol}] Ticker fetch failed", e)
-        return False
+    # Use price already fetched during analysis to avoid tick drift between analysis and execution
+    entry = float(context.get("current_price", 0))
+    if entry == 0:
+        try:
+            ticker = client.ticker_price(symbol=f"{symbol}USDT")
+            entry  = float(ticker["price"])
+        except Exception as e:
+            log_error(f"[{symbol}] Ticker fetch failed", e)
+            return False
 
     if signal == "BUY" and not (ai_tp > entry > ai_sl):
         log_gate_fail("DIRECTION", f"BUY needs TP({ai_tp}) > entry({entry}) > SL({ai_sl})", symbol)
