@@ -384,7 +384,9 @@ def get_account_balance(client: UMFutures) -> float:
         account = client.account()
         for asset in account.get("assets", []):
             if asset["asset"] == "USDT":
-                return float(asset["crossWalletBalance"])
+                wallet = float(asset["walletBalance"])
+                unrealized = float(asset.get("unrealizedProfit", 0))
+                return round(wallet + unrealized, 2)
     except Exception as e:
         log.warning(f"Balance fetch failed: {e}")
     return 0.0
