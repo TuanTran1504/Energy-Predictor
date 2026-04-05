@@ -437,7 +437,8 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     quarter    = band_width * 0.25
     near_lower = close_now <= lower_bb + quarter
     near_upper = close_now >= upper_bb - quarter
-    SETUP_E_MIN_RR = 1.0
+    SETUP_E_MIN_RR  = 1.0
+    SETUP_E_SL_MIN  = 0.001   # 0.1% — tighter than global 0.2% (sideways = small moves)
 
     context["_bb_debug"] = {
         "price": round(close_now, 4),
@@ -450,18 +451,18 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
     }
 
     if near_lower and rsi < 35:  # BUY: near lower BB + RSI oversold
-        raw_sl  = min(low_now, lower_bb) - close_now * 0.002
+        raw_sl  = min(low_now, lower_bb) - close_now * 0.001
         sl_dist = close_now - raw_sl
-        # Enforce min/max SL distance (clamp, don't reject)
-        if sl_dist / close_now < SL_MIN_PCT:
-            raw_sl  = close_now * (1 - SL_MIN_PCT)
+        # Clamp SL to Setup E tighter bounds
+        if sl_dist / close_now < SETUP_E_SL_MIN:
+            raw_sl  = close_now * (1 - SETUP_E_SL_MIN)
             sl_dist = close_now - raw_sl
         if sl_dist / close_now > SL_MAX_PCT:
             raw_sl  = close_now * (1 - SL_MAX_PCT)
             sl_dist = close_now - raw_sl
 
-        # TP at upper BB (full range target) — better R:R than SMA20 on tight bands
-        tp = float(upper_bb)
+        # TP at SMA20 midline — faster to hit than opposite band in sideways
+        tp = float(sma20)
         if tp <= close_now:
             return None
 
@@ -481,18 +482,18 @@ def detect_bb_mean_reversion(df_m5: pd.DataFrame, idx: int, context: dict) -> di
         }
 
     if near_upper and rsi > 65:  # SELL: near upper BB + RSI overbought
-        raw_sl  = max(high_now, upper_bb) + close_now * 0.002
+        raw_sl  = max(high_now, upper_bb) + close_now * 0.001
         sl_dist = raw_sl - close_now
-        # Enforce min/max SL distance (clamp, don't reject)
-        if sl_dist / close_now < SL_MIN_PCT:
-            raw_sl  = close_now * (1 + SL_MIN_PCT)
+        # Clamp SL to Setup E tighter bounds
+        if sl_dist / close_now < SETUP_E_SL_MIN:
+            raw_sl  = close_now * (1 + SETUP_E_SL_MIN)
             sl_dist = raw_sl - close_now
         if sl_dist / close_now > SL_MAX_PCT:
             raw_sl  = close_now * (1 + SL_MAX_PCT)
             sl_dist = raw_sl - close_now
 
-        # TP at lower BB (full range target) — better R:R than SMA20 on tight bands
-        tp = float(lower_bb)
+        # TP at SMA20 midline — faster to hit than opposite band in sideways
+        tp = float(sma20)
         if tp >= close_now:
             return None
 
