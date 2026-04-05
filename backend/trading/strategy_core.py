@@ -10,7 +10,7 @@ Public API:
   check_technical_gates(context) -> (bool, str)
   find_sr_levels(df_h1, current_price, df_m15) -> dict
   compute_score(df_m15, context) -> (int, list[str])
-  classify_trend(gap_pct, ema34, ema89, threshold, atr_pct) -> str
+  classify_trend(gap_pct, ema34, ema89, threshold, atr_pct, adx) -> str
   detect_bb_mean_reversion(df_m5, idx, context) -> dict | None
 """
 
@@ -30,15 +30,21 @@ SL_MIN_PCT = 0.002    # 0.2% hard min SL distance
 MIN_RR     = 1.5      # minimum reward-to-risk ratio
 
 
+ADX_TREND_THRESHOLD = 45  # ADX above this overrides EMA gap → treat as trending
+
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
-                   threshold: float, atr_pct: float = 0.0) -> str:
+                   threshold: float, atr_pct: float = 0.0,
+                   adx: float = 0.0) -> str:
     """
     UPTREND / DOWNTREND / VOLATILE_RANGE / SIDEWAY
     Gap >= threshold → directional trend.
+    ADX >= ADX_TREND_THRESHOLD → strong momentum, treat as trend even if EMA gap is small.
     Gap < threshold + high ATR → volatile range (tradeable).
     Gap < threshold + low ATR  → flat sideway (skip).
     """
     if gap_pct >= threshold:
+        return "UPTREND" if ema34 > ema89 else "DOWNTREND"
+    if adx >= ADX_TREND_THRESHOLD:
         return "UPTREND" if ema34 > ema89 else "DOWNTREND"
     if atr_pct >= ATR_VOLATILE_PCT:
         return "VOLATILE_RANGE"
@@ -71,10 +77,7 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     h1_atr      = df_h1["atr_h1"].iloc[-1]
     h1_atr_pct  = h1_atr / h1_close * 100
     h1_gap      = abs(h1_ema34 - h1_ema89) / h1_ema89 * 100
-    h1_trend    = classify_trend(h1_gap, h1_ema34, h1_ema89,
-                                 H1_TREND_GAP, h1_atr_pct)
-
-    # M15
+    # M15 — compute TR/ATR and ADX first so classify_trend can use adx
     df_m15 = df_m15.copy()
     df_m15["ema34"] = df_m15["close"].ewm(span=34, adjust=False).mean()
     df_m15["ema89"] = df_m15["close"].ewm(span=89, adjust=False).mean()
@@ -88,19 +91,6 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     )
     df_m15["atr"] = df_m15["tr"].ewm(span=14, adjust=False).mean()
 
-    m15_ema34  = df_m15["ema34"].iloc[-1]
-    m15_ema89  = df_m15["ema89"].iloc[-1]
-    m15_gap    = abs(m15_ema34 - m15_ema89) / m15_ema89 * 100
-    m15_trend  = classify_trend(m15_gap, m15_ema34, m15_ema89,
-                                M15_TREND_GAP, h1_atr_pct)
-    atr_m15    = df_m15["atr"].iloc[-1]
-
-    delta  = df_m15["close"].diff()
-    gain   = delta.clip(lower=0).ewm(span=14, adjust=False).mean()
-    loss   = (-delta.clip(upper=0)).ewm(span=14, adjust=False).mean()
-    rs     = gain / loss.replace(0, np.nan)
-    rsi    = (100 - 100 / (1 + rs)).iloc[-1]
-
     # ADX (M15) — simplified directional movement
     df_m15["dm_plus"]  = np.where(
         (df_m15["high"].diff() > -df_m15["low"].diff()) &
@@ -112,11 +102,27 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
         (-df_m15["low"].diff() > 0),
         -df_m15["low"].diff(), 0
     )
-    atr_s   = df_m15["tr"].ewm(span=14, adjust=False).mean()
+    atr_s    = df_m15["tr"].ewm(span=14, adjust=False).mean()
     di_plus  = 100 * df_m15["dm_plus"].ewm(span=14, adjust=False).mean() / atr_s
     di_minus = 100 * df_m15["dm_minus"].ewm(span=14, adjust=False).mean() / atr_s
     dx       = 100 * abs(di_plus - di_minus) / (di_plus + di_minus).replace(0, np.nan)
     adx      = dx.ewm(span=14, adjust=False).mean().iloc[-1]
+
+    h1_trend    = classify_trend(h1_gap, h1_ema34, h1_ema89,
+                                 H1_TREND_GAP, h1_atr_pct, adx)
+
+    m15_ema34  = df_m15["ema34"].iloc[-1]
+    m15_ema89  = df_m15["ema89"].iloc[-1]
+    m15_gap    = abs(m15_ema34 - m15_ema89) / m15_ema89 * 100
+    m15_trend  = classify_trend(m15_gap, m15_ema34, m15_ema89,
+                                M15_TREND_GAP, h1_atr_pct, adx)
+    atr_m15    = df_m15["atr"].iloc[-1]
+
+    delta  = df_m15["close"].diff()
+    gain   = delta.clip(lower=0).ewm(span=14, adjust=False).mean()
+    loss   = (-delta.clip(upper=0)).ewm(span=14, adjust=False).mean()
+    rs     = gain / loss.replace(0, np.nan)
+    rsi    = (100 - 100 / (1 + rs)).iloc[-1]
 
     direction = np.sign(df_m15["close"].diff()).fillna(0)
     obv       = (direction * df_m15["volume"]).cumsum()
