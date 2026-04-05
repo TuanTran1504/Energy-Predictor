@@ -126,8 +126,8 @@ def db_create_pending(symbol: str, side: str, setup: str,
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO trades
-                  (symbol, side, status, leverage, confidence, setup)
-                VALUES (%s,%s,'PENDING',%s,%s,%s)
+                  (symbol, side, status, entry_price, quantity, leverage, confidence, setup)
+                VALUES (%s,%s,'PENDING', 0, 0, %s,%s,%s)
                 RETURNING id
             """, (symbol, side, LEVERAGE, confidence, setup))
             tid = cur.fetchone()[0]
