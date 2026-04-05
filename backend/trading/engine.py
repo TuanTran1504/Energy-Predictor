@@ -513,7 +513,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             client.new_order(
                 symbol=sym_pair, side=close_side, type="STOP_MARKET",
                 stopPrice=str(round(ai_sl, 2)),
-                closePosition=True, timeInForce="GTE_GTC",
+                closePosition="true",
             )
             log.info(f"  [EXEC] SL order placed @ {ai_sl}")
         except Exception as e:
@@ -524,7 +524,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             client.new_order(
                 symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
                 stopPrice=str(round(ai_tp, 2)),
-                closePosition=True, timeInForce="GTE_GTC",
+                closePosition="true",
             )
             log.info(f"  [EXEC] TP order placed @ {ai_tp}")
         except Exception as e:
