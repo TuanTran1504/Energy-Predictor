@@ -274,11 +274,12 @@ def check_macro_bias(ml_direction: str, ml_confidence: float,
         allowed = "BUY" if ml_direction == "UP" else "SELL"
 
     # Fear & Greed: extreme values are contrarian signals
+    # Only override if ML isn't actively pointing the opposite direction
     if fear_greed is not None:
-        if fear_greed <= 15:
-            allowed = "BUY"   # extreme fear = contrarian long
-        elif fear_greed >= 85:
-            allowed = "SELL"  # extreme greed = contrarian short
+        if fear_greed <= 15 and ml_direction != "DOWN":
+            allowed = "BUY"   # extreme fear = contrarian long (only if ML not bearish)
+        elif fear_greed >= 85 and ml_direction != "UP":
+            allowed = "SELL"  # extreme greed = contrarian short (only if ML not bullish)
 
     if funding_rate > FUNDING_THRESHOLD and allowed in ("BUY", "BOTH"):
         if allowed == "BUY":
