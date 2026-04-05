@@ -44,7 +44,7 @@ else:
 TRAINING_PARENT = THIS_FILE.parent.parent
 if str(TRAINING_PARENT) not in sys.path:
     sys.path.append(str(TRAINING_PARENT))
-SYMBOLS = ["BTC", "ETH"]
+SYMBOLS = ["BTC", "ETH", "SOL", "XRP"]
 MIN_PROMOTION_IMPROVEMENT = 0.0
 
 REGISTER_MODELS = os.getenv("MLFLOW_REGISTER_MODELS", "false").strip().lower() in {

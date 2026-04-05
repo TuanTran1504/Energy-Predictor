@@ -60,7 +60,7 @@ if str(TRAINING_PARENT) not in sys.path:
 from feature_engineering import build_features, get_feature_columns  # noqa: E402
 
  
-SYMBOLS = ["BTC", "ETH"]
+SYMBOLS = ["BTC", "ETH", "SOL", "XRP"]
 MIN_PROMOTION_IMPROVEMENT = 0.0
 LOOKAHEAD_DAYS = int(os.getenv("LOOKAHEAD_DAYS", "1"))
 
@@ -636,7 +636,12 @@ def main():
 
     for symbol in SYMBOLS:
         with mlflow.start_run(run_name=f"{symbol}-direction-{LOOKAHEAD_DAYS}d") as run:
-            result = train_model(symbol)
+            try:
+                result = train_model(symbol)
+            except ValueError as e:
+                print(f"\n[SKIP] {symbol}: {e}")
+                mlflow.set_tag("skipped_reason", str(e))
+                continue
             results[symbol] = result
 
             artifact_info = log_result_to_mlflow(

@@ -15,13 +15,15 @@ from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 BINANCE_URL = "https://api.binance.com/api/v3/klines"
 SYMBOLS = [
     ("BTCUSDT", "BTC"),
     ("ETHUSDT", "ETH"),
+    ("SOLUSDT", "SOL"),
+    ("XRPUSDT", "XRP"),
 ]
 
 
@@ -132,6 +134,7 @@ def save_to_supabase(records: list) -> tuple[int, int]:
             (symbol, fetched_at, open_usd, high_usd, low_usd,
              close_usd, volume_usd, change_pct, source, interval_minutes)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'binance', %s)
+        ON CONFLICT (symbol, fetched_at) DO NOTHING
         """,
         batch_data,
         page_size=1000,

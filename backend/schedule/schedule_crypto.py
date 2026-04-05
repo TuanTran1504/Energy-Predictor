@@ -31,6 +31,8 @@ def save_crypto_30min():
     SYMBOLS = [
         ("BTCUSDT", "BTC"),
         ("ETHUSDT", "ETH"),
+        ("SOLUSDT", "SOL"),
+        ("XRPUSDT", "XRP"),
     ]
 
     conn = psycopg2.connect(DATABASE_URL, sslmode="require")

@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 EXPERIMENT_NAME   = "trading-signals"
 REDIS_TTL_SECONDS = 86_400        # 24h
-SYMBOLS           = ["BTC", "ETH"]
+SYMBOLS           = ["BTC", "ETH", "SOL", "XRP"]
 HORIZONS          = [1, 7]        # days — one model trained per horizon
 MODEL_DIR         = Path(__file__).parent / "models"
 

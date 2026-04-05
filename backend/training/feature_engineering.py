@@ -373,6 +373,8 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
     dropped_neutral = 0
 
     crypto_df  = load_crypto_prices(symbol)
+    if crypto_df.empty:
+        raise ValueError(f"No price data found for {symbol} in crypto_prices table. Run seed_crypto.py first.")
     other_sym  = "ETH" if symbol == "BTC" else "BTC"
     other_df   = load_crypto_prices(other_sym)[["date", "close_usd"]].rename(
         columns={"close_usd": "other_close_usd"}

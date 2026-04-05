@@ -53,8 +53,16 @@ API_SECRET   = os.getenv("BINANCE_FUTURES_SECRET_KEY", "")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 REDIS_URL    = os.getenv("REDIS_URL", "")
 
-SYMBOLS        = ["BTC", "ETH"]
+SYMBOLS        = ["BTC", "ETH", "SOL", "XRP"]
 LEVERAGE       = 5
+
+# Binance Futures quantity step sizes (decimal precision per coin)
+QTY_PRECISION  = {
+    "BTC": 3,   # step 0.001
+    "ETH": 2,   # step 0.01
+    "SOL": 1,   # step 0.1
+    "XRP": 0,   # step 1 (integer lots)
+}
 STOP_LOSS_PCT  = 0.008    # 0.8% hard max SL
 SL_MIN_PCT     = 0.002    # 0.2% hard min SL
 TAKE_PROFIT_MIN_RR    = 1.5
@@ -531,8 +539,9 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
         return 0.0
     position_value = (risk_usdt / sl_distance) * entry
     position_value = min(position_value, balance * 0.10 * LEVERAGE)
-    qty = position_value / entry
-    return round(qty, 3) if symbol == "BTC" else round(qty, 2)
+    qty       = position_value / entry
+    precision = QTY_PRECISION.get(symbol, 2)
+    return round(qty, precision)
 
 
 def execute_trade(client: UMFutures, symbol: str, decision: dict,
@@ -842,9 +851,11 @@ def run_once(dry_run: bool = False):
     balance        = get_account_balance(client)
 
     log.info(f"Balance: {balance:.2f} USDT | ML preds loaded: {list(ml_preds.keys())}")
-    log.info(f"Fear&Greed={market_signals.get('fear_greed','?')} "
-             f"BTC funding={market_signals.get('btc_funding',0):+.4f}% "
-             f"ETH funding={market_signals.get('eth_funding',0):+.4f}%")
+    funding_str = "  ".join(
+        f"{s} funding={market_signals.get(f'{s.lower()}_funding', 0):+.4f}%"
+        for s in SYMBOLS
+    )
+    log.info(f"Fear&Greed={market_signals.get('fear_greed','?')}  {funding_str}")
 
     for symbol in SYMBOLS:
         try:

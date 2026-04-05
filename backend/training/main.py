@@ -114,7 +114,7 @@ UP_THRESHOLDS: dict[str, float] = {
     "ETH": float(os.getenv("ETH_UP_THRESHOLD", "0.50")),
 }
 
-SYMBOLS: list[str] = ["BTC", "ETH"]
+SYMBOLS: list[str] = ["BTC", "ETH", "SOL", "XRP"]
 
 models: dict[str, object] = {}
 model_trained_at: dict[str, str] = {}   # key → ISO UTC timestamp from train.py bundle
@@ -256,7 +256,7 @@ class CandleIn(BaseModel):
 
 
 class PredictRequest(BaseModel):
-    symbol:  Literal["BTC", "ETH"]
+    symbol:  Literal["BTC", "ETH", "SOL", "XRP"]
     candles: list[CandleIn]   # minimum 15, recommended 20
 
 
@@ -486,8 +486,8 @@ def predict(req: PredictRequest):
 
 @app.get("/backtest", response_model=BacktestOut)
 def backtest(
-    symbol:   Literal["BTC", "ETH"] = Query(..., description="BTC or ETH"),
-    days:     int                    = Query(default=30, ge=7, le=180),
+    symbol:   Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
+    days:     int                                  = Query(default=30, ge=7, le=180),
     lookahead: int                   = Query(default=1, ge=1, le=30, description="Prediction horizon in days"),
 ):
     """
@@ -568,7 +568,7 @@ def backtest(
 
 @app.get("/predict/live/all")
 def predict_live_all(
-    symbol: Literal["BTC", "ETH"] = Query(..., description="BTC or ETH"),
+    symbol: Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
 ):
     """
     Returns predictions for all horizons for one symbol.
@@ -631,8 +631,8 @@ def predict_live_all(
 
 @app.get("/predict/live", response_model=PredictionOut)
 def predict_live(
-    symbol:    Literal["BTC", "ETH"] = Query(..., description="BTC or ETH"),
-    lookahead: int                    = Query(default=1, ge=1, le=30, description="Prediction horizon in days"),
+    symbol:    Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
+    lookahead: int                                  = Query(default=1, ge=1, le=30, description="Prediction horizon in days"),
 ):
     """
     Predict direction using the most recent row from the database.

@@ -1,13 +1,6 @@
 """
 Backfills BTC and ETH funding rate history from Bybit public API.
 
-Why Bybit instead of Binance:
-  - Binance futures API (fapi.binance.com) is geo-restricted on US servers and
-    returns at most ~400 days before hitting undocumented limits.
-  - Bybit's funding history endpoint supports cursor-based pagination and
-    returns the full available history (BTC/ETH perpetuals since ~Jan 2020).
-  - No API key required.
-
 Expected output:
   BTC:  ~1800 days of daily averages (3 x 8h readings each)
   ETH:  ~1800 days of daily averages
@@ -30,9 +23,9 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 BYBIT_URL = "https://api.bybit.com/v5/market/funding/history"
-SYMBOLS = ["BTC", "ETH"]
-REQUEST_DELAY = 0.3   # seconds between pages — stay well under rate limits
-MAX_PAGES = 500       # safety cap; 500 × 200 entries ÷ 3/day = ~33,000 days
+SYMBOLS = ["BTC", "ETH", "SOL", "XRP"]
+REQUEST_DELAY = 0.3  
+MAX_PAGES = 500      
 
 
 def fetch_all_funding_rates(symbol: str) -> list[dict]:
