@@ -57,7 +57,8 @@ SYMBOLS        = ["BTC", "ETH"]
 LEVERAGE       = 5
 STOP_LOSS_PCT  = 0.008    # 0.8% hard max SL
 SL_MIN_PCT     = 0.002    # 0.2% hard min SL
-TAKE_PROFIT_MIN_RR = 1.5
+TAKE_PROFIT_MIN_RR    = 1.5
+SETUP_E_MIN_RR        = 1.0   # lower bar for BB mean reversion (tighter TP target)
 POSITION_RISK_PCT  = 0.01  # risk 1% of balance per trade
 CYCLE_INTERVAL     = 5 * 60  # 5 minutes
 
@@ -581,10 +582,12 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         return False
 
     risk   = abs(entry - ai_sl)
-    reward = abs(ai_tp - entry)
-    rr     = reward / risk if risk > 0 else 0
-    if rr < TAKE_PROFIT_MIN_RR:
-        log_gate_fail("RR", f"R:R={rr:.2f} < {TAKE_PROFIT_MIN_RR}", symbol)
+    reward  = abs(ai_tp - entry)
+    rr      = reward / risk if risk > 0 else 0
+    is_setup_e = "setup_e" in setup.lower() if setup else False
+    min_rr  = SETUP_E_MIN_RR if is_setup_e else TAKE_PROFIT_MIN_RR
+    if rr < min_rr:
+        log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr} ({'Setup E' if is_setup_e else 'standard'})", symbol)
         return False
 
     qty = calc_quantity(balance, entry, ai_sl, symbol)
