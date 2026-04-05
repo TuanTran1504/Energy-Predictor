@@ -199,10 +199,14 @@ def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None
     return None
 
 
+_ORPHAN_SL_PCT = 0.005   # 0.5% default SL for recovered positions
+_ORPHAN_TP_PCT = 0.010   # 1.0% default TP for recovered positions (R:R = 2)
+
+
 def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
     """
     Scans Binance for open positions that have no matching OPEN record in the DB.
-    Inserts a recovery record so the monitor can track and close them properly.
+    Inserts a recovery record and places default SL/TP orders on Binance.
     """
     tracked_symbols = {t["symbol"] for t in open_trades}
     try:
@@ -225,11 +229,44 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
         qty   = abs(amt)
         mark  = float(pos["markPrice"])
 
+        # Compute default SL/TP from entry price
+        if side == "BUY":
+            sl = round(entry * (1 - _ORPHAN_SL_PCT), 2)
+            tp = round(entry * (1 + _ORPHAN_TP_PCT), 2)
+            close_side = "SELL"
+        else:
+            sl = round(entry * (1 + _ORPHAN_SL_PCT), 2)
+            tp = round(entry * (1 - _ORPHAN_TP_PCT), 2)
+            close_side = "BUY"
+
         log.warning(
             f"[MONITOR] Orphaned position detected: {sym} {side} qty={qty} "
-            f"entry={entry} mark={mark} — inserting recovery record into DB"
+            f"entry={entry} mark={mark} — recovering with SL={sl} TP={tp}"
         )
 
+        sym_pair = f"{sym}USDT"
+
+        # Place SL order on Binance
+        try:
+            client.new_order(
+                symbol=sym_pair, side=close_side, type="STOP_MARKET",
+                stopPrice=str(sl), closePosition="true",
+            )
+            log.info(f"[MONITOR] Recovery SL placed @ {sl}")
+        except Exception as e:
+            log.warning(f"[MONITOR] Could not place recovery SL for {sym}: {e}")
+
+        # Place TP order on Binance
+        try:
+            client.new_order(
+                symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
+                stopPrice=str(tp), closePosition="true",
+            )
+            log.info(f"[MONITOR] Recovery TP placed @ {tp}")
+        except Exception as e:
+            log.warning(f"[MONITOR] Could not place recovery TP for {sym}: {e}")
+
+        # Insert DB record with the computed SL/TP
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
@@ -237,8 +274,8 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
                     INSERT INTO trades
                       (symbol, side, status, entry_price, quantity, leverage,
                        stop_loss, take_profit, confidence, horizon)
-                    VALUES (%s,%s,'OPEN',%s,%s,%s, 0, 0, 0, 1)
-                """, (sym, side, entry, qty, LEVERAGE))
+                    VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s, 0, 1)
+                """, (sym, side, entry, qty, LEVERAGE, sl, tp))
             conn.commit()
             log.info(f"[MONITOR] Recovery record inserted for {sym} {side} @ {entry}")
         except Exception as e:

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
-const fmt  = (n, d = 2) => n == null ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmt  = (n, d = 2) => (n == null || n === 0) ? "—" : Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
 const pct  = (n) => n == null ? "—" : `${Number(n).toFixed(2)}%`;
 const clr  = (n) => n == null ? "#aeaeb2" : n >= 0 ? "#30d158" : "#ff3b30";
 const side_color = (s) => s === "BUY" ? "#30d158" : "#ff3b30";
