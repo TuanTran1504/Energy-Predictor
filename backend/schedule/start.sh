@@ -5,7 +5,9 @@
 set -e
 
 python run_scheduler.py &
+PID1=$!
 python run_macro_etf_ingestor.py &
+PID2=$!
 
 # Wait for either process to exit; if one dies the container restarts.
-wait -n
+wait $PID1 $PID2
