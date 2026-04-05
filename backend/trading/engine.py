@@ -236,8 +236,8 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
                 cur.execute("""
                     INSERT INTO trades
                       (symbol, side, status, entry_price, quantity, leverage,
-                       stop_loss, take_profit, confidence)
-                    VALUES (%s,%s,'OPEN',%s,%s,%s, 0, 0, 0)
+                       stop_loss, take_profit, confidence, horizon)
+                    VALUES (%s,%s,'OPEN',%s,%s,%s, 0, 0, 0, 1)
                 """, (sym, side, entry, qty, LEVERAGE))
             conn.commit()
             log.info(f"[MONITOR] Recovery record inserted for {sym} {side} @ {entry}")
