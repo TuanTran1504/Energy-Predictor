@@ -458,8 +458,10 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
     risk_pct = abs(entry - ai_sl) / entry * 100
     if risk_pct < SL_MIN_PCT * 100:
-        log_gate_fail("SL_MIN", f"SL {risk_pct:.3f}% < min {SL_MIN_PCT*100:.2f}%", symbol)
-        return False
+        # Price ticked between analysis and execution — clamp SL to minimum distance
+        log.info(f"  [EXEC] SL {risk_pct:.3f}% < min, clamping to {SL_MIN_PCT*100:.2f}%")
+        ai_sl = entry * (1 - SL_MIN_PCT) if signal == "BUY" else entry * (1 + SL_MIN_PCT)
+        risk_pct = SL_MIN_PCT * 100
     if risk_pct > STOP_LOSS_PCT * 100:
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
         return False
