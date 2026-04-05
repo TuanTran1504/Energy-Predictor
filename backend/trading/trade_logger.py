@@ -185,8 +185,25 @@ def log_error(msg: str, exc: Exception = None):
     _cycle_log.error(f"  [ERROR] {msg}")
 
 
-def log_cycle_summary(symbol: str, signal: str, executed: bool, balance: float):
+def log_cycle_summary(symbol: str, signal: str, executed: bool, balance: float,
+                      context: dict = None, decision: dict = None):
+    ctx  = context  or {}
+    dec  = decision or {}
+    mode  = ctx.get("market_mode", "?")
+    score = ctx.get("score", "?")
+    price = ctx.get("current_price", ctx.get("close", "?"))
+    entry = dec.get("entry_price") or ctx.get("setup_e_entry", "—")
+    sl    = dec.get("stop_loss",  "—")
+    tp    = dec.get("take_profit","—")
+    reason = dec.get("reason", ctx.get("skip_reason", "—"))
+    setup  = dec.get("analysis", {}).get("setup_identified") or ctx.get("setup", "—")
+    status = "EXECUTED" if executed else ("SIGNAL" if signal not in ("WAIT", "SKIP") else signal)
     _cycle_log.info(
-        f"  CYCLE END | {symbol} | signal={signal} executed={executed} "
-        f"balance={balance:.2f} USDT"
+        f"\n  ┌─ DECISION  {symbol}  {'─'*40}\n"
+        f"  │  mode={mode}  score={score}/5  price={price}\n"
+        f"  │  signal={signal}  setup={setup}  status={status}\n"
+        f"  │  entry={entry}  SL={sl}  TP={tp}\n"
+        f"  │  reason: {reason}\n"
+        f"  │  balance={balance:.2f} USDT\n"
+        f"  └{'─'*50}"
     )

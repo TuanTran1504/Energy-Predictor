@@ -682,7 +682,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     if signal == "WAIT":
         log.info(f"  [AI] WAIT — {decision.get('reason','')}")
         log_skip("AI_WAIT", decision.get("reason", ""), ctx, decision)
-        log_cycle_summary(symbol, "WAIT", False, balance)
+        log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
 
     # For Setup E, override AI SL/TP with pre-validated levels
@@ -695,7 +695,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             log.info(f"  [SETUP_E] Using pre-computed SL={mr['sl']} TP={mr['tp']} R:R={mr['rr']}")
 
     executed = execute_trade(client, symbol, decision, balance, ctx, dry_run=dry_run)
-    log_cycle_summary(symbol, signal, executed, balance)
+    log_cycle_summary(symbol, signal, executed, balance, ctx, decision)
 
 
 def run_once(dry_run: bool = False):
