@@ -188,15 +188,69 @@ def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None
     return None
 
 
+def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
+    """
+    Scans Binance for open positions that have no matching OPEN record in the DB.
+    Inserts a recovery record so the monitor can track and close them properly.
+    """
+    tracked_symbols = {t["symbol"] for t in open_trades}
+    try:
+        all_positions = client.get_position_risk()
+    except Exception as e:
+        log.warning(f"[MONITOR] Could not fetch Binance positions for orphan check: {e}")
+        return
+
+    for pos in all_positions:
+        amt = float(pos.get("positionAmt", 0))
+        if amt == 0:
+            continue  # no position
+
+        sym = pos["symbol"].replace("USDT", "")
+        if sym in tracked_symbols:
+            continue  # already tracked in DB
+
+        side = "BUY" if amt > 0 else "SELL"
+        entry = float(pos["entryPrice"])
+        qty   = abs(amt)
+        mark  = float(pos["markPrice"])
+
+        log.warning(
+            f"[MONITOR] Orphaned position detected: {sym} {side} qty={qty} "
+            f"entry={entry} mark={mark} — inserting recovery record into DB"
+        )
+
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO trades
+                      (symbol, side, status, entry_price, quantity, leverage,
+                       stop_loss, take_profit, setup, notes)
+                    VALUES (%s,%s,'OPEN',%s,%s,%s, 0, 0, %s,%s)
+                """, (sym, side, entry, qty, LEVERAGE,
+                      "recovered", "auto-recovered orphaned Binance position"))
+            conn.commit()
+        except Exception as e:
+            log.warning(f"[MONITOR] Failed to insert recovery record for {sym}: {e}")
+        finally:
+            conn.close()
+
+
 def _monitor_loop(client: UMFutures):
     """
-    Detects when a native Binance SL/TP has fired and records the close in DB.
+    1. Detects when a native Binance SL/TP has fired and records the close in DB.
+    2. Detects positions open on Binance but missing from DB and auto-recovers them.
     Runs in a background daemon thread.
     """
     log.info("[MONITOR] Background sync thread started (60s interval)")
     while True:
         try:
             open_trades = db_get_open_trades()
+
+            # --- Phase 1: recover orphaned Binance positions ---
+            _recover_orphaned_positions(client, open_trades)
+
+            # --- Phase 2: close DB records when Binance position is gone ---
             for trade in open_trades:
                 sym = trade["symbol"]
                 pos = get_open_position(client, sym)
