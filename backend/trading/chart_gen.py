@@ -4,9 +4,13 @@ chart_gen.py — Candlestick chart generator for the LLM analyst.
 Produces a dark-themed M5 chart (last 80 candles) with:
   - Candlestick bodies + wicks
   - EMA 34 (green) + EMA 89 (orange)
-  - Volume panel + Volume MA 20 (blue)
+  - SMA 20 (white dashed, BB midline)
+  - Bollinger Bands (visible, semi-transparent fill)
   - H1 Support (green dashed) + Resistance (red dashed)
-  - Bollinger Bands (white, semi-transparent)
+  - Current price line (yellow dashed)
+  - Last candle marker (vertical line)
+  - RSI panel with 30/70 overbought/oversold zones
+  - Volume panel + Volume MA 20 (blue)
   - Title bar: symbol, mode, score, ADX, RSI, ATR, funding
 
 Returns base64-encoded PNG string ready for Gemini vision API.
@@ -31,10 +35,15 @@ BULL_WICK  = "#4DB6AC"
 BEAR_WICK  = "#E57373"
 EMA34_C    = "#00E676"
 EMA89_C    = "#FF9800"
+SMA20_C    = "#FFFFFF"
 VOLMA_C    = "#2196F3"
 RESIST_C   = "#FF5252"
 SUPPORT_C  = "#69F0AE"
-BB_C       = "#FFFFFF"
+BB_C       = "#90CAF9"
+RSI_C      = "#CE93D8"
+RSI_OB_C   = "#EF5350"
+RSI_OS_C   = "#26A69A"
+CUR_PRICE_C = "#FFD600"
 
 
 def _apply_dark_style(ax):
@@ -65,49 +74,61 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
 
         df["ema34"]  = df["close"].ewm(span=34, adjust=False).mean()
         df["ema89"]  = df["close"].ewm(span=89, adjust=False).mean()
+        df["sma20"]  = df["close"].rolling(20).mean()
         df["vol_ma"] = df["volume"].rolling(20).mean()
 
-        sma20        = df["close"].rolling(20).mean()
         std20        = df["close"].rolling(20).std()
-        df["bb_up"]  = sma20 + 2 * std20
-        df["bb_dn"]  = sma20 - 2 * std20
+        df["bb_up"]  = df["sma20"] + 2 * std20
+        df["bb_dn"]  = df["sma20"] - 2 * std20
+
+        # RSI (14)
+        delta = df["close"].diff()
+        gain  = delta.clip(lower=0).ewm(span=14, adjust=False).mean()
+        loss  = (-delta.clip(upper=0)).ewm(span=14, adjust=False).mean()
+        rs    = gain / loss.replace(0, np.nan)
+        df["rsi"] = 100 - 100 / (1 + rs)
 
         sr          = context.get("sr", {})
         score       = context.get("score", 0)
         h1_trend    = context.get("h1_trend", "?")
         market_mode = context.get("market_mode", h1_trend)
         adx         = context.get("adx", 0)
-        rsi         = context.get("rsi", 0)
+        rsi_val     = context.get("rsi", 0)
         atr         = context.get("atr_m15", 0)
         funding     = context.get("funding_rate", 0)
         symbol      = context.get("symbol", "BTC/USDT")
         ml_dir      = context.get("ml_direction", "—")
         ml_conf     = context.get("ml_confidence", 0)
+        current_price = float(df["close"].iloc[-1])
 
-        fig = plt.figure(figsize=(14, 8), facecolor=BG)
+        # 3-panel layout: price (3x), RSI (1x), volume (1x)
+        fig = plt.figure(figsize=(14, 9), facecolor=BG)
         gs  = gridspec.GridSpec(
-            2, 1, height_ratios=[3, 1], hspace=0.04,
+            3, 1, height_ratios=[3, 1, 1], hspace=0.06,
             left=0.04, right=0.97, top=0.93, bottom=0.05,
         )
         ax_price  = fig.add_subplot(gs[0])
-        ax_volume = fig.add_subplot(gs[1], sharex=ax_price)
+        ax_rsi    = fig.add_subplot(gs[1], sharex=ax_price)
+        ax_volume = fig.add_subplot(gs[2], sharex=ax_price)
 
-        for ax in [ax_price, ax_volume]:
+        for ax in [ax_price, ax_rsi, ax_volume]:
             _apply_dark_style(ax)
 
         x = range(len(df))
+        last_x = len(df) - 1
 
         price_range = df["high"].max() - df["low"].min()
         min_body    = price_range * 0.001
 
+        # --- Candlesticks ---
         for i in x:
-            o = float(df["open"].iloc[i])
-            c = float(df["close"].iloc[i])
-            h = float(df["high"].iloc[i])
+            o  = float(df["open"].iloc[i])
+            c  = float(df["close"].iloc[i])
+            h  = float(df["high"].iloc[i])
             lo = float(df["low"].iloc[i])
             is_bull = c >= o
-            bc = BULL_BODY  if is_bull else BEAR_BODY
-            wc = BULL_WICK  if is_bull else BEAR_WICK
+            bc = BULL_BODY if is_bull else BEAR_BODY
+            wc = BULL_WICK if is_bull else BEAR_WICK
 
             ax_price.plot([i, i], [lo, h], color=wc, linewidth=0.8, zorder=2)
             body_lo = min(o, c)
@@ -120,42 +141,65 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
             )
             ax_price.add_patch(rect)
 
+        # --- EMAs ---
         ax_price.plot(x, df["ema34"], color=EMA34_C, linewidth=1.6,
                       label="EMA 34", zorder=4)
         ax_price.plot(x, df["ema89"], color=EMA89_C, linewidth=1.6,
                       label="EMA 89", zorder=4)
 
-        valid = df["bb_up"].notna()
+        # --- SMA20 (BB midline) ---
+        valid_sma = df["sma20"].notna()
         x_arr = np.array(list(x))
-        ax_price.plot(x_arr[valid], df["bb_up"][valid], color=BB_C,
-                      linewidth=0.7, alpha=0.35, linestyle="--", zorder=3)
-        ax_price.plot(x_arr[valid], df["bb_dn"][valid], color=BB_C,
-                      linewidth=0.7, alpha=0.35, linestyle="--", zorder=3)
+        ax_price.plot(x_arr[valid_sma], df["sma20"][valid_sma],
+                      color=SMA20_C, linewidth=0.8, alpha=0.5,
+                      linestyle="--", label="SMA 20", zorder=3)
+
+        # --- Bollinger Bands (more visible) ---
+        valid_bb = df["bb_up"].notna()
+        ax_price.plot(x_arr[valid_bb], df["bb_up"][valid_bb], color=BB_C,
+                      linewidth=1.2, alpha=0.7, linestyle="-", zorder=3)
+        ax_price.plot(x_arr[valid_bb], df["bb_dn"][valid_bb], color=BB_C,
+                      linewidth=1.2, alpha=0.7, linestyle="-", zorder=3)
         ax_price.fill_between(
-            x_arr[valid],
-            df["bb_up"][valid], df["bb_dn"][valid],
-            color=BB_C, alpha=0.04, zorder=2,
+            x_arr[valid_bb],
+            df["bb_up"][valid_bb], df["bb_dn"][valid_bb],
+            color=BB_C, alpha=0.06, zorder=2,
         )
 
+        # --- S/R lines ---
         if sr.get("resistance"):
             ax_price.axhline(sr["resistance"], color=RESIST_C, linewidth=1.3,
                              linestyle="--", alpha=0.85, zorder=5)
-            ax_price.text(len(df) - 1, sr["resistance"],
-                          f"  R {sr['resistance']}", color=RESIST_C,
+            ax_price.text(last_x, sr["resistance"],
+                          f"  R {sr['resistance']:.1f}", color=RESIST_C,
                           fontsize=8, va="bottom", ha="right")
 
         if sr.get("support"):
             ax_price.axhline(sr["support"], color=SUPPORT_C, linewidth=1.3,
                              linestyle="--", alpha=0.85, zorder=5)
-            ax_price.text(len(df) - 1, sr["support"],
-                          f"  S {sr['support']}", color=SUPPORT_C,
+            ax_price.text(last_x, sr["support"],
+                          f"  S {sr['support']:.1f}", color=SUPPORT_C,
                           fontsize=8, va="top", ha="right")
+
+        # --- Current price line ---
+        ax_price.axhline(current_price, color=CUR_PRICE_C, linewidth=1.0,
+                         linestyle=":", alpha=0.9, zorder=6)
+        ax_price.text(0, current_price, f"{current_price:.2f} ",
+                      color=CUR_PRICE_C, fontsize=8, va="bottom", ha="left",
+                      fontweight="bold", zorder=7)
+
+        # --- Last candle marker ---
+        ax_price.axvline(last_x, color=CUR_PRICE_C, linewidth=0.8,
+                         linestyle=":", alpha=0.5, zorder=5)
+        ax_rsi.axvline(last_x, color=CUR_PRICE_C, linewidth=0.8,
+                       linestyle=":", alpha=0.5, zorder=5)
 
         ax_price.legend(loc="upper left", fontsize=8,
                         facecolor="#161B22", edgecolor=SPINE, labelcolor=TEXT)
         ax_price.set_ylabel("Price (USDT)", color=TEXT, fontsize=9)
         ax_price.set_xlim(-1, len(df))
 
+        # right-side price axis mirror
         ax_r = ax_price.twinx()
         ax_r.set_facecolor(BG)
         ax_r.set_ylim(ax_price.get_ylim())
@@ -163,6 +207,29 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         for spine in ax_r.spines.values():
             spine.set_color(SPINE)
 
+        # --- RSI panel ---
+        valid_rsi = df["rsi"].notna()
+        ax_rsi.plot(x_arr[valid_rsi], df["rsi"][valid_rsi],
+                    color=RSI_C, linewidth=1.4, zorder=3)
+        ax_rsi.axhline(70, color=RSI_OB_C, linewidth=0.8, linestyle="--", alpha=0.8)
+        ax_rsi.axhline(30, color=RSI_OS_C, linewidth=0.8, linestyle="--", alpha=0.8)
+        ax_rsi.axhline(50, color=TEXT,     linewidth=0.5, linestyle="--", alpha=0.3)
+        ax_rsi.fill_between(x_arr[valid_rsi], df["rsi"][valid_rsi], 70,
+                            where=df["rsi"][valid_rsi] >= 70,
+                            color=RSI_OB_C, alpha=0.15, zorder=2)
+        ax_rsi.fill_between(x_arr[valid_rsi], df["rsi"][valid_rsi], 30,
+                            where=df["rsi"][valid_rsi] <= 30,
+                            color=RSI_OS_C, alpha=0.15, zorder=2)
+        ax_rsi.set_ylim(0, 100)
+        ax_rsi.set_yticks([30, 50, 70])
+        ax_rsi.set_ylabel("RSI", color=TEXT, fontsize=9)
+        # current RSI label
+        cur_rsi = float(df["rsi"].iloc[-1]) if valid_rsi.any() else rsi_val
+        rsi_color = RSI_OB_C if cur_rsi >= 70 else (RSI_OS_C if cur_rsi <= 30 else TEXT)
+        ax_rsi.text(last_x + 0.3, cur_rsi, f"{cur_rsi:.1f}",
+                    color=rsi_color, fontsize=8, va="center", fontweight="bold")
+
+        # --- Volume panel ---
         vol_colors = [
             BULL_BODY if float(df["close"].iloc[i]) >= float(df["open"].iloc[i])
             else BEAR_BODY
@@ -176,6 +243,7 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         ax_volume.legend(loc="upper left", fontsize=8,
                          facecolor="#161B22", edgecolor=SPINE, labelcolor=TEXT)
 
+        # --- X-axis timestamps ---
         if "timestamp" in df.columns:
             step = max(1, len(df) // 10)
             ticks = list(range(0, len(df), step))
@@ -191,6 +259,7 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
             ax_volume.set_xticklabels(labels, color=TEXT, fontsize=7, rotation=20)
 
         plt.setp(ax_price.get_xticklabels(), visible=False)
+        plt.setp(ax_rsi.get_xticklabels(), visible=False)
 
         mode_color = {
             "UPTREND":        EMA34_C,
@@ -202,14 +271,14 @@ def generate_chart(df_m5: pd.DataFrame, context: dict) -> str:
         title = (
             f"{symbol} · M5 (80 candles)  |  "
             f"Mode: {market_mode}  |  H1: {h1_trend}  |  Score: {score}/5  |  "
-            f"ADX: {adx:.1f}  RSI: {rsi:.1f}  ATR: {atr:.2f}  "
+            f"ADX: {adx:.1f}  RSI: {rsi_val:.1f}  ATR: {atr:.2f}  "
             f"Funding: {funding:+.4f}%  |  ML: {ml_dir} ({ml_conf:.0%})"
         )
         fig.suptitle(title, color=mode_color, fontsize=10,
                      fontweight="bold", y=0.975)
 
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=80, bbox_inches="tight",
+        plt.savefig(buf, format="png", dpi=100, bbox_inches="tight",
                     facecolor=BG)
         plt.close(fig)
         plt.close("all")
