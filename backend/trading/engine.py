@@ -74,7 +74,7 @@ def _get_conn():
 
 
 def db_ensure_trades_table():
-    """Create trades table if it doesn't exist (idempotent)."""
+    """Create trades table if it doesn't exist, and add any missing columns (idempotent)."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -102,6 +102,17 @@ def db_ensure_trades_table():
                     closed_at         TIMESTAMPTZ
                 )
             """)
+            # Add columns that may be missing from older table versions
+            for col, definition in [
+                ("setup", "TEXT"),
+                ("notes", "TEXT"),
+                ("confidence", "FLOAT"),
+                ("binance_order_id", "TEXT"),
+                ("close_reason", "TEXT"),
+            ]:
+                cur.execute(f"""
+                    ALTER TABLE trades ADD COLUMN IF NOT EXISTS {col} {definition}
+                """)
         conn.commit()
     finally:
         conn.close()
@@ -225,11 +236,11 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
                 cur.execute("""
                     INSERT INTO trades
                       (symbol, side, status, entry_price, quantity, leverage,
-                       stop_loss, take_profit, setup, notes)
-                    VALUES (%s,%s,'OPEN',%s,%s,%s, 0, 0, %s,%s)
-                """, (sym, side, entry, qty, LEVERAGE,
-                      "recovered", "auto-recovered orphaned Binance position"))
+                       stop_loss, take_profit)
+                    VALUES (%s,%s,'OPEN',%s,%s,%s, 0, 0)
+                """, (sym, side, entry, qty, LEVERAGE))
             conn.commit()
+            log.info(f"[MONITOR] Recovery record inserted for {sym} {side} @ {entry}")
         except Exception as e:
             log.warning(f"[MONITOR] Failed to insert recovery record for {sym}: {e}")
         finally:
