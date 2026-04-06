@@ -309,19 +309,13 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
 
         sym_pair = f"{sym}USDT"
         try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="STOP_MARKET",
-                stopPrice=str(sl), closePosition="true",
-            )
+            _algo_order(sym_pair, close_side, "STOP_MARKET", sl)
             log.info(f"[MONITOR] Recovery SL placed @ {sl}")
         except Exception as e:
             log.warning(f"[MONITOR] Recovery SL failed for {sym}: {e}")
 
         try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
-                stopPrice=str(tp), closePosition="true",
-            )
+            _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp)
             log.info(f"[MONITOR] Recovery TP placed @ {tp}")
         except Exception as e:
             log.warning(f"[MONITOR] Recovery TP failed for {sym}: {e}")
@@ -350,46 +344,10 @@ def _monitor_loop(client: UMFutures):
             db_cleanup_stale_pending()
             open_trades = db_get_open_trades()
 
-            # --- Phase 1: software SL/TP backup ---
-            for trade in list(open_trades):
-                sl = trade.get("stop_loss") or 0
-                tp = trade.get("take_profit") or 0
-                if not sl and not tp:
-                    continue
-                sym = trade["symbol"]
-                try:
-                    ticker = client.ticker_price(symbol=f"{sym}USDT")
-                    mark = float(ticker["price"])
-                except Exception:
-                    continue
-                trade_side = trade["side"]
-                hit = None
-                if trade_side == "BUY":
-                    if sl and mark <= sl:
-                        hit = "stop_loss"
-                    elif tp and mark >= tp:
-                        hit = "take_profit"
-                else:
-                    if sl and mark >= sl:
-                        hit = "stop_loss"
-                    elif tp and mark <= tp:
-                        hit = "take_profit"
-                if hit:
-                    close_side = "SELL" if trade_side == "BUY" else "BUY"
-                    qty = trade["quantity"]
-                    log.warning(f"[MONITOR] {sym} {hit} hit (mark={mark}) — closing")
-                    try:
-                        client.new_order(symbol=f"{sym}USDT", side=close_side,
-                                         type="MARKET", quantity=qty)
-                        db_close_trade(trade["id"], mark, hit)
-                        open_trades = [t for t in open_trades if t["id"] != trade["id"]]
-                    except Exception as e:
-                        log.warning(f"[MONITOR] Failed to close {sym} on {hit}: {e}")
-
-            # --- Phase 2: recover orphaned positions ---
+            # --- Phase 1: recover orphaned positions ---
             _recover_orphaned_positions(client, open_trades)
 
-            # --- Phase 3: close DB records when Binance position is gone ---
+            # --- Phase 2: close DB records when Binance position is gone ---
             for trade in open_trades:
                 sym = trade["symbol"]
                 pos = get_open_position(client, sym)
