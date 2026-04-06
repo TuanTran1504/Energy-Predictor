@@ -16,11 +16,30 @@ All public functions are thread-safe (RotatingFileHandler uses file locks).
 import json
 import logging
 import os
+import threading
+import urllib.request
 from datetime import datetime, timezone
 UTC = timezone.utc
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
+
+_TG_TOKEN   = os.getenv("TELEGRAM_BOT_TOKEN", "")
+_TG_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+def _tg_send(text: str):
+    """Fire-and-forget Telegram message."""
+    if not _TG_TOKEN or not _TG_CHAT_ID:
+        return
+    def _send():
+        try:
+            url = f"https://api.telegram.org/bot{_TG_TOKEN}/sendMessage"
+            data = json.dumps({"chat_id": _TG_CHAT_ID, "text": text, "parse_mode": "Markdown"}).encode()
+            req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=5)
+        except Exception:
+            pass
+    threading.Thread(target=_send, daemon=True).start()
 
 LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -141,6 +160,13 @@ def log_trade_open(symbol: str, side: str, entry: float, sl: float, tp: float,
     }
     _trade_log.info(json.dumps(record))
     _append_jsonl(record)
+    side_emoji = "🟢" if side == "BUY" else "🔴"
+    _tg_send(
+        f"{side_emoji} *TRADE OPEN* — {symbol} {side}\n"
+        f"Entry: `{entry}` | SL: `{sl}` | TP: `{tp}`\n"
+        f"R:R: `{rr:.2f}` | Setup: {setup}\n"
+        f"_{reason}_"
+    )
     _cycle_log.info(
         f"  [TRADE OPEN] {side} {symbol} | entry={entry} SL={sl} TP={tp} "
         f"R:R={rr:.2f} | setup={setup}"
@@ -167,6 +193,15 @@ def log_trade_close(symbol: str, side: str, entry: float, exit_price: float,
     }
     _trade_log.info(json.dumps(record))
     _append_jsonl(record)
+    outcome_emoji = "✅" if pnl_usdt > 0 else "❌"
+    pnl_str = f"+{pnl_usdt:.2f}" if pnl_usdt >= 0 else f"{pnl_usdt:.2f}"
+    pct_str = f"+{pnl_pct*100:.2f}%" if pnl_pct >= 0 else f"{pnl_pct*100:.2f}%"
+    _tg_send(
+        f"{outcome_emoji} *TRADE CLOSE* — {symbol} {side}\n"
+        f"P&L: `{pnl_str} USDT` ({pct_str})\n"
+        f"Entry: `{entry}` → Exit: `{exit_price}`\n"
+        f"Reason: {reason} | Held: {duration_min:.0f}min"
+    )
     _cycle_log.info(
         f"  [TRADE CLOSE] {outcome} | {side} {symbol} | "
         f"entry={entry} exit={exit_price} pnl={pnl_pct*100:+.2f}% ({pnl_usdt:+.2f} USDT) "
