@@ -4,6 +4,7 @@ import { createChart, CandlestickSeries } from "lightweight-charts";
 import MLTab from "./MLTab";
 import AITab from "./AITab";
 import TradingTab from "./TradingTab";
+import LiveTradingTab from "./LiveTradingTab";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 const WS_URL  = import.meta.env.VITE_WS_URL ||
@@ -697,13 +698,13 @@ export default function App() {
       <TickerStrip signals={signals} />
 
       <div className="tabs">
-        {["macro", "crypto", "signals", "ml", "ai", "trading"].map(t => (
+        {["macro", "crypto", "signals", "ml", "ai", "trading", "live"].map(t => (
           <button
             key={t}
             className={`tab-btn ${tab === t ? "active" : ""}`}
             onClick={() => setTab(t)}
           >
-            {t === "macro" ? "MACRO" : t === "crypto" ? "CRYPTO" : t === "signals" ? "SIGNALS" : t === "ml" ? "ML MODEL" : t === "ai" ? "AI ANALYST" : "TRADING"}
+            {t === "macro" ? "MACRO" : t === "crypto" ? "CRYPTO" : t === "signals" ? "SIGNALS" : t === "ml" ? "ML MODEL" : t === "ai" ? "AI ANALYST" : t === "trading" ? "TRADING" : "LIVE"}
           </button>
         ))}
       </div>
@@ -717,6 +718,11 @@ export default function App() {
         {tab === "trading" && <TradingTab livePrices={{
           BTC: signals?.crypto?.btc?.price_usd,
           ETH: signals?.crypto?.eth?.price_usd,
+        }} />}
+        {tab === "live" && <LiveTradingTab livePrices={{
+          BTC: signals?.crypto?.btc?.price_usd,
+          ETH: signals?.crypto?.eth?.price_usd,
+          SOL: signals?.crypto?.sol?.price_usd,
         }} />}
       </main>
 

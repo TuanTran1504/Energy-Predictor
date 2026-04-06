@@ -85,6 +85,23 @@ services:
       - redis
     restart: unless-stopped
 
+  # ── Live account engine (BTC/ETH/SOL — real Binance, not testnet) ──────
+  trading-engine-live:
+    build:
+      context: .
+      dockerfile: backend/trading/Dockerfile
+    command: python engine_live.py --loop
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      BINANCE_LIVE_API_KEY: ${BINANCE_LIVE_API_KEY}
+      BINANCE_LIVE_SECRET_KEY: ${BINANCE_LIVE_SECRET_KEY}
+    depends_on:
+      - ml-service
+      - redis
+    restart: unless-stopped
+
   # ── Data scheduler (Fear&Greed, FRED, funding rates, macro_releases) ──
   scheduler:
     build:

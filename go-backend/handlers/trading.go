@@ -22,7 +22,7 @@ func getDB() (*sql.DB, error) {
 	return sql.Open("postgres", dsn)
 }
 
-func TradingStatus(c *gin.Context) {
+func tradingStatusByAccount(c *gin.Context, accountType string) {
 	db, err := getDB()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -30,14 +30,15 @@ func TradingStatus(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// Open trades
+	// Open trades filtered by account_type
 	rows, err := db.Query(`
 		SELECT id, symbol, side, entry_price, quantity, leverage,
 		       stop_loss, take_profit, confidence, horizon,
 		       binance_order_id, opened_at
 		FROM trades WHERE status = 'OPEN'
+		  AND COALESCE(account_type, 'testnet') = $1
 		ORDER BY opened_at DESC
-	`)
+	`, accountType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -84,14 +85,15 @@ func TradingStatus(c *gin.Context) {
 		openTrades = []OpenTrade{}
 	}
 
-	// Summary stats
+	// Summary stats filtered by account_type
 	var totalTrades, wins int
 	var totalPnl float64
 	db.QueryRow(`
 		SELECT COUNT(*), COALESCE(SUM(pnl_usdt),0),
 		       COUNT(CASE WHEN pnl_usdt > 0 THEN 1 END)
 		FROM trades WHERE status = 'CLOSED'
-	`).Scan(&totalTrades, &totalPnl, &wins)
+		  AND COALESCE(account_type, 'testnet') = $1
+	`, accountType).Scan(&totalTrades, &totalPnl, &wins)
 
 	winRate := 0.0
 	if totalTrades > 0 {
@@ -126,7 +128,15 @@ func TradingStatus(c *gin.Context) {
 	})
 }
 
-func TradingHistory(c *gin.Context) {
+func TradingStatus(c *gin.Context) {
+	tradingStatusByAccount(c, "testnet")
+}
+
+func LiveTradingStatus(c *gin.Context) {
+	tradingStatusByAccount(c, "live")
+}
+
+func tradingHistoryByAccount(c *gin.Context, accountType string) {
 	db, err := getDB()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -138,8 +148,9 @@ func TradingHistory(c *gin.Context) {
 		SELECT id, symbol, side, status, entry_price, exit_price,
 		       quantity, leverage, pnl_usdt, pnl_pct, confidence,
 		       horizon, close_reason, opened_at, closed_at
-		FROM trades ORDER BY opened_at DESC LIMIT 100
-	`)
+		FROM trades WHERE COALESCE(account_type, 'testnet') = $1
+		ORDER BY opened_at DESC LIMIT 100
+	`, accountType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -195,4 +206,12 @@ func TradingHistory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"trades": trades})
+}
+
+func TradingHistory(c *gin.Context) {
+	tradingHistoryByAccount(c, "testnet")
+}
+
+func LiveTradingHistory(c *gin.Context) {
+	tradingHistoryByAccount(c, "live")
 }
