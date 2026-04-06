@@ -74,7 +74,7 @@ def run_tests(real: bool):
     print("\n⚠️  REAL MODE — requires an open ETH position on live account")
     print("    Orders will be placed then immediately cancelled.\n")
 
-    # Test 1: STOP_MARKET with closePosition (current approach — failing)
+    # Test 1: STOP_MARKET with closePosition (current approach)
     try_order(
         "STOP_MARKET + closePosition=true",
         symbol=SYMBOL, side=CLOSE_SIDE, type="STOP_MARKET",
@@ -88,26 +88,36 @@ def run_tests(real: bool):
         stopPrice=str(FAKE_SL), reduceOnly="true", quantity=str(FAKE_QTY),
     )
 
-    # Test 3: STOP (limit stop) with reduceOnly + qty
+    # Test 3: STOP_MARKET + workingType + priceProtect + timeInForce
+    try_order(
+        "STOP_MARKET + workingType=MARK_PRICE + priceProtect + GTC",
+        symbol=SYMBOL, side=CLOSE_SIDE, type="STOP_MARKET",
+        stopPrice=str(FAKE_SL), quantity=str(FAKE_QTY),
+        timeInForce="GTC", workingType="MARK_PRICE", priceProtect="true",
+    )
+
+    # Test 4: STOP_MARKET + CONTRACT_PRICE
+    try_order(
+        "STOP_MARKET + workingType=CONTRACT_PRICE",
+        symbol=SYMBOL, side=CLOSE_SIDE, type="STOP_MARKET",
+        stopPrice=str(FAKE_SL), quantity=str(FAKE_QTY),
+        timeInForce="GTC", workingType="CONTRACT_PRICE", priceProtect="true",
+    )
+
+    # Test 5: TAKE_PROFIT_MARKET + workingType + priceProtect
+    try_order(
+        "TAKE_PROFIT_MARKET + workingType=MARK_PRICE + priceProtect",
+        symbol=SYMBOL, side=CLOSE_SIDE, type="TAKE_PROFIT_MARKET",
+        stopPrice=str(FAKE_TP), quantity=str(FAKE_QTY),
+        timeInForce="GTC", workingType="MARK_PRICE", priceProtect="true",
+    )
+
+    # Test 6: STOP (limit stop) with reduceOnly + qty
     try_order(
         "STOP (limit) + reduceOnly=true + qty",
         symbol=SYMBOL, side=CLOSE_SIDE, type="STOP",
         price=str(FAKE_SL - 1), stopPrice=str(FAKE_SL),
         reduceOnly="true", quantity=str(FAKE_QTY),
-    )
-
-    # Test 4: TAKE_PROFIT_MARKET with closePosition
-    try_order(
-        "TAKE_PROFIT_MARKET + closePosition=true",
-        symbol=SYMBOL, side=CLOSE_SIDE, type="TAKE_PROFIT_MARKET",
-        stopPrice=str(FAKE_TP), closePosition="true",
-    )
-
-    # Test 5: TAKE_PROFIT_MARKET with reduceOnly + qty
-    try_order(
-        "TAKE_PROFIT_MARKET + reduceOnly=true + qty",
-        symbol=SYMBOL, side=CLOSE_SIDE, type="TAKE_PROFIT_MARKET",
-        stopPrice=str(FAKE_TP), reduceOnly="true", quantity=str(FAKE_QTY),
     )
 
 
