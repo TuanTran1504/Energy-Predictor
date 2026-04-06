@@ -71,7 +71,7 @@ POSITION_RISK_PCT  = 0.01  # risk 1% of balance per trade
 CYCLE_INTERVAL     = 5 * 60  # 5 minutes
 
 TESTNET_BASE    = "https://testnet.binancefuture.com"
-MONITOR_INTERVAL = 15  # seconds between DB↔Binance sync checks
+MONITOR_INTERVAL = 5   # seconds between DB↔Binance sync checks
 
 
 def get_client() -> UMFutures:
