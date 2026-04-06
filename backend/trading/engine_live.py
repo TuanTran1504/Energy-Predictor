@@ -560,6 +560,18 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
         return False
 
+    # Adjust SL/TP to cover round-trip fees + slippage
+    # Taker fee 0.04% x2 sides + ~0.05% slippage each way = ~0.18% total
+    FEE_BUFFER = 0.0018
+    fee_adj = entry * FEE_BUFFER
+    if signal == "BUY":
+        ai_sl = round(ai_sl - fee_adj, 6)   # widen SL down
+        ai_tp = round(ai_tp + fee_adj, 6)   # push TP further up
+    else:
+        ai_sl = round(ai_sl + fee_adj, 6)   # widen SL up
+        ai_tp = round(ai_tp - fee_adj, 6)   # push TP further down
+    log.info(f"  [EXEC] Fee-adjusted SL={ai_sl} TP={ai_tp} (buffer={FEE_BUFFER*100:.2f}%)")
+
     risk      = abs(entry - ai_sl)
     reward    = abs(ai_tp - entry)
     rr        = reward / risk if risk > 0 else 0
