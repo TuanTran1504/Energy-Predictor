@@ -22,6 +22,8 @@ type CryptoPrice struct {
 type CryptoSignals struct {
 	BTC       CryptoPrice `json:"btc"`
 	ETH       CryptoPrice `json:"eth"`
+	SOL       CryptoPrice `json:"sol"`
+	XRP       CryptoPrice `json:"xrp"`
 	FetchedAt string      `json:"fetched_at"`
 }
 
@@ -73,33 +75,40 @@ func fetchCryptoPrice(symbol string) (*CryptoPrice, error) {
 func FetchCryptoSignals() (*CryptoSignals, error) {
 	btcCh := make(chan *CryptoPrice, 1)
 	ethCh := make(chan *CryptoPrice, 1)
+	solCh := make(chan *CryptoPrice, 1)
+	xrpCh := make(chan *CryptoPrice, 1)
 
-	go func() {
-		price, err := fetchCryptoPrice("BTCUSDT")
-		if err != nil {
-			fmt.Printf("Warning: BTC fetch failed: %v\n", err)
-			btcCh <- &CryptoPrice{Symbol: "BTC", PriceUSD: 0}
-			return
-		}
-		btcCh <- price
-	}()
-
-	go func() {
-		price, err := fetchCryptoPrice("ETHUSDT")
-		if err != nil {
-			fmt.Printf("Warning: ETH fetch failed: %v\n", err)
-			ethCh <- &CryptoPrice{Symbol: "ETH", PriceUSD: 0}
-			return
-		}
-		ethCh <- price
-	}()
+	for _, pair := range []struct {
+		sym string
+		ch  chan *CryptoPrice
+	}{
+		{"BTCUSDT", btcCh},
+		{"ETHUSDT", ethCh},
+		{"SOLUSDT", solCh},
+		{"XRPUSDT", xrpCh},
+	} {
+		pair := pair
+		go func() {
+			price, err := fetchCryptoPrice(pair.sym)
+			if err != nil {
+				fmt.Printf("Warning: %s fetch failed: %v\n", pair.sym, err)
+				pair.ch <- &CryptoPrice{Symbol: pair.sym[:len(pair.sym)-4], PriceUSD: 0}
+				return
+			}
+			pair.ch <- price
+		}()
+	}
 
 	btc := <-btcCh
 	eth := <-ethCh
+	sol := <-solCh
+	xrp := <-xrpCh
 
 	return &CryptoSignals{
 		BTC:       *btc,
 		ETH:       *eth,
+		SOL:       *sol,
+		XRP:       *xrp,
 		FetchedAt: time.Now().UTC().Format(time.RFC3339),
 	}, nil
 }
