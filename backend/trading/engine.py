@@ -382,10 +382,48 @@ def _monitor_loop(client: UMFutures):
             db_cleanup_stale_pending()
             open_trades = db_get_open_trades()
 
-            # --- Phase 1: recover orphaned Binance positions ---
+            # --- Phase 1: software SL/TP enforcement ---
+            # Exchange-side conditional orders are not supported on this account.
+            # The monitor enforces SL/TP by checking mark price every cycle.
+            for trade in list(open_trades):
+                sl = trade.get("stop_loss") or 0
+                tp = trade.get("take_profit") or 0
+                if not sl and not tp:
+                    continue
+                sym = trade["symbol"]
+                try:
+                    ticker = client.ticker_price(symbol=f"{sym}USDT")
+                    mark = float(ticker["price"])
+                except Exception:
+                    continue
+                trade_side = trade["side"]
+                hit = None
+                if trade_side == "BUY":
+                    if sl and mark <= sl:
+                        hit = "stop_loss"
+                    elif tp and mark >= tp:
+                        hit = "take_profit"
+                else:
+                    if sl and mark >= sl:
+                        hit = "stop_loss"
+                    elif tp and mark <= tp:
+                        hit = "take_profit"
+                if hit:
+                    close_side = "SELL" if trade_side == "BUY" else "BUY"
+                    qty = trade["quantity"]
+                    log.warning(f"[MONITOR] {sym} {hit} hit (mark={mark}) — closing position")
+                    try:
+                        client.new_order(symbol=f"{sym}USDT", side=close_side,
+                                         type="MARKET", quantity=qty)
+                        db_close_trade(trade["id"], mark, hit)
+                        open_trades = [t for t in open_trades if t["id"] != trade["id"]]
+                    except Exception as e:
+                        log.warning(f"[MONITOR] Failed to close {sym} on {hit}: {e}")
+
+            # --- Phase 2: recover orphaned Binance positions ---
             _recover_orphaned_positions(client, open_trades)
 
-            # --- Phase 2: close DB records when Binance position is gone ---
+            # --- Phase 3: close DB records when Binance position is gone ---
             for trade in open_trades:
                 sym = trade["symbol"]
                 pos = get_open_position(client, sym)
@@ -618,9 +656,8 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
                        trade_id="DRY_RUN", context=context)
         return True
 
-    side       = "BUY" if signal == "BUY" else "SELL"
-    close_side = "SELL" if signal == "BUY" else "BUY"
-    sym_pair   = f"{symbol}USDT"
+    side     = "BUY" if signal == "BUY" else "SELL"
+    sym_pair = f"{symbol}USDT"
     confidence = context.get("ml_confidence", 0.0)
 
     # --- Step 1: reserve DB slot before touching the exchange ---
@@ -643,49 +680,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         actual_price = float(order.get("avgPrice", entry)) or entry
         log.info(f"  [EXEC] Entry filled @ {actual_price} orderId={order_id}")
 
-        time.sleep(0.5)
-
-        # --- Step 3: SL — abort if it fails ---
-        # Use STOP (limit-stop) — STOP_MARKET/-TAKE_PROFIT_MARKET now require Binance algo endpoint.
-        # Limit price set 0.2% worse than trigger to ensure fill in fast markets.
-        sl_price = round(ai_sl * (0.998 if close_side == "SELL" else 1.002), 2)
-        try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="STOP",
-                stopPrice=str(round(ai_sl, 2)), price=str(sl_price),
-                quantity=qty, reduceOnly="true",
-            )
-            log.info(f"  [EXEC] SL order placed @ {ai_sl}")
-        except Exception as e:
-            log_error(f"[{symbol}] SL placement failed — closing position to avoid unprotected trade", e)
-            try:
-                client.new_order(symbol=sym_pair, side=close_side, type="MARKET", quantity=qty)
-                log.info(f"  [EXEC] Position closed after SL failure")
-            except Exception as ce:
-                log_error(f"[{symbol}] Emergency close also failed — MANUAL ACTION REQUIRED", ce)
-            db_cancel_pending(pending_id)
-            return False
-
-        # --- Step 4: TP — abort if it fails ---
-        tp_price = round(ai_tp * (0.999 if close_side == "SELL" else 1.001), 2)
-        try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="TAKE_PROFIT",
-                stopPrice=str(round(ai_tp, 2)), price=str(tp_price),
-                quantity=qty, reduceOnly="true",
-            )
-            log.info(f"  [EXEC] TP order placed @ {ai_tp}")
-        except Exception as e:
-            log_error(f"[{symbol}] TP placement failed — closing position to avoid unprotected trade", e)
-            try:
-                client.new_order(symbol=sym_pair, side=close_side, type="MARKET", quantity=qty)
-                log.info(f"  [EXEC] Position closed after TP failure")
-            except Exception as ce:
-                log_error(f"[{symbol}] Emergency close also failed — MANUAL ACTION REQUIRED", ce)
-            db_cancel_pending(pending_id)
-            return False
-
-        # --- Step 5: all confirmed — promote PENDING → OPEN ---
+        # --- Step 3: confirm OPEN — SL/TP enforced by software monitor ---
         db_confirm_open(pending_id, actual_price, qty, ai_sl, ai_tp, order_id, reason)
         log_trade_open(symbol, signal, actual_price, ai_sl, ai_tp, rr,
                        setup, reason, trade_id=order_id, context=context)
