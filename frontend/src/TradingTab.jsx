@@ -155,13 +155,13 @@ export default function TradingTab({ livePrices = {} }) {
       {/* ── Open positions ── */}
       <div>
         <div className="chart-label" style={{ marginBottom: 10 }}>OPEN POSITIONS</div>
-        {status?.open_trades?.length === 0 ? (
+        {!status?.open_trades?.length ? (
           <div className="card" style={{ color: "var(--muted2)", fontSize: 11, padding: "16px" }}>
             No open positions — waiting for next signal cycle
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {status.open_trades.map(t => (
+            {(status.open_trades || []).map(t => (
               <div key={t.id} className="card" style={{ padding: "12px 16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
