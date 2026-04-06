@@ -62,6 +62,13 @@ _trade_log  = _build_logger("trades",  "trades.log",   logging.INFO, _SIMPLE_FMT
 _skip_log   = _build_logger("skipped", "skipped.log",  logging.INFO, _SIMPLE_FMT)
 _error_log  = _build_logger("errors",  "errors.log",   logging.ERROR)
 
+_JSONL_PATH = LOG_DIR / "trades.jsonl"
+
+def _append_jsonl(record: dict):
+    """Append one JSON line to trades.jsonl — pure JSON, no logging wrapper."""
+    with open(_JSONL_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+
 
 def get_logger() -> logging.Logger:
     """Main cycle logger — use for general INFO/DEBUG messages."""
@@ -133,6 +140,7 @@ def log_trade_open(symbol: str, side: str, entry: float, sl: float, tp: float,
         "ml_direction": context.get("ml_direction") if context else None,
     }
     _trade_log.info(json.dumps(record))
+    _append_jsonl(record)
     _cycle_log.info(
         f"  [TRADE OPEN] {side} {symbol} | entry={entry} SL={sl} TP={tp} "
         f"R:R={rr:.2f} | setup={setup}"
@@ -158,6 +166,7 @@ def log_trade_close(symbol: str, side: str, entry: float, exit_price: float,
         "duration_min": round(duration_min, 1),
     }
     _trade_log.info(json.dumps(record))
+    _append_jsonl(record)
     _cycle_log.info(
         f"  [TRADE CLOSE] {outcome} | {side} {symbol} | "
         f"entry={entry} exit={exit_price} pnl={pnl_pct*100:+.2f}% ({pnl_usdt:+.2f} USDT) "
