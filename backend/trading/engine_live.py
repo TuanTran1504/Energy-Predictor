@@ -547,10 +547,15 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("DIRECTION", f"SELL needs SL({ai_sl}) > entry({entry}) > TP({ai_tp})", symbol)
         return False
 
+    atr = context.get("atr", 0)
+    atr_min_pct = (1.5 * atr / entry) if (atr > 0 and entry > 0) else SL_MIN_PCT
+    effective_min_pct = max(SL_MIN_PCT, atr_min_pct)
+
     risk_pct = abs(entry - ai_sl) / entry * 100
-    if risk_pct < SL_MIN_PCT * 100:
-        ai_sl = entry * (1 - SL_MIN_PCT) if signal == "BUY" else entry * (1 + SL_MIN_PCT)
-        risk_pct = SL_MIN_PCT * 100
+    if risk_pct < effective_min_pct * 100:
+        log.info(f"  [EXEC] SL {risk_pct:.3f}% < min {effective_min_pct*100:.3f}% (1.5×ATR), widening SL")
+        ai_sl = entry * (1 - effective_min_pct) if signal == "BUY" else entry * (1 + effective_min_pct)
+        risk_pct = effective_min_pct * 100
     if risk_pct > STOP_LOSS_PCT * 100:
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
         return False

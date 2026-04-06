@@ -357,9 +357,10 @@ White dashed bands = Bollinger Bands
 SL / TP MATH RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TREND setups (A/B/C/D):
-  BUY : SL = signal candle low − (entry × 0.0025). Need |entry−SL| ≥ {atr:.4f}.
+  SL buffer for this symbol = {"0.50%" if symbol in ("SOL", "XRP") else "0.25%"} (volatile coins need wider SL to survive wicks).
+  BUY : SL = signal candle low − (entry × {"0.005" if symbol in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
         TP must be BELOW resistance = {sr.get('resistance','?')}.
-  SELL: SL = signal candle high + (entry × 0.0025). Need |entry−SL| ≥ {atr:.4f}.
+  SELL: SL = signal candle high + (entry × {"0.005" if symbol in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
         TP must be ABOVE support = {sr.get('support','?')}.
 
 SIDEWAY Setup E (mean reversion):
