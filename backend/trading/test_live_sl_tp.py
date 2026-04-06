@@ -9,7 +9,13 @@ Usage:
 """
 
 import argparse
+import hashlib
+import hmac
 import os
+import time
+import urllib.parse
+import urllib.request
+import json
 from pathlib import Path
 from dotenv import load_dotenv
 from binance.um_futures import UMFutures
@@ -53,6 +59,37 @@ def try_order(label, **kwargs):
         except Exception:
             pass
         return True
+    except Exception as e:
+        print(f"  ❌ FAILED: {e}")
+        return False
+
+
+def try_raw_order(label, params: dict):
+    """Bypass the library — sign and send directly via urllib."""
+    print(f"\n--- {label} (raw HTTP) ---")
+    params["timestamp"] = int(time.time() * 1000)
+    query = urllib.parse.urlencode(params)
+    sig = hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()  # type: ignore
+    query += f"&signature={sig}"
+    url = f"https://fapi.binance.com/fapi/v1/order?{query}"
+    print(f"  Params: {params}")
+    try:
+        req = urllib.request.Request(url, method="POST",
+                                     headers={"X-MBX-APIKEY": API_KEY})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            resp = json.loads(r.read())
+        print(f"  ✅ SUCCESS: orderId={resp.get('orderId')}")
+        # Cancel immediately
+        try:
+            client.cancel_order(symbol=params["symbol"], orderId=resp["orderId"])
+            print(f"  (cancelled)")
+        except Exception:
+            pass
+        return True
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()
+        print(f"  ❌ FAILED: {e.code} {body}")
+        return False
     except Exception as e:
         print(f"  ❌ FAILED: {e}")
         return False
@@ -119,6 +156,18 @@ def run_tests(real: bool):
         price=str(FAKE_SL - 1), stopPrice=str(FAKE_SL),
         reduceOnly="true", quantity=str(FAKE_QTY),
     )
+
+    # Test 7 & 8: raw HTTP — bypass the library entirely
+    print("\n=== RAW HTTP TESTS (bypass library) ===")
+    try_raw_order("STOP_MARKET raw", {
+        "symbol": SYMBOL, "side": CLOSE_SIDE, "type": "STOP_MARKET",
+        "stopPrice": str(FAKE_SL), "closePosition": "true",
+    })
+    try_raw_order("STOP_MARKET raw + quantity", {
+        "symbol": SYMBOL, "side": CLOSE_SIDE, "type": "STOP_MARKET",
+        "stopPrice": str(FAKE_SL), "quantity": str(FAKE_QTY),
+        "timeInForce": "GTC", "workingType": "MARK_PRICE",
+    })
 
 
 if __name__ == "__main__":
