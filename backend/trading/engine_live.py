@@ -799,11 +799,15 @@ def run_loop(dry_run: bool = False):
     t = threading.Thread(target=_monitor_loop, args=(client_monitor,), daemon=True)
     t.start()
 
+    from trade_logger import _tg_send
+    _tg_send("🟢 *Live engine started* — monitoring BTC / ETH / SOL")
+
     while True:
         try:
             run_once(dry_run=dry_run)
         except Exception as e:
             log_error("Loop-level error", e)
+            _tg_send(f"⚠️ *Live engine error*: {e}")
         log.info(f"  Sleeping {CYCLE_INTERVAL}s until next cycle...")
         time.sleep(CYCLE_INTERVAL)
 
