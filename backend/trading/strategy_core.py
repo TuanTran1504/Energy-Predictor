@@ -315,6 +315,10 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
             return False, f"GATE2: H1={h1} vs M15={m15} misaligned"
 
     threshold = SCORE_THRESHOLD
+    # Altcoins with very strong ADX need less confirmation — trend already validated
+    # by BTC_CORR gate (H1 + M15 + BTC all aligned)
+    if not str(context.get("symbol", "BTC")).startswith("BTC") and context.get("adx", 0) > 45:
+        threshold = 2
     if score < threshold:
         return False, f"GATE3: score {score}/{threshold} insufficient"
 
