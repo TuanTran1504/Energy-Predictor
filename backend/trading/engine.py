@@ -332,7 +332,7 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
         try:
             client.new_order(
                 symbol=sym_pair, side=close_side, type="STOP_MARKET",
-                stopPrice=str(sl), closePosition="true",
+                stopPrice=str(sl), quantity=qty, reduceOnly="true",
             )
             log.info(f"[MONITOR] Recovery SL placed @ {sl}")
         except Exception as e:
@@ -342,7 +342,7 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
         try:
             client.new_order(
                 symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
-                stopPrice=str(tp), closePosition="true",
+                stopPrice=str(tp), quantity=qty, reduceOnly="true",
             )
             log.info(f"[MONITOR] Recovery TP placed @ {tp}")
         except Exception as e:
@@ -646,7 +646,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             client.new_order(
                 symbol=sym_pair, side=close_side, type="STOP_MARKET",
                 stopPrice=str(round(ai_sl, 2)),
-                closePosition="true",
+                quantity=qty, reduceOnly="true",
             )
             log.info(f"  [EXEC] SL order placed @ {ai_sl}")
         except Exception as e:
@@ -664,7 +664,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             client.new_order(
                 symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
                 stopPrice=str(round(ai_tp, 2)),
-                closePosition="true",
+                quantity=qty, reduceOnly="true",
             )
             log.info(f"  [EXEC] TP order placed @ {ai_tp}")
         except Exception as e:
