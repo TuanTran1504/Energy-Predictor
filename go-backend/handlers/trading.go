@@ -19,7 +19,15 @@ func getDB() (*sql.DB, error) {
 			dsn += "?sslmode=require"
 		}
 	}
-	return sql.Open("postgres", dsn)
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return db, nil
 }
 
 func tradingStatusByAccount(c *gin.Context, accountType string) {
