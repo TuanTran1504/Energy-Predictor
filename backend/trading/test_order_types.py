@@ -17,7 +17,9 @@ API_SECRET = os.getenv("BINANCE_FUTURES_SECRET_KEY", "").rstrip("\\")
 if not API_KEY or not API_SECRET:
     sys.exit("ERROR: BINANCE_API_KEY / BINANCE_API_SECRET not set in .env")
 
-client = UMFutures(key=API_KEY, secret=API_SECRET)
+TESTNET_BASE = "https://testnet.binancefuture.com"
+client = UMFutures(key=API_KEY, secret=API_SECRET, base_url=TESTNET_BASE)
+print(f"  Using base_url: {TESTNET_BASE}")
 
 print("\n=== Account Info ===")
 try:
