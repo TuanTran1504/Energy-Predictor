@@ -215,3 +215,4 @@ func TradingHistory(c *gin.Context) {
 func LiveTradingHistory(c *gin.Context) {
 	tradingHistoryByAccount(c, "live")
 }
+
