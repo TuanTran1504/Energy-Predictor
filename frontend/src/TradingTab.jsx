@@ -179,7 +179,7 @@ export default function TradingTab({ livePrices = {} }) {
                   // Prefer Binance live data; fall back to local WebSocket price calc
                   const bn   = binancePos[t.symbol];
                   const mark = bn?.mark_price ?? livePrices[t.symbol] ?? null;
-                  const upnl = bn
+                  const upnl = (bn?.unrealized_pnl != null)
                     ? { pnl_usdt: bn.unrealized_pnl, currentPrice: bn.mark_price,
                         pnl_pct: bn.mark_price && bn.entry_price
                           ? (t.side === "BUY"
