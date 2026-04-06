@@ -310,6 +310,10 @@ def _build_prompt(context: dict) -> tuple[str, str]:
         patterns = [PATTERN_LIBRARY["wait"]]
         bias_note = "Trend unclear → WAIT."
 
+    min_rr = 1.0 if symbol in ("SOL", "XRP") else 1.5
+    rr_str = str(min_rr)
+    patterns = [p.replace("R:R ≥ 1.5", f"R:R ≥ {rr_str}")
+                 .replace("R:R < 1.5", f"R:R < {rr_str}") for p in patterns]
     combined = "\n\n" + ("=" * 60 + "\n").join(patterns)
 
     system_prompt = f"""You are a quantitative trading analyst combining chart pattern recognition with hard data.
