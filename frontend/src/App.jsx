@@ -718,11 +718,14 @@ export default function App() {
         {tab === "trading" && <TradingTab livePrices={{
           BTC: signals?.crypto?.btc?.price_usd,
           ETH: signals?.crypto?.eth?.price_usd,
+          SOL: signals?.crypto?.sol?.price_usd,
+          XRP: signals?.crypto?.xrp?.price_usd,
         }} />}
         {tab === "live" && <LiveTradingTab livePrices={{
           BTC: signals?.crypto?.btc?.price_usd,
           ETH: signals?.crypto?.eth?.price_usd,
           SOL: signals?.crypto?.sol?.price_usd,
+          XRP: signals?.crypto?.xrp?.price_usd,
         }} />}
       </main>
 
