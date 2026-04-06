@@ -631,16 +631,8 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         except Exception as e:
             log.warning(f"  [EXEC] Exchange TP failed ({e}) — software monitor will enforce")
 
-        # If SL couldn't be placed on exchange, abort to protect capital
         if not sl_placed:
-            log.warning(f"  [EXEC] SL not on exchange — closing position for safety")
-            try:
-                client.new_order(symbol=sym_pair, side=close_side, type="MARKET", quantity=qty)
-                log.info(f"  [EXEC] Position closed (no exchange SL)")
-            except Exception as ce:
-                log_error(f"[{symbol}] Emergency close failed — MANUAL ACTION REQUIRED", ce)
-            db_cancel_pending(pending_id)
-            return False
+            log.warning(f"  [EXEC] Exchange SL unavailable — software monitor will enforce SL={ai_sl}")
 
         # --- Step 5: confirm OPEN ---
         db_confirm_open(pending_id, actual_price, qty, ai_sl, ai_tp, order_id, reason)
