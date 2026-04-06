@@ -11,10 +11,15 @@ Identical strategy to engine.py but:
 """
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import time
 import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 UTC = timezone.utc
 from pathlib import Path
@@ -67,6 +72,26 @@ MONITOR_INTERVAL      = 5
 
 def get_client() -> UMFutures:
     return UMFutures(key=API_KEY, secret=API_SECRET)  # no base_url = live
+
+
+def _algo_order(symbol: str, side: str, order_type: str, trigger_price: float) -> dict:
+    """Place SL/TP via Binance Algo Order API (/fapi/v1/algoOrder)."""
+    params = {
+        "algoType":    "CONDITIONAL",
+        "symbol":      symbol,
+        "side":        side,
+        "type":        order_type,
+        "triggerPrice": str(round(trigger_price, 2)),
+        "workingType": "MARK_PRICE",
+        "closePosition": "true",
+        "timestamp":   int(time.time() * 1000),
+    }
+    query = urllib.parse.urlencode(params)
+    sig   = hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+    url   = f"https://fapi.binance.com/fapi/v1/algoOrder?{query}&signature={sig}"
+    req   = urllib.request.Request(url, method="POST", headers={"X-MBX-APIKEY": API_KEY})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read())
 
 
 def _get_conn():
@@ -621,30 +646,19 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
         time.sleep(0.5)
 
-        # --- Step 3: SL on exchange (live supports STOP_MARKET) ---
-        sl_placed = False
+        # --- Step 3: SL via Algo Order API ---
         try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="STOP_MARKET",
-                stopPrice=str(round(ai_sl, 2)), closePosition="true",
-            )
-            log.info(f"  [EXEC] SL order placed @ {ai_sl}")
-            sl_placed = True
+            resp = _algo_order(sym_pair, close_side, "STOP_MARKET", ai_sl)
+            log.info(f"  [EXEC] SL algo order placed @ {ai_sl} id={resp.get('algoId','?')}")
         except Exception as e:
-            log.warning(f"  [EXEC] Exchange SL failed ({e}) — software monitor will enforce")
+            log.warning(f"  [EXEC] SL algo order failed ({e}) — software monitor will enforce")
 
-        # --- Step 4: TP on exchange ---
+        # --- Step 4: TP via Algo Order API ---
         try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
-                stopPrice=str(round(ai_tp, 2)), closePosition="true",
-            )
-            log.info(f"  [EXEC] TP order placed @ {ai_tp}")
+            resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", ai_tp)
+            log.info(f"  [EXEC] TP algo order placed @ {ai_tp} id={resp.get('algoId','?')}")
         except Exception as e:
-            log.warning(f"  [EXEC] Exchange TP failed ({e}) — software monitor will enforce")
-
-        if not sl_placed:
-            log.warning(f"  [EXEC] Exchange SL unavailable — software monitor will enforce SL={ai_sl}")
+            log.warning(f"  [EXEC] TP algo order failed ({e}) — software monitor will enforce")
 
         # --- Step 5: confirm OPEN ---
         db_confirm_open(pending_id, actual_price, qty, ai_sl, ai_tp, order_id, reason)
