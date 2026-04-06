@@ -362,7 +362,7 @@ SIDEWAY Setup E (mean reversion):
   BUY : SL below lower Bollinger Band minus 0.2% buffer. TP = upper Bollinger Band.
   SELL: SL above upper Bollinger Band plus 0.2% buffer. TP = lower Bollinger Band.
 
-Minimum R:R = 1.5 for ALL setups. If R:R < 1.5 → WAIT.
+Minimum R:R = {1.0 if symbol in ("SOL", "XRP") else 1.5} for this symbol. If R:R below minimum → WAIT.
 
 MATH CHECK (enforce):
   BUY:  TP > entry > SL
