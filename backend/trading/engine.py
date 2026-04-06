@@ -329,20 +329,24 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
         sym_pair = f"{sym}USDT"
 
         # Place SL order on Binance
+        sl_price = round(sl * (0.998 if close_side == "SELL" else 1.002), 2)
         try:
             client.new_order(
-                symbol=sym_pair, side=close_side, type="STOP_MARKET",
-                stopPrice=str(sl), quantity=qty, reduceOnly="true",
+                symbol=sym_pair, side=close_side, type="STOP",
+                stopPrice=str(sl), price=str(sl_price),
+                quantity=qty, reduceOnly="true",
             )
             log.info(f"[MONITOR] Recovery SL placed @ {sl}")
         except Exception as e:
             log.warning(f"[MONITOR] Could not place recovery SL for {sym}: {e}")
 
         # Place TP order on Binance
+        tp_price = round(tp * (0.999 if close_side == "SELL" else 1.001), 2)
         try:
             client.new_order(
-                symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
-                stopPrice=str(tp), quantity=qty, reduceOnly="true",
+                symbol=sym_pair, side=close_side, type="TAKE_PROFIT",
+                stopPrice=str(tp), price=str(tp_price),
+                quantity=qty, reduceOnly="true",
             )
             log.info(f"[MONITOR] Recovery TP placed @ {tp}")
         except Exception as e:
@@ -642,10 +646,13 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         time.sleep(0.5)
 
         # --- Step 3: SL — abort if it fails ---
+        # Use STOP (limit-stop) — STOP_MARKET/-TAKE_PROFIT_MARKET now require Binance algo endpoint.
+        # Limit price set 0.2% worse than trigger to ensure fill in fast markets.
+        sl_price = round(ai_sl * (0.998 if close_side == "SELL" else 1.002), 2)
         try:
             client.new_order(
-                symbol=sym_pair, side=close_side, type="STOP_MARKET",
-                stopPrice=str(round(ai_sl, 2)),
+                symbol=sym_pair, side=close_side, type="STOP",
+                stopPrice=str(round(ai_sl, 2)), price=str(sl_price),
                 quantity=qty, reduceOnly="true",
             )
             log.info(f"  [EXEC] SL order placed @ {ai_sl}")
@@ -660,10 +667,11 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             return False
 
         # --- Step 4: TP — abort if it fails ---
+        tp_price = round(ai_tp * (0.999 if close_side == "SELL" else 1.001), 2)
         try:
             client.new_order(
-                symbol=sym_pair, side=close_side, type="TAKE_PROFIT_MARKET",
-                stopPrice=str(round(ai_tp, 2)),
+                symbol=sym_pair, side=close_side, type="TAKE_PROFIT",
+                stopPrice=str(round(ai_tp, 2)), price=str(tp_price),
                 quantity=qty, reduceOnly="true",
             )
             log.info(f"  [EXEC] TP order placed @ {ai_tp}")
