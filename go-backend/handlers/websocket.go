@@ -14,22 +14,16 @@ import (
 // upgrader converts an HTTP connection to a WebSocket connection
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins in development
-		// In production: check r.Header.Get("Origin") against whitelist
 		return true
 	},
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
 
-// Client represents one connected dashboard browser tab
 type Client struct {
 	conn *websocket.Conn
 	send chan []byte
 }
-
-// Hub manages all connected clients
-// This is the standard Go WebSocket hub pattern
 type Hub struct {
 	clients    map[*Client]bool
 	broadcast  chan []byte
@@ -38,7 +32,6 @@ type Hub struct {
 	mu         sync.RWMutex
 }
 
-// Global hub — one instance for the whole server
 var hub = &Hub{
 	clients:    make(map[*Client]bool),
 	broadcast:  make(chan []byte, 256),
@@ -46,7 +39,6 @@ var hub = &Hub{
 	unregister: make(chan *Client),
 }
 
-// Run starts the hub — call this once in a goroutine from main.go
 func (h *Hub) Run() {
 	for {
 		select {
@@ -60,7 +52,6 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				// Safe close — recover from panic if channel already closed
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -78,9 +69,9 @@ func (h *Hub) Run() {
 			for client := range h.clients {
 				select {
 				case client.send <- message:
-					// Successfully sent
+
 				default:
-					// Client's send buffer is full — disconnect
+
 					h.mu.RUnlock()
 					h.unregister <- client
 					h.mu.RLock()
@@ -125,7 +116,6 @@ func (c *Client) writePump() {
 	}
 }
 
-// readPump keeps the connection alive and handles client messages
 func (c *Client) readPump() {
 	defer func() {
 		hub.unregister <- c

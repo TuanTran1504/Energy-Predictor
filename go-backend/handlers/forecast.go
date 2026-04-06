@@ -25,8 +25,6 @@ type ForecastRequest struct {
 	LoadLag168h   float64 `json:"load_lag_168h"`
 }
 
-// PythonPredictRequest is what Go sends to the Python service
-// It includes everything ForecastRequest has PLUS the live shock signals
 type PythonPredictRequest struct {
 	CurrentLoadMw  float64 `json:"current_load_mw"`
 	TemperatureC   float64 `json:"temperature_c"`
@@ -42,7 +40,6 @@ type PythonPredictRequest struct {
 	HeadlineScore  float64 `json:"headline_score"`
 }
 
-// PythonPredictResponse is what the Python service sends back
 type PythonPredictResponse struct {
 	ForecastMw    float64 `json:"forecast_mw"`
 	LowerBoundMw  float64 `json:"lower_bound_mw"`
@@ -52,8 +49,6 @@ type PythonPredictResponse struct {
 	ConfidencePct int     `json:"confidence_pct"`
 }
 
-// ForecastResponse is what Go returns to the dashboard
-// It combines the Python prediction with the live shock signals
 type ForecastResponse struct {
 	ForecastMw    float64 `json:"forecast_mw"`
 	LowerBoundMw  float64 `json:"lower_bound_mw"`
@@ -68,16 +63,13 @@ type ForecastResponse struct {
 }
 
 func Forecast(c *gin.Context) {
-	// 1. Parse the incoming request from the dashboard
+
 	var req ForecastRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request: " + err.Error()})
 		return
 	}
 
-	// 2. Fetch all three live signals in parallel using goroutines
-	// This is where Go shines — three API calls simultaneously,
-	// not one after another like Python asyncio
 	type result struct {
 		oilDelta  float64
 		headline  float64
@@ -129,12 +121,9 @@ func Forecast(c *gin.Context) {
 		OilDeltaPct30m: oilDelta,
 		HeadlineScore:  headlineScore,
 	}
-
-	// 4. Call the Python ML service
 	prediction, err := callPythonMLService(pythonReq)
 	if err != nil {
-		// If Python service is down, return a degraded response
-		// rather than crashing — this is called graceful degradation
+
 		fmt.Printf("Warning: Python ML service unavailable: %v\n", err)
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"error":  "ML service unavailable",
@@ -143,7 +132,6 @@ func Forecast(c *gin.Context) {
 		return
 	}
 
-	// 5. Build and return the final response
 	_, alertColor, _ := getAlertLevel(prediction.ShockScore)
 	level, _, alertMsg := getAlertLevel(prediction.ShockScore)
 
@@ -160,7 +148,7 @@ func Forecast(c *gin.Context) {
 		Timestamp:     time.Now().UTC().Format(time.RFC3339),
 	})
 
-	_ = alertMsg // used in dashboard — suppress unused warning
+	_ = alertMsg
 }
 
 // callPythonMLService sends the feature vector to the Python inference

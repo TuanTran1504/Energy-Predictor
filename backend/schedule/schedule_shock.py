@@ -149,20 +149,20 @@ HEADLINES:
 {headlines_text}
 
 WHAT COUNTS AS A SHOCK EVENT:
-✓ Direct oil supply threats (Hormuz closure, pipeline attacks, OPEC surprise cuts)
-✓ Active military conflict escalation or de-escalation (ceasefire, new strikes)
-✓ Surprise central bank decisions (emergency rate changes, unexpected holds)
-✓ Major crypto market events (large exchange collapse, unexpected ETF rejection/approval, regulatory ban)
-✓ Financial system stress (major bank failure, sovereign default, liquidity crisis)
-✓ Events directly affecting Vietnam economy (dong devaluation, capital controls, sanctions)
+Direct oil supply threats (Hormuz closure, pipeline attacks, OPEC surprise cuts)
+Active military conflict escalation or de-escalation (ceasefire, new strikes)
+Surprise central bank decisions (emergency rate changes, unexpected holds)
+Major crypto market events (large exchange collapse, unexpected ETF rejection/approval, regulatory ban)
+Financial system stress (major bank failure, sovereign default, liquidity crisis)
+Events directly affecting Vietnam economy (dong devaluation, capital controls, sanctions)
 
 WHAT DOES NOT COUNT:
-✗ Analyst predictions or price forecasts ("oil could hit $150 if...")
-✗ Routine scheduled events with expected outcomes
-✗ Minor daily price movements without a clear catalyst
-✗ Old news being re-reported
-✗ Company earnings (unless the company is systemically important)
-✗ Opinion pieces or commentary
+Analyst predictions or price forecasts ("oil could hit $150 if...")
+Routine scheduled events with expected outcomes
+Minor daily price movements without a clear catalyst
+Old news being re-reported
+Company earnings (unless the company is systemically important)
+Opinion pieces or commentary
 
 SEVERITY GUIDE:
 - HIGH: Direct oil supply disruption, active armed conflict, major market crash. Expected price moves >5%.

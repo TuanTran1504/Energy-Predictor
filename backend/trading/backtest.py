@@ -352,30 +352,25 @@ def run_backtest(symbol: str, days: int, output_csv: str | None = None) -> dict:
 
         m5_local_idx = len(m5_slice) - 1
 
-        # SIDEWAY: use Setup E (BB mean reversion), skipping trend-alignment gates
-        if ctx["market_mode"] == "SIDEWAY":
-            signal = detect_bb_mean_reversion(
-                m5_slice.reset_index(drop=True), m5_local_idx, ctx
-            )
+        # Setup E disabled — all modes use technical gates
+        tech_ok, _ = check_technical_gates(ctx)
+        if not tech_ok:
+            continue
+
+        if ctx["is_range"]:
+            ctx["range_bias"] = get_range_bias(ctx)
+
+        # No ML in backtest — derive allowed direction from H1 trend
+        if ctx["h1_trend"] == "UPTREND":
+            ctx["allowed_direction"] = "BUY"
+        elif ctx["h1_trend"] == "DOWNTREND":
+            ctx["allowed_direction"] = "SELL"
         else:
-            tech_ok, _ = check_technical_gates(ctx)
-            if not tech_ok:
-                continue
+            ctx["allowed_direction"] = "BOTH"
 
-            if ctx["is_range"]:
-                ctx["range_bias"] = get_range_bias(ctx)
-
-            # No ML in backtest — derive allowed direction from H1 trend
-            if ctx["h1_trend"] == "UPTREND":
-                ctx["allowed_direction"] = "BUY"
-            elif ctx["h1_trend"] == "DOWNTREND":
-                ctx["allowed_direction"] = "SELL"
-            else:
-                ctx["allowed_direction"] = "BOTH"
-
-            signal = generate_signal(
-                m5_slice.reset_index(drop=True), m5_local_idx, ctx
-            )
+        signal = generate_signal(
+            m5_slice.reset_index(drop=True), m5_local_idx, ctx
+        )
 
         if signal is None:
             continue

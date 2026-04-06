@@ -35,7 +35,6 @@ from llm_analyst    import ask_gemini
 from strategy_core  import (
     compute_indicators, compute_score, find_sr_levels,
     check_macro_bias, check_technical_gates, get_range_bias,
-    detect_bb_mean_reversion,
 )
 from trade_logger   import (
     get_logger, log_cycle_start, log_gate_pass, log_gate_fail,
@@ -773,39 +772,18 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             return
         log_gate_pass("BTC_CORR", f"BTC={btc_trend}")
 
-    # SIDEWAY bypasses trend-alignment gates and goes to Setup E (BB mean reversion)
-    is_sideway = ctx["market_mode"] == "SIDEWAY"
+    tech_ok, tech_reason = check_technical_gates(ctx)
+    if not tech_ok:
+        log_gate_fail("TECHNICAL", tech_reason, symbol, ctx)
+        return
+    log_gate_pass("TECHNICAL", tech_reason)
 
-    if is_sideway:
-        log.info("  SIDEWAY mode → Setup E (BB mean reversion) pre-check...")
-        mr_signal = detect_bb_mean_reversion(df_m5, len(df_m5) - 1, ctx)
-        if mr_signal is None:
-            bb = ctx.get("_bb_debug", {})
-            log_gate_fail("SETUP_E", "No BB extreme + RSI signal (price not at band or RSI neutral)", symbol, ctx)
-            if bb:
-                log.info(
-                    f"  [BB] price={bb.get('price')} upper={bb.get('upper_bb')} "
-                    f"lower={bb.get('lower_bb')} sma20={bb.get('sma20')} "
-                    f"RSI={bb.get('rsi')} near_lower={bb.get('near_lower')} "
-                    f"near_upper={bb.get('near_upper')} side={bb.get('side','?')} R:R={bb.get('rr','?')}"
-                )
+    if ctx["is_range"]:
+        ctx["range_bias"] = get_range_bias(ctx)
+        log.info(f"  Range bias: {ctx['range_bias']}")
+        if ctx["range_bias"] == "MIDDLE":
+            log_gate_fail("RANGE_POSITION", "price in middle of range — no edge", symbol, ctx)
             return
-        log_gate_pass("SETUP_E", f"BB MR: {mr_signal['signal']} entry={mr_signal['entry']} "
-                                  f"SL={mr_signal['sl']} TP={mr_signal['tp']} R:R={mr_signal['rr']}")
-        ctx["setup_e_signal"] = mr_signal
-    else:
-        tech_ok, tech_reason = check_technical_gates(ctx)
-        if not tech_ok:
-            log_gate_fail("TECHNICAL", tech_reason, symbol, ctx)
-            return
-        log_gate_pass("TECHNICAL", tech_reason)
-
-        if ctx["is_range"]:
-            ctx["range_bias"] = get_range_bias(ctx)
-            log.info(f"  Range bias: {ctx['range_bias']}")
-            if ctx["range_bias"] == "MIDDLE":
-                log_gate_fail("RANGE_POSITION", "price in middle of range — no edge", symbol, ctx)
-                return
 
     log.info("  All gates passed → generating chart...")
     chart_b64 = generate_chart(df_m5, ctx)
@@ -829,15 +807,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_skip("AI_WAIT", decision.get("reason", ""), ctx, decision)
         log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
-
-    # For Setup E, override AI SL/TP with pre-validated levels
-    if is_sideway and "setup_e_signal" in ctx:
-        mr = ctx["setup_e_signal"]
-        if signal == mr["signal"]:   # AI agrees with direction
-            decision["stop_loss"]   = mr["sl"]
-            decision["take_profit"] = mr["tp"]
-            decision["entry_price"] = mr["entry"]
-            log.info(f"  [SETUP_E] Using pre-computed SL={mr['sl']} TP={mr['tp']} R:R={mr['rr']}")
 
     executed = execute_trade(client, symbol, decision, balance, ctx, dry_run=dry_run)
     log_cycle_summary(symbol, signal, executed, balance, ctx, decision)
