@@ -19,6 +19,10 @@ func getDB() (*sql.DB, error) {
 			dsn += "?sslmode=require"
 		}
 	}
+	// Disable prepared statements — required for Supabase PgBouncer transaction mode
+	if !strings.Contains(dsn, "prefer_simple_protocol") {
+		dsn += "&prefer_simple_protocol=true"
+	}
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, err
