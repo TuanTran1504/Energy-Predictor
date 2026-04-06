@@ -146,28 +146,27 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 *Crypto Agent Bot*\n\n"
         "Commands:\n"
-        "/status — all open positions\n"
-        "/live — live account positions\n"
-        "/trades — last 10 closed trades\n"
-        "/pnl — P&L summary\n"
-        "/livepnl — live account P&L",
+        "/status — live open positions\n"
+        "/trades — last 10 live closed trades\n"
+        "/pnl — live account P&L summary\n"
+        "/livepnl — same as /pnl\n"
+        "/live — same as /status",
         parse_mode="Markdown"
     )
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rows = fetch_open_trades()
+    rows = fetch_open_trades(account_type="live")
     if not rows:
-        await update.message.reply_text("No open positions.")
+        await update.message.reply_text("💰 No open live positions.")
         return
 
-    lines = ["📊 *Open Positions*\n"]
+    lines = ["💰 *Live Open Positions*\n"]
     for r in rows:
         symbol, side, entry, sl, tp, qty, lev, opened_at, acc = r
         side_emoji = "🟢" if side == "BUY" else "🔴"
-        acc_tag = "LIVE" if acc == "live" else "TEST"
         lines.append(
-            f"{side_emoji} *{symbol}* [{acc_tag}] {side}\n"
+            f"{side_emoji} *{symbol}* {side}\n"
             f"  Entry: `{entry}` | Qty: `{qty}`\n"
             f"  SL: `{sl}` | TP: `{tp}`\n"
             f"  Opened: {opened_at.strftime('%m/%d %H:%M') if opened_at else '—'}\n"
@@ -195,27 +194,26 @@ async def cmd_live(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_trades(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    rows = fetch_closed_trades(limit=10)
+    rows = fetch_closed_trades(limit=10, account_type="live")
     if not rows:
-        await update.message.reply_text("No closed trades yet.")
+        await update.message.reply_text("No closed live trades yet.")
         return
 
-    lines = ["📋 *Last 10 Trades*\n"]
+    lines = ["📋 *Last 10 Live Trades*\n"]
     for r in rows:
         symbol, side, entry, exit_p, pnl, pnl_pct, reason, opened_at, closed_at, acc = r
         outcome = "✅" if (pnl or 0) > 0 else "❌"
-        acc_tag = "LIVE" if acc == "live" else "TEST"
         lines.append(
-            f"{outcome} *{symbol}* [{acc_tag}] {side} → "
+            f"{outcome} *{symbol}* {side} → "
             f"`{fmt_pnl(pnl)} USDT` ({fmt_pct(pnl_pct)}) — {reason or '—'}\n"
         )
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    row = fetch_pnl_summary()
+    row = fetch_pnl_summary(account_type="live")
     if not row or not row[0]:
-        await update.message.reply_text("No closed trades yet.")
+        await update.message.reply_text("No closed live trades yet.")
         return
 
     total, wins, losses, total_pnl, avg_pnl = row
@@ -224,7 +222,7 @@ async def cmd_pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
     win_rate = (wins / total * 100) if total else 0
 
     await update.message.reply_text(
-        f"📈 *Overall P&L Summary*\n\n"
+        f"💰 *Live Account P&L*\n\n"
         f"Total trades: `{total}`\n"
         f"Wins: `{wins}` | Losses: `{losses}`\n"
         f"Win rate: `{win_rate:.1f}%`\n"
