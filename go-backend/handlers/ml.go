@@ -221,12 +221,10 @@ func TradingPositionsSync(c *gin.Context) {
 	}
 	defer db.Close()
 
-	rows, err := db.Query(`
-		SELECT symbol, side, entry_price, quantity, stop_loss, take_profit
+	rows, err := db.Query(`SELECT symbol, side, entry_price, quantity, stop_loss, take_profit
 		FROM trades WHERE status = 'OPEN'
 		  AND COALESCE(account_type, 'testnet') = 'testnet'
-		ORDER BY opened_at DESC
-	`)
+		ORDER BY opened_at DESC`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
