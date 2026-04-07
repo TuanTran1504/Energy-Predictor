@@ -273,14 +273,53 @@ def db_cleanup_stale_pending(max_age_seconds: int = 120):
         conn.close()
 
 
-def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None:
+def _get_exit_fill_from_binance(client: UMFutures, symbol: str, trade_side: str) -> dict | None:
     try:
         trades = client.get_account_trades(symbol=f"{symbol}USDT", limit=10)
-        if trades:
-            return float(trades[-1]["price"])
+        if not trades:
+            return None
+
+        closing_side = "SELL" if trade_side == "BUY" else "BUY"
+        closing_fills = []
+        for trade in reversed(trades):
+            if trade.get("side") != closing_side:
+                continue
+            qty = abs(float(trade.get("qty", 0) or 0))
+            price = float(trade.get("price", 0) or 0)
+            if qty <= 0 or price <= 0:
+                continue
+            closing_fills.append(trade)
+            # Stop once the fill set changes timestamp significantly.
+            if len(closing_fills) >= 1:
+                first_time = int(closing_fills[0].get("time", 0) or 0)
+                current_time = int(trade.get("time", 0) or 0)
+                if first_time and current_time and abs(first_time - current_time) > 5000:
+                    closing_fills.pop()
+                    break
+
+        if not closing_fills:
+            return None
+
+        total_qty = sum(abs(float(t.get("qty", 0) or 0)) for t in closing_fills)
+        if total_qty <= 0:
+            return None
+
+        weighted_exit = sum(
+            float(t.get("price", 0) or 0) * abs(float(t.get("qty", 0) or 0))
+            for t in closing_fills
+        ) / total_qty
+        realized_pnl = sum(float(t.get("realizedPnl", 0) or 0) for t in closing_fills)
+        latest_time = max(int(t.get("time", 0) or 0) for t in closing_fills)
+        return {
+            "exit_price": weighted_exit,
+            "qty": total_qty,
+            "realized_pnl": realized_pnl,
+            "time": latest_time,
+            "fills": len(closing_fills),
+        }
     except Exception as e:
-        log.warning(f"[MONITOR] Could not fetch exit price for {symbol}: {e}")
-    return None
+        log.warning(f"[MONITOR] Could not fetch exit fills for {symbol}: {e}")
+        return None
 
 
 _ORPHAN_SL_PCT = 0.005
@@ -418,8 +457,14 @@ def _monitor_loop(client: UMFutures):
                     )
                     continue
 
-                exit_price = _get_exit_price_from_binance(client, sym)
-                if exit_price is None:
+                exit_fill = _get_exit_fill_from_binance(client, sym, trade["side"])
+                if exit_fill is not None:
+                    exit_price = float(exit_fill["exit_price"])
+                    log.info(
+                        f"[MONITOR] {sym} exit fills={exit_fill['fills']} "
+                        f"qty={exit_fill['qty']:.6f} pnl={exit_fill['realized_pnl']:.4f}"
+                    )
+                else:
                     try:
                         ticker = client.ticker_price(symbol=f"{sym}USDT")
                         exit_price = float(ticker["price"])
