@@ -53,6 +53,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 REDIS_URL    = os.getenv("REDIS_URL", "")
 
 ACCOUNT_TYPE   = "live"
+TRADES_TABLE   = "trades_live"
 SYMBOLS        = ["BTC", "ETH", "SOL"]
 LEVERAGE       = 5
 MIN_NOTIONAL   = 5.0   # USD — skip trades with position value below this
@@ -111,8 +112,8 @@ def db_ensure_trades_table():
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS trades (
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {TRADES_TABLE} (
                     id                BIGSERIAL PRIMARY KEY,
                     symbol            TEXT        NOT NULL,
                     side              TEXT        NOT NULL,
@@ -144,11 +145,11 @@ def db_ensure_trades_table():
                 ("account_type",     "TEXT DEFAULT 'testnet'"),
             ]:
                 cur.execute(f"""
-                    ALTER TABLE trades ADD COLUMN IF NOT EXISTS {col} {definition}
+                    ALTER TABLE {TRADES_TABLE} ADD COLUMN IF NOT EXISTS {col} {definition}
                 """)
-            cur.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS trades_one_open_position_per_account_symbol_idx
-                ON trades (account_type, symbol)
+            cur.execute(f"""
+                CREATE UNIQUE INDEX IF NOT EXISTS {TRADES_TABLE}_one_open_position_per_account_symbol_idx
+                ON {TRADES_TABLE} (account_type, symbol)
                 WHERE status = 'OPEN'
             """)
         conn.commit()
@@ -161,8 +162,8 @@ def db_create_pending(symbol: str, side: str, setup: str,
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO trades
+            cur.execute(f"""
+                INSERT INTO {TRADES_TABLE}
                   (symbol, side, status, entry_price, quantity, leverage,
                    stop_loss, take_profit, confidence, setup, horizon, account_type)
                 VALUES (%s,%s,'PENDING', 0, 0, %s, 0, 0, %s,%s, 1, %s)
@@ -181,8 +182,8 @@ def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE trades SET
+            cur.execute(f"""
+                UPDATE {TRADES_TABLE} SET
                     status='OPEN', entry_price=%s, quantity=%s,
                     stop_loss=%s, take_profit=%s,
                     binance_order_id=%s, notes=%s
@@ -198,7 +199,7 @@ def db_cancel_pending(trade_id: int):
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM trades WHERE id=%s AND status='PENDING'", (trade_id,))
+            cur.execute(f"DELETE FROM {TRADES_TABLE} WHERE id=%s AND status='PENDING'", (trade_id,))
         conn.commit()
     finally:
         conn.close()
@@ -209,7 +210,7 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT entry_price, quantity, side FROM trades WHERE id=%s", (trade_id,)
+                f"SELECT entry_price, quantity, side FROM {TRADES_TABLE} WHERE id=%s", (trade_id,)
             )
             row = cur.fetchone()
             if not row:
@@ -221,8 +222,8 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
                 pnl_pct = (entry - exit_price) / entry * LEVERAGE
             margin   = qty * entry / LEVERAGE
             pnl_usdt = pnl_pct * margin
-            cur.execute("""
-                UPDATE trades SET
+            cur.execute(f"""
+                UPDATE {TRADES_TABLE} SET
                     status='CLOSED', exit_price=%s, pnl_usdt=%s,
                     pnl_pct=%s, close_reason=%s, closed_at=NOW()
                 WHERE id=%s
@@ -237,10 +238,10 @@ def db_get_open_trades() -> list[dict]:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT id, symbol, side, entry_price, quantity,
                        stop_loss, take_profit, binance_order_id, opened_at
-                FROM trades WHERE status='OPEN' AND account_type=%s
+                FROM {TRADES_TABLE} WHERE status='OPEN' AND account_type=%s
             """, (ACCOUNT_TYPE,))
             cols = [d[0] for d in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
@@ -255,8 +256,8 @@ def db_cleanup_stale_pending(max_age_seconds: int = 120):
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                DELETE FROM trades
+            cur.execute(f"""
+                DELETE FROM {TRADES_TABLE}
                 WHERE status='PENDING'
                   AND account_type=%s
                   AND opened_at < NOW() - INTERVAL '%s seconds'
@@ -324,8 +325,8 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO trades
+                cur.execute(f"""
+                    INSERT INTO {TRADES_TABLE}
                       (symbol, side, status, entry_price, quantity, leverage,
                        stop_loss, take_profit, confidence, horizon, account_type)
                     VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s, 0, 1, %s)
