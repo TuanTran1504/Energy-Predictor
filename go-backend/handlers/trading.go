@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -22,6 +23,13 @@ func getDB() (*sql.DB, error) {
 	return sql.Open("postgres", dsn)
 }
 
+func tradesTableForAccount(accountType string) string {
+	if accountType == "live" {
+		return "trades_live"
+	}
+	return "trades"
+}
+
 func tradingStatusByAccount(c *gin.Context, accountType string) {
 	db, err := getDB()
 	if err != nil {
@@ -30,13 +38,15 @@ func tradingStatusByAccount(c *gin.Context, accountType string) {
 	}
 	defer db.Close()
 
+	tableName := tradesTableForAccount(accountType)
+
 	// Open trades filtered by account_type (inlined to avoid PgBouncer prepared statement issues)
-	query := `SELECT id, symbol, side, entry_price, quantity, leverage,
+	query := fmt.Sprintf(`SELECT id, symbol, side, entry_price, quantity, leverage,
 		       stop_loss, take_profit, confidence, horizon,
 		       binance_order_id, opened_at
-		FROM trades WHERE status = 'OPEN'
+		FROM %s WHERE status = 'OPEN'
 		  AND COALESCE(account_type, 'testnet') = '` + accountType + `'
-		ORDER BY opened_at DESC`
+		ORDER BY opened_at DESC`, tableName)
 	rows, err := db.Query(query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -87,10 +97,10 @@ func tradingStatusByAccount(c *gin.Context, accountType string) {
 	// Summary stats filtered by account_type
 	var totalTrades, wins int
 	var totalPnl float64
-	db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(pnl_usdt),0),
+	db.QueryRow(fmt.Sprintf(`SELECT COUNT(*), COALESCE(SUM(pnl_usdt),0),
 		       COUNT(CASE WHEN pnl_usdt > 0 THEN 1 END)
-		FROM trades WHERE status = 'CLOSED'
-		  AND COALESCE(account_type, 'testnet') = '` + accountType + `'`).Scan(&totalTrades, &totalPnl, &wins)
+		FROM %s WHERE status = 'CLOSED'
+		  AND COALESCE(account_type, 'testnet') = '` + accountType + `'`, tableName)).Scan(&totalTrades, &totalPnl, &wins)
 
 	winRate := 0.0
 	if totalTrades > 0 {
@@ -141,11 +151,13 @@ func tradingHistoryByAccount(c *gin.Context, accountType string) {
 	}
 	defer db.Close()
 
-	rows, err := db.Query(`SELECT id, symbol, side, status, entry_price, exit_price,
+	tableName := tradesTableForAccount(accountType)
+
+	rows, err := db.Query(fmt.Sprintf(`SELECT id, symbol, side, status, entry_price, exit_price,
 		       quantity, leverage, pnl_usdt, pnl_pct, confidence,
 		       horizon, close_reason, opened_at, closed_at
-		FROM trades WHERE COALESCE(account_type, 'testnet') = '` + accountType + `'
-		ORDER BY opened_at DESC LIMIT 100`)
+		FROM %s WHERE COALESCE(account_type, 'testnet') = '` + accountType + `'
+		ORDER BY opened_at DESC LIMIT 100`, tableName))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -210,4 +222,3 @@ func TradingHistory(c *gin.Context) {
 func LiveTradingHistory(c *gin.Context) {
 	tradingHistoryByAccount(c, "live")
 }
-
