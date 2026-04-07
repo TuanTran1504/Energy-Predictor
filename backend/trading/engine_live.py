@@ -535,7 +535,8 @@ def get_account_balance(client: UMFutures) -> float:
 def get_open_position(client: UMFutures, symbol: str) -> dict | None:
     try:
         risk = client.get_position_risk(symbol=f"{symbol}USDT")
-        for pos in risk:
+        positions = risk if isinstance(risk, list) else [risk]
+        for pos in positions:
             amt = float(pos.get("positionAmt", 0))
             if abs(amt) > 0:
                 return {
