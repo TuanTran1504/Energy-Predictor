@@ -25,6 +25,7 @@ UTC = timezone.utc
 from pathlib import Path
 
 import psycopg2
+from psycopg2 import errors
 import redis
 from binance.um_futures import UMFutures
 from dotenv import load_dotenv
@@ -145,6 +146,11 @@ def db_ensure_trades_table():
                 cur.execute(f"""
                     ALTER TABLE trades ADD COLUMN IF NOT EXISTS {col} {definition}
                 """)
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS trades_one_open_position_per_account_symbol_idx
+                ON trades (account_type, symbol)
+                WHERE status = 'OPEN'
+            """)
         conn.commit()
     finally:
         conn.close()
@@ -315,24 +321,30 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
             f"entry={entry} mark={mark} — recovering SL={sl} TP={tp}"
         )
 
-        # Check if a DB record already exists before inserting to avoid duplicates
+        claimed_trade_id = None
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT id FROM trades WHERE symbol=%s AND status='OPEN' AND account_type=%s",
-                    (sym, ACCOUNT_TYPE)
-                )
-                existing = cur.fetchone()
+                cur.execute("""
+                    INSERT INTO trades
+                      (symbol, side, status, entry_price, quantity, leverage,
+                       stop_loss, take_profit, confidence, horizon, account_type)
+                    VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s, 0, 1, %s)
+                    RETURNING id
+                """, (sym, side, entry, qty, LEVERAGE, sl, tp, ACCOUNT_TYPE))
+                claimed_trade_id = cur.fetchone()[0]
+            conn.commit()
+            log.info(f"[MONITOR] Recovery record inserted for {sym} {side} @ {entry} id={claimed_trade_id}")
+        except errors.UniqueViolation:
+            conn.rollback()
+            log.info(f"[MONITOR] Orphan {sym} already claimed by another monitor - skipping recovery insert")
+            continue
         except Exception as e:
-            log.warning(f"[MONITOR] Could not check existing records for {sym}: {e}")
-            existing = None
+            conn.rollback()
+            log.warning(f"[MONITOR] Failed to insert recovery record for {sym}: {e}")
+            continue
         finally:
             conn.close()
-
-        if existing:
-            log.info(f"[MONITOR] Orphan {sym} already has DB record id={existing[0]} — skipping insert")
-            continue
 
         sym_pair = f"{sym}USDT"
         try:
@@ -346,22 +358,6 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
             log.info(f"[MONITOR] Recovery TP placed @ {tp}")
         except Exception as e:
             log.warning(f"[MONITOR] Recovery TP failed for {sym}: {e}")
-
-        conn = _get_conn()
-        try:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO trades
-                      (symbol, side, status, entry_price, quantity, leverage,
-                       stop_loss, take_profit, confidence, horizon, account_type)
-                    VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s, 0, 1, %s)
-                """, (sym, side, entry, qty, LEVERAGE, sl, tp, ACCOUNT_TYPE))
-            conn.commit()
-            log.info(f"[MONITOR] Recovery record inserted for {sym} {side} @ {entry}")
-        except Exception as e:
-            log.warning(f"[MONITOR] Failed to insert recovery record for {sym}: {e}")
-        finally:
-            conn.close()
 
 
 def _monitor_loop(client: UMFutures):
