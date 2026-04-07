@@ -61,6 +61,12 @@ QTY_PRECISION  = {
     "ETH": 2,
     "SOL": 1,
 }
+PRICE_PRECISION = {
+    "BTC": 1,   # tick size 0.1  → e.g. 84234.5
+    "ETH": 2,   # tick size 0.01 → e.g. 2113.95
+    "SOL": 2,   # tick size 0.01 → e.g. 79.87
+    "XRP": 4,   # tick size 0.0001 → e.g. 2.1234
+}
 STOP_LOSS_PCT         = 0.008
 SL_MIN_PCT            = 0.002
 TAKE_PROFIT_MIN_RR    = 1.5
@@ -76,12 +82,14 @@ def get_client() -> UMFutures:
 
 def _algo_order(symbol: str, side: str, order_type: str, trigger_price: float) -> dict:
     """Place SL/TP via Binance Algo Order API (/fapi/v1/algoOrder)."""
+    base      = symbol.replace("USDT", "")
+    precision = PRICE_PRECISION.get(base, 2)
     params = {
         "algoType":    "CONDITIONAL",
         "symbol":      symbol,
         "side":        side,
         "type":        order_type,
-        "triggerPrice": str(round(trigger_price, 2)),
+        "triggerPrice": f"{trigger_price:.{precision}f}",
         "workingType": "MARK_PRICE",
         "closePosition": "true",
         "timestamp":   int(time.time() * 1000),
