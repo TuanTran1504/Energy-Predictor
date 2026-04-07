@@ -307,6 +307,25 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
             f"entry={entry} mark={mark} — recovering SL={sl} TP={tp}"
         )
 
+        # Check if a DB record already exists before inserting to avoid duplicates
+        conn = _get_conn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT id FROM trades WHERE symbol=%s AND status='OPEN' AND account_type=%s",
+                    (sym, ACCOUNT_TYPE)
+                )
+                existing = cur.fetchone()
+        except Exception as e:
+            log.warning(f"[MONITOR] Could not check existing records for {sym}: {e}")
+            existing = None
+        finally:
+            conn.close()
+
+        if existing:
+            log.info(f"[MONITOR] Orphan {sym} already has DB record id={existing[0]} — skipping insert")
+            continue
+
         sym_pair = f"{sym}USDT"
         try:
             _algo_order(sym_pair, close_side, "STOP_MARKET", sl)
