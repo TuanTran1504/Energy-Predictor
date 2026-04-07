@@ -284,6 +284,7 @@ def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None
 
 _ORPHAN_SL_PCT = 0.005
 _ORPHAN_TP_PCT = 0.010
+_POSITION_MISS_COUNTS: dict[int, int] = {}
 
 
 def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
@@ -310,11 +311,9 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
         if side == "BUY":
             sl = round(entry * (1 - _ORPHAN_SL_PCT), 2)
             tp = round(entry * (1 + _ORPHAN_TP_PCT), 2)
-            close_side = "SELL"
         else:
             sl = round(entry * (1 + _ORPHAN_SL_PCT), 2)
             tp = round(entry * (1 - _ORPHAN_TP_PCT), 2)
-            close_side = "BUY"
 
         log.warning(
             f"[MONITOR] Orphaned position: {sym} {side} qty={qty} "
@@ -345,19 +344,6 @@ def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
             continue
         finally:
             conn.close()
-
-        sym_pair = f"{sym}USDT"
-        try:
-            _algo_order(sym_pair, close_side, "STOP_MARKET", sl)
-            log.info(f"[MONITOR] Recovery SL placed @ {sl}")
-        except Exception as e:
-            log.warning(f"[MONITOR] Recovery SL failed for {sym}: {e}")
-
-        try:
-            _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp)
-            log.info(f"[MONITOR] Recovery TP placed @ {tp}")
-        except Exception as e:
-            log.warning(f"[MONITOR] Recovery TP failed for {sym}: {e}")
 
 
 def _monitor_loop(client: UMFutures):
@@ -417,9 +403,20 @@ def _monitor_loop(client: UMFutures):
             # --- Phase 3: close DB records when Binance position is gone ---
             for trade in open_trades:
                 sym = trade["symbol"]
+                trade_id = trade["id"]
                 pos = get_open_position(client, sym)
                 if pos is not None:
+                    _POSITION_MISS_COUNTS.pop(trade_id, None)
                     continue
+
+                miss_count = _POSITION_MISS_COUNTS.get(trade_id, 0) + 1
+                _POSITION_MISS_COUNTS[trade_id] = miss_count
+                if miss_count < 3:
+                    log.info(
+                        f"[MONITOR] {sym} position miss {miss_count}/3 - waiting before DB close"
+                    )
+                    continue
+
                 exit_price = _get_exit_price_from_binance(client, sym)
                 if exit_price is None:
                     try:
@@ -440,6 +437,7 @@ def _monitor_loop(client: UMFutures):
                               else "native_close")
                 log.info(f"[MONITOR] {sym} closed → reason={reason} exit={exit_price}")
                 db_close_trade(trade["id"], exit_price, reason)
+                _POSITION_MISS_COUNTS.pop(trade_id, None)
 
         except Exception as e:
             log.warning(f"[MONITOR] Sync error: {e}")
