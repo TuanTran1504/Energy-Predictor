@@ -74,6 +74,10 @@ SL_MIN_PCT            = 0.002
 TAKE_PROFIT_MIN_RR    = 1.5
 SETUP_E_MIN_RR        = 1.0
 POSITION_RISK_PCT     = 0.01
+MAX_POSITION_FRACTION = 0.10  # default cap: 10% of balance * leverage
+MAX_POSITION_FRACTION_BY_SYMBOL = {
+    "BTC": 0.25,  # higher cap so small balances can still reach 0.001 BTC
+}
 CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
 
@@ -602,7 +606,8 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     if sl_distance == 0:
         return 0.0
     position_value = (risk_usdt / sl_distance) * entry
-    position_value = min(position_value, balance * 0.10 * LEVERAGE)
+    max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
+    position_value = min(position_value, balance * max_fraction * LEVERAGE)
     # Min notional check — Binance rejects orders below $5
     if position_value < MIN_NOTIONAL:
         return 0.0
