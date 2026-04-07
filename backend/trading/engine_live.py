@@ -616,6 +616,30 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     return round(qty, precision)
 
 
+def _signal_follows_trend(signal: str, context: dict) -> tuple[bool, str]:
+    """Hard guard: AI signal must align with directional trend + macro direction."""
+    if signal not in ("BUY", "SELL"):
+        return False, f"invalid signal {signal}"
+
+    allowed = context.get("allowed_direction", "BOTH")
+    if allowed in ("BUY", "SELL") and signal != allowed:
+        return False, f"macro allows {allowed} only"
+
+    h1 = context.get("h1_trend", "")
+    if h1 == "UPTREND" and signal != "BUY":
+        return False, f"H1={h1} requires BUY"
+    if h1 == "DOWNTREND" and signal != "SELL":
+        return False, f"H1={h1} requires SELL"
+
+    m15 = context.get("m15_trend", "")
+    if m15 == "UPTREND" and signal != "BUY":
+        return False, f"M15={m15} requires BUY"
+    if m15 == "DOWNTREND" and signal != "SELL":
+        return False, f"M15={m15} requires SELL"
+
+    return True, "OK"
+
+
 def execute_trade(client: UMFutures, symbol: str, decision: dict,
                   balance: float, context: dict, dry_run: bool = False) -> bool:
     signal = decision.get("signal")
@@ -857,6 +881,13 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     if signal == "WAIT":
         log.info(f"  [AI] WAIT — {decision.get('reason','')}")
         log_skip("AI_WAIT", decision.get("reason", ""), ctx, decision)
+        log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
+        return
+
+    trend_ok, trend_reason = _signal_follows_trend(signal, ctx)
+    if not trend_ok:
+        log_gate_fail("AI_TREND", trend_reason, symbol, ctx)
+        log_skip("AI_TREND", trend_reason, ctx, decision)
         log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
 
