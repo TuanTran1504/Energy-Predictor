@@ -371,10 +371,54 @@ def _monitor_loop(client: UMFutures):
             db_cleanup_stale_pending()
             open_trades = db_get_open_trades()
 
-            # --- Phase 1: recover orphaned positions ---
+            # --- Phase 1: software SL/TP backup ---
+            for trade in list(open_trades):
+                sl = trade.get("stop_loss") or 0
+                tp = trade.get("take_profit") or 0
+                if not sl and not tp:
+                    continue
+
+                sym = trade["symbol"]
+                try:
+                    ticker = client.ticker_price(symbol=f"{sym}USDT")
+                    mark = float(ticker["price"])
+                except Exception:
+                    continue
+
+                trade_side = trade["side"]
+                hit = None
+                if trade_side == "BUY":
+                    if sl and mark <= sl:
+                        hit = "stop_loss"
+                    elif tp and mark >= tp:
+                        hit = "take_profit"
+                else:
+                    if sl and mark >= sl:
+                        hit = "stop_loss"
+                    elif tp and mark <= tp:
+                        hit = "take_profit"
+
+                if hit:
+                    close_side = "SELL" if trade_side == "BUY" else "BUY"
+                    qty = trade["quantity"]
+                    log.warning(f"[MONITOR] {sym} {hit} hit (mark={mark}) - closing position")
+                    try:
+                        client.new_order(
+                            symbol=f"{sym}USDT",
+                            side=close_side,
+                            type="MARKET",
+                            quantity=qty,
+                            reduceOnly="true",
+                        )
+                        db_close_trade(trade["id"], mark, hit)
+                        open_trades = [t for t in open_trades if t["id"] != trade["id"]]
+                    except Exception as e:
+                        log.warning(f"[MONITOR] Failed to close {sym} on {hit}: {e}")
+
+            # --- Phase 2: recover orphaned positions ---
             _recover_orphaned_positions(client, open_trades)
 
-            # --- Phase 2: close DB records when Binance position is gone ---
+            # --- Phase 3: close DB records when Binance position is gone ---
             for trade in open_trades:
                 sym = trade["symbol"]
                 pos = get_open_position(client, sym)
@@ -805,6 +849,10 @@ def run_loop(dry_run: bool = False):
         db_ensure_trades_table()
     except Exception as e:
         log.warning(f"DB table init failed: {e}")
+
+    client_monitor = get_client()
+    t = threading.Thread(target=_monitor_loop, args=(client_monitor,), daemon=True)
+    t.start()
 
     from trade_logger import _tg_send
     _tg_send("🟢 *Live engine started* — monitoring BTC / ETH / SOL")
