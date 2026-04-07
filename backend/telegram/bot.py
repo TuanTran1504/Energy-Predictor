@@ -36,6 +36,12 @@ def get_db():
     return psycopg2.connect(DATABASE_URL)
 
 
+def trades_table_for_account(account_type=None):
+    if account_type == "live":
+        return "trades_live"
+    return "trades"
+
+
 def fmt_pnl(val):
     if val is None:
         return "—"
@@ -54,22 +60,23 @@ def fetch_open_trades(account_type=None):
     conn = get_db()
     try:
         cur = conn.cursor()
+        table_name = trades_table_for_account(account_type)
         if account_type:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT symbol, side, entry_price, stop_loss, take_profit,
                        quantity, leverage, opened_at,
                        COALESCE(account_type, 'testnet') as account_type
-                FROM trades
+                FROM {table_name}
                 WHERE status = 'OPEN'
                   AND COALESCE(account_type, 'testnet') = %s
                 ORDER BY opened_at DESC
             """, (account_type,))
         else:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT symbol, side, entry_price, stop_loss, take_profit,
                        quantity, leverage, opened_at,
                        COALESCE(account_type, 'testnet') as account_type
-                FROM trades
+                FROM {table_name}
                 WHERE status = 'OPEN'
                 ORDER BY opened_at DESC
             """)
@@ -82,23 +89,24 @@ def fetch_closed_trades(limit=10, account_type=None):
     conn = get_db()
     try:
         cur = conn.cursor()
+        table_name = trades_table_for_account(account_type)
         if account_type:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT symbol, side, entry_price, exit_price,
                        pnl_usdt, pnl_pct, close_reason, opened_at, closed_at,
                        COALESCE(account_type, 'testnet') as account_type
-                FROM trades
+                FROM {table_name}
                 WHERE status = 'CLOSED'
                   AND COALESCE(account_type, 'testnet') = %s
                 ORDER BY closed_at DESC
                 LIMIT %s
             """, (account_type, limit))
         else:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT symbol, side, entry_price, exit_price,
                        pnl_usdt, pnl_pct, close_reason, opened_at, closed_at,
                        COALESCE(account_type, 'testnet') as account_type
-                FROM trades
+                FROM {table_name}
                 WHERE status = 'CLOSED'
                 ORDER BY closed_at DESC
                 LIMIT %s
@@ -112,27 +120,28 @@ def fetch_pnl_summary(account_type=None):
     conn = get_db()
     try:
         cur = conn.cursor()
+        table_name = trades_table_for_account(account_type)
         if account_type:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN pnl_usdt > 0 THEN 1 ELSE 0 END) as wins,
                     SUM(CASE WHEN pnl_usdt <= 0 THEN 1 ELSE 0 END) as losses,
                     SUM(pnl_usdt) as total_pnl,
                     AVG(pnl_usdt) as avg_pnl
-                FROM trades
+                FROM {table_name}
                 WHERE status = 'CLOSED'
                   AND COALESCE(account_type, 'testnet') = %s
             """, (account_type,))
         else:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN pnl_usdt > 0 THEN 1 ELSE 0 END) as wins,
                     SUM(CASE WHEN pnl_usdt <= 0 THEN 1 ELSE 0 END) as losses,
                     SUM(pnl_usdt) as total_pnl,
                     AVG(pnl_usdt) as avg_pnl
-                FROM trades
+                FROM {table_name}
                 WHERE status = 'CLOSED'
             """)
         return cur.fetchone()
