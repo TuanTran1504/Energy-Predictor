@@ -71,6 +71,14 @@ PRICE_PRECISION = {
 }
 STOP_LOSS_PCT         = 0.008
 SL_MIN_PCT            = 0.002
+try:
+    SL_ATR_MULTIPLIER = max(0.0, float(os.getenv("SL_ATR_MULTIPLIER", "1.8")))
+except (TypeError, ValueError):
+    SL_ATR_MULTIPLIER = 1.8
+try:
+    SL_SR_BUFFER_ATR_MULT = max(0.0, float(os.getenv("SL_SR_BUFFER_ATR_MULT", "0.25")))
+except (TypeError, ValueError):
+    SL_SR_BUFFER_ATR_MULT = 0.25
 TAKE_PROFIT_MIN_RR    = 1.5
 SETUP_E_MIN_RR        = 1.0
 POSITION_RISK_PCT     = 0.01
@@ -790,15 +798,46 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("DIRECTION", f"SELL needs SL({ai_sl}) > entry({entry}) > TP({ai_tp})", symbol)
         return False
 
-    atr = context.get("atr", 0)
-    atr_min_pct = (1.5 * atr / entry) if (atr > 0 and entry > 0) else SL_MIN_PCT
+    atr = float(context.get("atr_m15") or context.get("atr") or 0.0)
+    atr_min_pct = (SL_ATR_MULTIPLIER * atr / entry) if (atr > 0 and entry > 0) else SL_MIN_PCT
     effective_min_pct = max(SL_MIN_PCT, atr_min_pct)
 
     risk_pct = abs(entry - ai_sl) / entry * 100
     if risk_pct < effective_min_pct * 100:
-        log.info(f"  [EXEC] SL {risk_pct:.3f}% < min {effective_min_pct*100:.3f}% (1.5×ATR), widening SL")
+        log.info(
+            f"  [EXEC] SL {risk_pct:.3f}% < min {effective_min_pct*100:.3f}% "
+            f"({SL_ATR_MULTIPLIER:.2f}xATR), widening SL"
+        )
         ai_sl = entry * (1 - effective_min_pct) if signal == "BUY" else entry * (1 + effective_min_pct)
-        risk_pct = effective_min_pct * 100
+
+    sr = context.get("sr") or {}
+    support = sr.get("support")
+    resistance = sr.get("resistance")
+    sr_buffer = atr * SL_SR_BUFFER_ATR_MULT if atr > 0 else 0.0
+    if signal == "BUY" and support is not None:
+        try:
+            sr_sl = float(support) - sr_buffer
+            if sr_sl < ai_sl and sr_sl < entry:
+                log.info(
+                    f"  [EXEC] SL widened below support ({support}) by ATR buffer "
+                    f"{sr_buffer:.4f}: {ai_sl:.6f} -> {sr_sl:.6f}"
+                )
+                ai_sl = sr_sl
+        except (TypeError, ValueError):
+            pass
+    elif signal == "SELL" and resistance is not None:
+        try:
+            sr_sl = float(resistance) + sr_buffer
+            if sr_sl > ai_sl and sr_sl > entry:
+                log.info(
+                    f"  [EXEC] SL widened above resistance ({resistance}) by ATR buffer "
+                    f"{sr_buffer:.4f}: {ai_sl:.6f} -> {sr_sl:.6f}"
+                )
+                ai_sl = sr_sl
+        except (TypeError, ValueError):
+            pass
+
+    risk_pct = abs(entry - ai_sl) / entry * 100
     if risk_pct > STOP_LOSS_PCT * 100:
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
         return False
