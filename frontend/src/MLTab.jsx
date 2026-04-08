@@ -266,7 +266,7 @@ const MarketSignals = ({ signals }) => {
 // ── Main ML Tab ────────────────────────────────────────────────────────────────
 export default function MLTab({ mlPredictions }) {
   const [symbol,    setSymbol]    = useState("BTC");
-  const [lookahead, setLookahead] = useState(1);
+  const [horizon,   setHorizon]   = useState("1d");
   const [days,      setDays]      = useState(30);
   const [backtest,  setBacktest]  = useState(null);
   const [btLoading, setBtLoading] = useState(false);
@@ -277,7 +277,7 @@ export default function MLTab({ mlPredictions }) {
     setBtLoading(true);
     setBtError(null);
     try {
-      const res = await fetch(`${API_URL}/ml/backtest?symbol=${symbol}&days=${days}&lookahead=${lookahead}`);
+      const res = await fetch(`${API_URL}/ml/backtest?symbol=${symbol}&days=${days}&horizon=${horizon}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setBacktest(await res.json());
     } catch (e) {
@@ -285,7 +285,7 @@ export default function MLTab({ mlPredictions }) {
     } finally {
       setBtLoading(false);
     }
-  }, [symbol, days, lookahead]);
+  }, [symbol, days, horizon]);
 
   useEffect(() => { fetchBacktest(); }, [fetchBacktest]);
 
@@ -357,16 +357,16 @@ export default function MLTab({ mlPredictions }) {
           ))}
         </div>
 
-        {/* Lookahead toggle */}
+        {/* Horizon toggle */}
         <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: 3, overflow: "hidden" }}>
-          {[{ v: 1, label: "1D" }, { v: 7, label: "7D" }].map(({ v, label }) => (
+          {[{ v: "4h", label: "4H" }, { v: "1d", label: "1D" }].map(({ v, label }) => (
             <button
               key={v}
-              onClick={() => setLookahead(v)}
+              onClick={() => setHorizon(v)}
               style={{
                 padding: "6px 12px",
-                background: lookahead === v ? "var(--border2)" : "transparent",
-                color: lookahead === v ? "var(--text)" : "var(--muted2)",
+                background: horizon === v ? "var(--border2)" : "transparent",
+                color: horizon === v ? "var(--text)" : "var(--muted2)",
                 border: "none",
                 fontFamily: "var(--mono)",
                 fontSize: 11,
@@ -403,8 +403,8 @@ export default function MLTab({ mlPredictions }) {
         {symbol} FORECASTS
       </div>
       <div className="card-grid">
-        <PredictionCard symbol={symbol} label="24H FORECAST"  prediction={mlPredictions?.[`${symbol}_1d`]} />
-        <PredictionCard symbol={symbol} label="7D FORECAST"   prediction={mlPredictions?.[`${symbol}_7d`]} />
+        <PredictionCard symbol={symbol} label="4H FORECAST"   prediction={mlPredictions?.[`${symbol}_4h`]} />
+        <PredictionCard symbol={symbol} label="1D FORECAST"   prediction={mlPredictions?.[`${symbol}_1d`]} />
       </div>
 
       {/* ── Accuracy badge ── */}
@@ -413,7 +413,7 @@ export default function MLTab({ mlPredictions }) {
       {/* ── Predicted vs Actual chart ── */}
       <div className="chart-section">
         <div className="chart-label">
-          {symbol}/USDT · BACKTEST · {lookahead === 1 ? "24H" : `${lookahead}D`} HORIZON · LAST {days}D
+          {symbol}/USDT · BACKTEST · {horizon.toUpperCase()} HORIZON · LAST {days}D
         </div>
         <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 12 }}>
           <span style={{ color: "#30d158" }}>▲ UP</span>

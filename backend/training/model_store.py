@@ -42,16 +42,18 @@ BUNDLE_ARTIFACT_NAMES = ["{symbol}-bundle", "{symbol}-model"]
 
 
 def _parse_horizon_tokens(raw: str) -> list[str]:
+    allowed = {"4h", "1d"}
     tokens: list[str] = []
     for p in raw.split(","):
         t = p.strip().lower()
         if not t:
             continue
         if len(t) < 2 or t[-1] not in {"d", "h"} or not t[:-1].isdigit():
-            raise ValueError(f"Invalid horizon token '{t}'. Use forms like 1d,7d,4h")
-        tokens.append(t)
+            raise ValueError(f"Invalid horizon token '{t}'. Use forms like 1d,4h")
+        if t in allowed:
+            tokens.append(t)
     if not tokens:
-        tokens = ["1d", "7d"]
+        tokens = ["4h", "1d"]
     out: list[str] = []
     for t in tokens:
         if t not in out:
@@ -59,7 +61,7 @@ def _parse_horizon_tokens(raw: str) -> list[str]:
     return out
 
 
-HORIZONS = _parse_horizon_tokens(os.getenv("MODEL_HORIZONS", "1d,7d"))
+HORIZONS = _parse_horizon_tokens(os.getenv("MODEL_HORIZONS", "4h,1d"))
 
 
 def _model_variant_suffix() -> str:
@@ -215,7 +217,7 @@ def _load_from_dagshub(symbol: str, horizon_token: str = "1d"):
     Loads the model for a given symbol+horizon from DagsHub.
 
     Priority:
-      1. @champion alias on registered model  (btc-direction-7d@champion)
+      1. @champion alias on registered model  (btc-direction-4h@champion)
          â€” set manually on DagsHub UI or promoted automatically by train.py
       2. Most recent FINISHED run matching the run name pattern
          â€” fallback when no registered model / alias exists yet
@@ -334,7 +336,7 @@ def load_all_models() -> tuple[dict[str, object], dict[str, str]]:
     """
     Loads models for every (symbol, horizon) combination.
     Returns (models_dict, trained_at_dict).
-    Keys: "BTC_1d", "BTC_7d", "ETH_1d", "ETH_7d"
+    Keys: "BTC_4h", "BTC_1d", "ETH_4h", "ETH_1d"
     Load priority: Redis â†’ DagsHub â†’ local disk (horizon=1 only for disk fallback)
     """
     r = _redis_client()

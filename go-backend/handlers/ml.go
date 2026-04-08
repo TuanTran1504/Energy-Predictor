@@ -33,6 +33,7 @@ func MLBacktest(c *gin.Context) {
 	symbol := c.Query("symbol")
 	days := c.Query("days")
 	lookahead := c.Query("lookahead")
+	horizon := c.Query("horizon")
 
 	url := pythonMLURL() + "/backtest?symbol=" + symbol
 	if days != "" {
@@ -40,6 +41,9 @@ func MLBacktest(c *gin.Context) {
 	}
 	if lookahead != "" {
 		url += "&lookahead=" + lookahead
+	}
+	if horizon != "" {
+		url += "&horizon=" + horizon
 	}
 
 	client := &http.Client{Timeout: 45 * time.Second}
@@ -60,7 +64,7 @@ func MLBacktest(c *gin.Context) {
 }
 
 // FetchMLPredictions calls Python GET /predict/live/all for BTC and ETH concurrently.
-// One DB read per symbol covers all horizons — returns "BTC_1d", "BTC_7d", "ETH_1d", "ETH_7d".
+// One DB read per symbol covers all configured horizons — e.g. "BTC_4h", "BTC_1d".
 func FetchMLPredictions() map[string]*MLPrediction {
 	type result struct {
 		preds map[string]*MLPrediction
@@ -272,4 +276,3 @@ func MLMarketSignals(c *gin.Context) {
 	}
 	c.Data(resp.StatusCode, "application/json", body)
 }
-

@@ -81,7 +81,7 @@ def _get_redis() -> Optional[redis_lib.Redis]:
 def _normalize_horizon_token(token: str) -> str:
     t = str(token).strip().lower()
     if len(t) < 2 or t[-1] not in {"d", "h"} or not t[:-1].isdigit():
-        raise ValueError(f"Invalid horizon token '{token}'. Use forms like 1d, 7d, 4h.")
+        raise ValueError(f"Invalid horizon token '{token}'. Use forms like 1d, 4h.")
     return f"{int(t[:-1])}{t[-1]}"
 
 
@@ -129,7 +129,6 @@ def _horizon_interval_seconds(horizon_token: str) -> int:
       2) Default: min(horizon length, 24h)
          - 4h  -> 4h
          - 1d  -> 24h
-         - 7d  -> 24h (capped)
     """
     token = _normalize_horizon_token(horizon_token)
     env_key = f"PRECOMPUTE_INTERVAL_{token.upper()}"
@@ -145,20 +144,28 @@ def _horizon_interval_seconds(horizon_token: str) -> int:
 
 
 HORIZON_TOKENS: list[str] = []
+_ALLOWED_HORIZONS = {"4h", "1d"}
 for _h in HORIZONS:
     try:
         t = _normalize_horizon_token(_h)
+        if t not in _ALLOWED_HORIZONS:
+            continue
         if t not in HORIZON_TOKENS:
             HORIZON_TOKENS.append(t)
     except Exception:
         log.warning(f"Ignoring invalid MODEL_HORIZONS token: {_h}")
 
 if not HORIZON_TOKENS:
-    HORIZON_TOKENS = ["1d", "7d"]
+    HORIZON_TOKENS = ["4h", "1d"]
+
+
+def _sanitize_horizon(token: str, fallback: str) -> str:
+    return token if token in _ALLOWED_HORIZONS else fallback
 
 DEFAULT_HORIZON_TOKEN = _normalize_horizon_token(
     os.getenv("DEFAULT_HORIZON_TOKEN", HORIZON_TOKENS[0])
 )
+DEFAULT_HORIZON_TOKEN = _sanitize_horizon(DEFAULT_HORIZON_TOKEN, HORIZON_TOKENS[0])
 if DEFAULT_HORIZON_TOKEN not in HORIZON_TOKENS:
     HORIZON_TOKENS = [DEFAULT_HORIZON_TOKEN] + HORIZON_TOKENS
 
@@ -240,7 +247,11 @@ def precompute_predictions(target_horizons: Optional[list[str]] = None) -> dict:
     """
     target_set: Optional[set[str]] = None
     if target_horizons:
-        target_set = {_normalize_horizon_token(t) for t in target_horizons}
+        target_set = {
+            _normalize_horizon_token(t)
+            for t in target_horizons
+            if _normalize_horizon_token(t) in _ALLOWED_HORIZONS
+        }
 
     results = {}
     for symbol in SYMBOLS:
@@ -600,6 +611,11 @@ def predict(req: PredictRequest):
         horizon_token = _normalize_horizon_token(req.horizon)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    if horizon_token not in _ALLOWED_HORIZONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported horizon '{horizon_token}'. Supported horizons: {sorted(_ALLOWED_HORIZONS)}",
+        )
 
     model_key = _model_key(req.symbol, horizon_token)
     model = models.get(model_key)
@@ -660,7 +676,7 @@ def predict(req: PredictRequest):
 def backtest(
     symbol:   Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
     days:     int                                  = Query(default=30, ge=7, le=180),
-    horizon: str = Query(default=DEFAULT_HORIZON_TOKEN, description="Prediction horizon token (e.g. 1d, 7d, 4h)."),
+    horizon: str = Query(default=DEFAULT_HORIZON_TOKEN, description="Prediction horizon token (e.g. 1d, 4h)."),
     lookahead: Optional[int] = Query(default=None, ge=1, le=30, description="Deprecated: day horizon. Use 'horizon' token."),
 ):
     """
@@ -677,6 +693,11 @@ def backtest(
         horizon_token = _normalize_horizon_token(raw_horizon)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    if horizon_token not in _ALLOWED_HORIZONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported horizon '{horizon_token}'. Supported horizons: {sorted(_ALLOWED_HORIZONS)}",
+        )
 
     model_key = _model_key(symbol, horizon_token)
     model = models.get(model_key)
@@ -807,7 +828,7 @@ def predict_live_all(
 @app.get("/predict/live", response_model=PredictionOut)
 def predict_live(
     symbol: Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
-    horizon: str = Query(default=DEFAULT_HORIZON_TOKEN, description="Prediction horizon token (e.g. 1d, 7d, 4h)."),
+    horizon: str = Query(default=DEFAULT_HORIZON_TOKEN, description="Prediction horizon token (e.g. 1d, 4h)."),
     lookahead: Optional[int] = Query(default=None, ge=1, le=30, description="Deprecated: day horizon. Use 'horizon' token."),
 ):
     """
@@ -820,6 +841,11 @@ def predict_live(
         horizon_token = _normalize_horizon_token(raw_horizon)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    if horizon_token not in _ALLOWED_HORIZONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported horizon '{horizon_token}'. Supported horizons: {sorted(_ALLOWED_HORIZONS)}",
+        )
 
     model_key = _model_key(symbol, horizon_token)
     model = models.get(model_key)

@@ -80,12 +80,13 @@ MAX_POSITION_FRACTION_BY_SYMBOL = {
 }
 CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
+ALLOWED_ML_HORIZONS = {"4h", "1d"}
 
 
 def _normalize_horizon_token(token: str) -> str:
     t = str(token).strip().lower()
     if len(t) < 2 or t[-1] not in {"d", "h"} or not t[:-1].isdigit():
-        raise ValueError(f"Invalid horizon token '{token}'. Use values like 1d, 7d, 4h.")
+        raise ValueError(f"Invalid horizon token '{token}'. Use values like 1d, 4h.")
     return f"{int(t[:-1])}{t[-1]}"
 
 
@@ -96,19 +97,27 @@ def _parse_horizon_tokens(raw: str) -> list[str]:
         if not p:
             continue
         token = _normalize_horizon_token(p)
+        if token not in ALLOWED_ML_HORIZONS:
+            continue
         if token not in tokens:
             tokens.append(token)
-    return tokens or ["1d", "7d"]
+    return tokens or ["4h", "1d"]
 
 
-ML_HORIZONS = _parse_horizon_tokens(os.getenv("ML_HORIZONS", "1d,7d"))
-ML_PRIMARY_HORIZON = _normalize_horizon_token(
-    os.getenv("ML_PRIMARY_HORIZON", ML_HORIZONS[0])
+def _sanitize_horizon(token: str, fallback: str) -> str:
+    return token if token in ALLOWED_ML_HORIZONS else fallback
+
+
+ML_HORIZONS = _parse_horizon_tokens(os.getenv("ML_HORIZONS", "4h,1d"))
+ML_PRIMARY_HORIZON = _sanitize_horizon(
+    _normalize_horizon_token(os.getenv("ML_PRIMARY_HORIZON", ML_HORIZONS[0])),
+    ML_HORIZONS[0],
 )
 if ML_PRIMARY_HORIZON not in ML_HORIZONS:
     ML_HORIZONS = [ML_PRIMARY_HORIZON] + ML_HORIZONS
-ML_TREND_HORIZON = _normalize_horizon_token(
-    os.getenv("ML_TREND_HORIZON", "1d")
+ML_TREND_HORIZON = _sanitize_horizon(
+    _normalize_horizon_token(os.getenv("ML_TREND_HORIZON", "1d")),
+    "1d",
 )
 ML_REQUIRE_TREND_ALIGNMENT = os.getenv("ML_REQUIRE_TREND_ALIGNMENT", "1") == "1"
 
