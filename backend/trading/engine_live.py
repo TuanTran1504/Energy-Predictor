@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import hmac
 import json
+import math
 import os
 import time
 import threading
@@ -674,7 +675,8 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
         return 0.0
     qty       = position_value / entry
     precision = QTY_PRECISION.get(symbol, 2)
-    qty = round(qty, precision)
+    factor = 10 ** precision
+    qty = math.floor(qty * factor) / factor
     if qty <= 0 or (qty * entry) < MIN_NOTIONAL:
         return 0.0
     return qty
