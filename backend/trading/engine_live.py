@@ -1025,14 +1025,19 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     decision["entry_price"] = plan["entry_price"]
     decision["stop_loss"] = plan["stop_loss"]
     decision["take_profit"] = plan["take_profit"]
+    decision["take_profit_1"] = plan["take_profit_1"]
+    decision["take_profit_2"] = plan["take_profit_2"]
+    decision["target_mode"] = plan["target_mode"]
     decision["planned_rr"] = plan["rr"]
     decision.setdefault("analysis", {})
     decision["analysis"]["rr_check"] = (
         f"Python planned Entry={plan['entry_price']} SL={plan['stop_loss']} "
-        f"TP={plan['take_profit']} net R:R={plan['rr']:.2f} gross R:R={plan['gross_rr']:.2f}. Pass."
+        f"TP={plan['take_profit']} ({plan['target_mode']}, TP1={plan['take_profit_1']}, TP2={plan['take_profit_2']}) "
+        f"net R:R={plan['rr']:.2f} gross R:R={plan['gross_rr']:.2f}. Pass."
     )
     log.info(
         f"  [PLAN] entry={plan['entry_price']} SL={plan['stop_loss']} TP={plan['take_profit']} "
+        f"({plan['target_mode']}; TP1={plan['take_profit_1']} TP2={plan['take_profit_2']}) "
         f"netR:R={plan['rr']:.2f} grossR:R={plan['gross_rr']:.2f} | {plan_reason}"
     )
 

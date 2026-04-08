@@ -250,6 +250,9 @@ def log_cycle_summary(symbol: str, signal: str, executed: bool, balance: float,
     entry = dec.get("entry_price") or ctx.get("setup_e_entry", "—")
     sl    = dec.get("stop_loss",  "—")
     tp    = dec.get("take_profit","—")
+    tp1   = dec.get("take_profit_1")
+    tp2   = dec.get("take_profit_2")
+    target_mode = dec.get("target_mode")
     zone_lo = dec.get("seek_entry_low")
     zone_hi = dec.get("seek_entry_high")
     zone_basis = dec.get("seek_entry_basis", "")
@@ -263,11 +266,17 @@ def log_cycle_summary(symbol: str, signal: str, executed: bool, balance: float,
         if zone_lo is not None or zone_hi is not None or zone_basis
         else ""
     )
+    target_line = (
+        f"  │  target_mode={target_mode}  TP1={tp1}  TP2={tp2}\n"
+        if target_mode or tp1 is not None or tp2 is not None
+        else ""
+    )
     _cycle_log.info(
         f"\n  ┌─ DECISION  {symbol}  {'─'*40}\n"
         f"  │  mode={mode}  score={score}/5  price={price}\n"
         f"  │  signal={signal}  setup={setup}  status={status}\n"
         f"  │  entry={entry}  SL={sl}  TP={tp}\n"
+        f"{target_line}"
         f"{zone_line}"
         f"  │  reason: {reason}\n"
         f"  │  balance={balance:.2f} USDT\n"

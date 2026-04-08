@@ -270,6 +270,8 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     h1          = context.get("h1_trend", "?")
     primary     = context.get("primary_trend", context.get("m15_trend", "?"))
     market_mode = context.get("market_mode", primary)
+    trend_rollover = bool(context.get("trend_rollover"))
+    trend_rollover_reason = context.get("trend_rollover_reason", "")
     score       = context.get("score", 0)
     adx         = context.get("adx", 0)
     rsi         = context.get("rsi", 0)
@@ -304,21 +306,35 @@ def _build_prompt(context: dict) -> tuple[str, str]:
             patterns = [PATTERN_LIBRARY["wait"]]
             bias_note = f"SIDEWAY + RSI={rsi:.1f} neutral — no edge. WAIT."
     elif primary == "UPTREND":
-        if score >= 4:
+        if trend_rollover:
+            patterns = [PATTERN_LIBRARY["setup_C_buy"], PATTERN_LIBRARY["wait"]]
+            bias_note = (
+                f"M15 uptrend is rolling over — do NOT use continuation buys. "
+                f"Only consider strong Setup C reversals or WAIT. {trend_rollover_reason}"
+            )
+        elif score >= 4:
             patterns = [PATTERN_LIBRARY["setup_B_buy"], PATTERN_LIBRARY["wait"]]
+            bias_note = f"M15 uptrend strong — breakout BUYs allowed. H1 context: {h1}. Allowed direction: {allowed_dir}."
         else:
             patterns = [PATTERN_LIBRARY["setup_A_buy"],
                         PATTERN_LIBRARY["setup_C_buy"],
                         PATTERN_LIBRARY["wait"]]
-        bias_note = f"M15 uptrend — only BUY setups. H1 context: {h1}. Allowed direction: {allowed_dir}."
+            bias_note = f"M15 uptrend — only BUY setups. H1 context: {h1}. Allowed direction: {allowed_dir}."
     elif primary == "DOWNTREND":
-        if score >= 4:
+        if trend_rollover:
+            patterns = [PATTERN_LIBRARY["setup_C_sell"], PATTERN_LIBRARY["wait"]]
+            bias_note = (
+                f"M15 downtrend is rolling over — do NOT use continuation sells. "
+                f"Only consider strong Setup C reversals or WAIT. {trend_rollover_reason}"
+            )
+        elif score >= 4:
             patterns = [PATTERN_LIBRARY["setup_B_sell"], PATTERN_LIBRARY["wait"]]
+            bias_note = f"M15 downtrend strong — breakdown SELLs allowed. H1 context: {h1}. Allowed direction: {allowed_dir}."
         else:
             patterns = [PATTERN_LIBRARY["setup_A_sell"],
                         PATTERN_LIBRARY["setup_C_sell"],
                         PATTERN_LIBRARY["wait"]]
-        bias_note = f"M15 downtrend — only SELL setups. H1 context: {h1}. Allowed direction: {allowed_dir}."
+            bias_note = f"M15 downtrend — only SELL setups. H1 context: {h1}. Allowed direction: {allowed_dir}."
     else:
         patterns = [PATTERN_LIBRARY["wait"]]
         bias_note = "Trend unclear → WAIT."
@@ -569,5 +585,6 @@ def _to_float_or_none(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
 
 

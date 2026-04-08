@@ -52,6 +52,29 @@ def classify_trend(gap_pct: float, ema34: float, ema89: float,
     return "SIDEWAY"
 
 
+def _is_strong_breakout_context(setup_code: str, context: dict,
+                                entry: float, atr: float,
+                                box_low: float, box_high: float,
+                                signal: str) -> bool:
+    """
+    Allows TP2 only when breakout quality is genuinely strong.
+    """
+    if setup_code != "B":
+        return False
+
+    adx = float(context.get("adx") or 0.0)
+    score = int(context.get("score") or 0)
+    vol_spike = bool(context.get("vol_spike"))
+    if adx < 25 or score < 4 or not vol_spike:
+        return False
+
+    breakout_buffer = max(entry * BREAKOUT_CONFIRM_PCT, atr * BREAKOUT_CONFIRM_ATR_MULT)
+    price = float(context.get("current_price") or entry)
+    if signal == "BUY":
+        return price >= (box_high + breakout_buffer)
+    return price <= (box_low - breakout_buffer)
+
+
 def detect_m15_rollover(raw_trend: str, df_m15: pd.DataFrame,
                         atr: float, rsi: float) -> tuple[bool, str]:
     """
@@ -186,7 +209,7 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     m15_rollover, m15_rollover_reason = detect_m15_rollover(
         raw_m15_trend, df_m15, float(atr_m15), float(rsi)
     )
-    m15_trend = "SIDEWAY" if m15_rollover else raw_m15_trend
+    m15_trend = raw_m15_trend
 
     direction = np.sign(df_m15["close"].diff()).fillna(0)
     obv = (direction * df_m15["volume"]).cumsum()
@@ -327,8 +350,7 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
         details.append("Vol spike 1.5x (+1)")
 
     if context.get("trend_rollover"):
-        score = max(0, score - 1)
-        details.append("M15 rollover (-1)")
+        details.append("M15 rollover caution")
 
     return score, details
 
@@ -373,9 +395,6 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     score = context["score"]
     is_range = context["is_range"]
 
-    if context.get("trend_rollover"):
-        return False, f"GATE0: {context.get('trend_rollover_reason', 'M15 rollover detected')}"
-
     if primary == "SIDEWAY":
         return False, "GATE1: M15 SIDEWAY"
 
@@ -386,6 +405,8 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     threshold = SCORE_THRESHOLD
     if not str(context.get("symbol", "BTC")).startswith("BTC") and context.get("adx", 0) > 45:
         threshold = 2
+    if context.get("trend_rollover"):
+        threshold = min(threshold, 1)
     if score < threshold:
         return False, f"GATE3: score {score}/{threshold} insufficient"
 
@@ -594,6 +615,11 @@ def validate_ai_trade_decision(decision: dict, context: dict,
         return False, f"M15={primary} requires SELL"
 
     setup_code = _setup_code(decision.get("analysis", {}).get("setup_identified", ""))
+    if context.get("trend_rollover") and setup_code in ("A", "B"):
+        return False, (
+            f"M15 rollover: continuation {setup_code} blocked; "
+            f"wait for Setup C or stabilization"
+        )
     if setup_code == "C":
         setup_c_ok, setup_c_reason = _setup_c_reversal_ok(signal, context, df_m5)
         if not setup_c_ok:
@@ -939,30 +965,52 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
 
         sl = raw_sl
         risk = entry - sl
-        chosen_tp = None
-        best_rr = -999.0
-        best_gross_rr = 0.0
-        best_target = target_levels[0]
-        for target in target_levels:
-            tp = target
-            gross_reward = tp - entry
+        net_risk = risk + fee_cost
+        tp1 = target_levels[0]
+        tp2 = target_levels[1] if len(target_levels) > 1 else target_levels[0]
+        strong_breakout = _is_strong_breakout_context(
+            setup_code, context, entry, atr, box_low, box_high, signal
+        )
+
+        def _buy_rr(target: float) -> tuple[float, float]:
+            gross_reward = target - entry
             net_reward = gross_reward - fee_cost
-            net_risk = risk + fee_cost
             rr = net_reward / net_risk if net_risk > 0 else 0.0
             gross_rr = gross_reward / risk if risk > 0 else 0.0
-            if rr > best_rr:
-                best_rr = rr
-                best_gross_rr = gross_rr
-                best_target = target
-            if rr >= min_rr:
-                chosen_tp = tp
-                best_target = target
-                best_rr = rr
-                best_gross_rr = gross_rr
-                break
+            return rr, gross_rr
 
+        tp1_rr, tp1_gross_rr = _buy_rr(tp1)
+        tp2_rr, tp2_gross_rr = _buy_rr(tp2)
+
+        chosen_tp = None
+        best_target = tp1
+        best_rr = tp1_rr
+        best_gross_rr = tp1_gross_rr
+        target_mode = "TP1"
+
+        if tp1_rr >= min_rr:
+            chosen_tp = tp1
+        elif strong_breakout:
+            farther_targets = target_levels[1:] if len(target_levels) > 1 else []
+            for target in farther_targets:
+                rr, gross_rr = _buy_rr(target)
+                if rr >= min_rr:
+                    chosen_tp = target
+                    best_target = target
+                    best_rr = rr
+                    best_gross_rr = gross_rr
+                    target_mode = "TP2"
+                    break
+                if rr > best_rr:
+                    best_target = target
+                    best_rr = rr
+                    best_gross_rr = gross_rr
         if chosen_tp is None:
-            return None, f"best RR {best_rr:.2f} < {min_rr:.2f} to target {best_target:.4f}"
+            return None, (
+                f"TP1 RR {tp1_rr:.2f} < {min_rr:.2f}"
+                + (f"; TP2 RR {tp2_rr:.2f}" if len(target_levels) > 1 else "")
+                + f" (tp1={tp1:.4f})"
+            )
 
     else:
         if setup_code == "A":
@@ -1001,30 +1049,52 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
 
         sl = raw_sl
         risk = sl - entry
-        chosen_tp = None
-        best_rr = -999.0
-        best_gross_rr = 0.0
-        best_target = target_levels[0]
-        for target in target_levels:
-            tp = target
-            gross_reward = entry - tp
+        net_risk = risk + fee_cost
+        tp1 = target_levels[0]
+        tp2 = target_levels[1] if len(target_levels) > 1 else target_levels[0]
+        strong_breakout = _is_strong_breakout_context(
+            setup_code, context, entry, atr, box_low, box_high, signal
+        )
+
+        def _sell_rr(target: float) -> tuple[float, float]:
+            gross_reward = entry - target
             net_reward = gross_reward - fee_cost
-            net_risk = risk + fee_cost
             rr = net_reward / net_risk if net_risk > 0 else 0.0
             gross_rr = gross_reward / risk if risk > 0 else 0.0
-            if rr > best_rr:
-                best_rr = rr
-                best_gross_rr = gross_rr
-                best_target = target
-            if rr >= min_rr:
-                chosen_tp = tp
-                best_target = target
-                best_rr = rr
-                best_gross_rr = gross_rr
-                break
+            return rr, gross_rr
 
+        tp1_rr, tp1_gross_rr = _sell_rr(tp1)
+        tp2_rr, tp2_gross_rr = _sell_rr(tp2)
+
+        chosen_tp = None
+        best_target = tp1
+        best_rr = tp1_rr
+        best_gross_rr = tp1_gross_rr
+        target_mode = "TP1"
+
+        if tp1_rr >= min_rr:
+            chosen_tp = tp1
+        elif strong_breakout:
+            farther_targets = target_levels[1:] if len(target_levels) > 1 else []
+            for target in farther_targets:
+                rr, gross_rr = _sell_rr(target)
+                if rr >= min_rr:
+                    chosen_tp = target
+                    best_target = target
+                    best_rr = rr
+                    best_gross_rr = gross_rr
+                    target_mode = "TP2"
+                    break
+                if rr > best_rr:
+                    best_target = target
+                    best_rr = rr
+                    best_gross_rr = gross_rr
         if chosen_tp is None:
-            return None, f"best RR {best_rr:.2f} < {min_rr:.2f} to target {best_target:.4f}"
+            return None, (
+                f"TP1 RR {tp1_rr:.2f} < {min_rr:.2f}"
+                + (f"; TP2 RR {tp2_rr:.2f}" if len(target_levels) > 1 else "")
+                + f" (tp1={tp1:.4f})"
+            )
 
     final_risk_pct = abs(entry - sl) / entry
     if final_risk_pct > SL_MAX_PCT:
@@ -1034,15 +1104,22 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         "entry_price": round(entry, 6),
         "stop_loss": round(sl, 6),
         "take_profit": round(chosen_tp, 6),
+        "take_profit_1": round(tp1, 6),
+        "take_profit_2": round(tp2, 6),
+        "target_mode": target_mode,
         "rr": round(best_rr, 2),
         "gross_rr": round(best_gross_rr, 2),
+        "tp1_rr": round(tp1_rr, 2),
+        "tp2_rr": round(tp2_rr, 2),
         "min_rr": round(min_rr, 2),
         "stop_anchor": round(stop_anchor, 6),
         "target_anchor": round(best_target, 6),
+        "strong_breakout": bool(strong_breakout),
         "estimated_cost": round(fee_cost, 6),
     }
     reason = (
-        f"stop@{plan['stop_anchor']} target@{plan['target_anchor']} "
-        f"RRnet={plan['rr']:.2f} RRgross={plan['gross_rr']:.2f} min={plan['min_rr']:.2f}"
+        f"stop@{plan['stop_anchor']} TP1@{plan['take_profit_1']} TP2@{plan['take_profit_2']} "
+        f"selected={plan['target_mode']} RRnet={plan['rr']:.2f} RRgross={plan['gross_rr']:.2f} "
+        f"RR1={plan['tp1_rr']:.2f} RR2={plan['tp2_rr']:.2f} min={plan['min_rr']:.2f}"
     )
     return plan, reason
