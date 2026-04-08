@@ -32,6 +32,8 @@ SL_MIN_PCT = 0.002
 MIN_RR = 1.5
 
 ADX_TREND_THRESHOLD = 45
+BREAKOUT_CONFIRM_ATR_MULT = 0.20
+BREAKOUT_CONFIRM_PCT = 0.0008
 
 
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
@@ -564,8 +566,10 @@ def _dedupe_levels(values: list[float], reverse: bool = False) -> list[float]:
     return sorted(cleaned, reverse=reverse)
 
 
-def _recent_box_levels(df_m5: pd.DataFrame, window: int = 6) -> tuple[float, float]:
-    box = df_m5.tail(window)
+def _recent_box_levels(df_m5: pd.DataFrame, window: int = 6,
+                       exclude_last: int = 0) -> tuple[float, float]:
+    source = df_m5.iloc[:-exclude_last] if exclude_last > 0 and len(df_m5) > exclude_last else df_m5
+    box = source.tail(window) if not source.empty else df_m5.tail(window)
     return float(box["low"].min()), float(box["high"].max())
 
 
@@ -578,6 +582,39 @@ def _pullback_cluster_levels(df_m5: pd.DataFrame, signal: str, lookback: int = 1
     green = cluster[cluster["close"] > cluster["open"]]
     highs = green["high"] if not green.empty else cluster["high"]
     return float(cluster["low"].min()), float(highs.max())
+
+
+def _setup_b_breakout_gate(signal: str, entry: float, atr: float,
+                           box_low: float, box_high: float,
+                           df_m5: pd.DataFrame) -> tuple[bool, str]:
+    if df_m5.empty:
+        return False, "missing M5 candles for breakout validation"
+
+    last = df_m5.iloc[-1]
+    last_open = float(last["open"])
+    last_close = float(last["close"])
+    breakout_buffer = max(entry * BREAKOUT_CONFIRM_PCT, atr * BREAKOUT_CONFIRM_ATR_MULT)
+
+    if signal == "BUY":
+        breakout_level = box_high + breakout_buffer
+        if last_close <= last_open:
+            return False, f"breakout candle close {last_close:.4f} is not bullish"
+        if last_close <= breakout_level:
+            return False, (
+                f"breakout close {last_close:.4f} not above box {box_high:.4f} "
+                f"+ buffer {breakout_buffer:.4f}"
+            )
+        return True, ""
+
+    breakout_level = box_low - breakout_buffer
+    if last_close >= last_open:
+        return False, f"breakout candle close {last_close:.4f} is not bearish"
+    if last_close >= breakout_level:
+        return False, (
+            f"breakout close {last_close:.4f} not below box {box_low:.4f} "
+            f"- buffer {breakout_buffer:.4f}"
+        )
+    return True, ""
 
 
 def build_trade_plan(signal: str, setup_name: str, context: dict,
@@ -615,7 +652,7 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
     recent_low = float(m5_window["low"].min())
     recent_high = float(m5_window["high"].max())
     pullback_low, pullback_high = _pullback_cluster_levels(df_m5, signal)
-    box_low, box_high = _recent_box_levels(df_m5)
+    box_low, box_high = _recent_box_levels(df_m5, exclude_last=1)
     ema89 = float(df_m5["close"].astype(float).ewm(span=89, adjust=False).mean().iloc[-1])
     bb = _bb_snapshot(df_m5)
 
@@ -632,6 +669,13 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         min_rr = MIN_RR
         base_buffer = max(entry * 0.0015, atr * 0.25)
         min_risk = max(entry * SL_MIN_PCT, atr * 0.55)
+
+    if setup_code == "B":
+        breakout_ok, breakout_reason = _setup_b_breakout_gate(
+            signal, entry, atr, box_low, box_high, df_m5
+        )
+        if not breakout_ok:
+            return None, breakout_reason
 
     if signal == "BUY":
         if setup_code == "A":
