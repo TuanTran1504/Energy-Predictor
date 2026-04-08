@@ -732,7 +732,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
     risk      = abs(entry - ai_sl)
     reward    = abs(ai_tp - entry)
-    rr        = reward / risk if risk > 0 else 0
+    rr        = float(decision.get("planned_rr") or (reward / risk if risk > 0 else 0))
     is_setup_e = "setup_e" in setup.lower() if setup else False
     min_rr    = SETUP_E_MIN_RR if is_setup_e else TAKE_PROFIT_MIN_RR
     if rr < min_rr:
@@ -960,14 +960,15 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     decision["entry_price"] = plan["entry_price"]
     decision["stop_loss"] = plan["stop_loss"]
     decision["take_profit"] = plan["take_profit"]
+    decision["planned_rr"] = plan["rr"]
     decision.setdefault("analysis", {})
     decision["analysis"]["rr_check"] = (
         f"Python planned Entry={plan['entry_price']} SL={plan['stop_loss']} "
-        f"TP={plan['take_profit']} R:R={plan['rr']:.2f}. Pass."
+        f"TP={plan['take_profit']} net R:R={plan['rr']:.2f} gross R:R={plan['gross_rr']:.2f}. Pass."
     )
     log.info(
         f"  [PLAN] entry={plan['entry_price']} SL={plan['stop_loss']} TP={plan['take_profit']} "
-        f"R:R={plan['rr']:.2f} | {plan_reason}"
+        f"netR:R={plan['rr']:.2f} grossR:R={plan['gross_rr']:.2f} | {plan_reason}"
     )
 
     executed = execute_trade(client, symbol, decision, balance, ctx, dry_run=dry_run)

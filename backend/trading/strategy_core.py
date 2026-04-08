@@ -564,6 +564,22 @@ def _dedupe_levels(values: list[float], reverse: bool = False) -> list[float]:
     return sorted(cleaned, reverse=reverse)
 
 
+def _recent_box_levels(df_m5: pd.DataFrame, window: int = 6) -> tuple[float, float]:
+    box = df_m5.tail(window)
+    return float(box["low"].min()), float(box["high"].max())
+
+
+def _pullback_cluster_levels(df_m5: pd.DataFrame, signal: str, lookback: int = 12) -> tuple[float, float]:
+    cluster = df_m5.tail(lookback).copy()
+    if signal == "BUY":
+        red = cluster[cluster["close"] < cluster["open"]]
+        lows = red["low"] if not red.empty else cluster["low"]
+        return float(lows.min()), float(cluster["high"].max())
+    green = cluster[cluster["close"] > cluster["open"]]
+    highs = green["high"] if not green.empty else cluster["high"]
+    return float(cluster["low"].min()), float(highs.max())
+
+
 def build_trade_plan(signal: str, setup_name: str, context: dict,
                      df_m5: pd.DataFrame) -> tuple[dict | None, str]:
     """
@@ -598,32 +614,43 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
     m5_window = df_m5.tail(8).copy()
     recent_low = float(m5_window["low"].min())
     recent_high = float(m5_window["high"].max())
+    pullback_low, pullback_high = _pullback_cluster_levels(df_m5, signal)
+    box_low, box_high = _recent_box_levels(df_m5)
     ema89 = float(df_m5["close"].astype(float).ewm(span=89, adjust=False).mean().iloc[-1])
     bb = _bb_snapshot(df_m5)
 
-    fee_buffer = entry * 0.0018
+    fee_cost = entry * 0.0018
     if is_setup_e:
         min_rr = 1.0
         base_buffer = max(entry * 0.0010, atr * 0.10)
         min_risk = max(entry * 0.0010, atr * 0.25)
     elif is_range:
         min_rr = MIN_RR
-        base_buffer = max(entry * 0.0015, atr * 0.15)
+        base_buffer = max(entry * 0.0015, atr * 0.20)
         min_risk = max(entry * SL_MIN_PCT, atr * 0.35)
     else:
         min_rr = MIN_RR
-        base_buffer = max(entry * 0.0015, atr * 0.20)
-        min_risk = max(entry * SL_MIN_PCT, atr * 0.45)
+        base_buffer = max(entry * 0.0015, atr * 0.25)
+        min_risk = max(entry * SL_MIN_PCT, atr * 0.55)
 
     if signal == "BUY":
-        stop_refs = [recent_low, support, bb["lower_bb"]]
-        if not is_setup_e:
-            stop_refs.append(ema89)
+        if setup_code == "A":
+            stop_refs = [pullback_low, support, ema89]
+        elif setup_code == "B":
+            stop_refs = [box_low, support, ema89]
+        elif setup_code == "C":
+            stop_refs = [pullback_low, recent_low, support, ema89]
+        elif setup_code == "D":
+            stop_refs = [support, recent_low]
+        elif is_setup_e:
+            stop_refs = [bb["lower_bb"], recent_low]
+        else:
+            stop_refs = [pullback_low, recent_low, support, ema89, bb["lower_bb"]]
         stop_candidates = _dedupe_levels([x for x in stop_refs if x is not None and x < entry], reverse=True)
         if not stop_candidates:
             return None, "no valid bullish invalidation below entry"
 
-        stop_anchor = stop_candidates[0]
+        stop_anchor = stop_candidates[-1] if len(stop_candidates) > 1 else stop_candidates[0]
         raw_sl = stop_anchor - base_buffer
         risk = entry - raw_sl
         if risk < min_risk:
@@ -632,41 +659,60 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         target_candidates = []
         if is_setup_e:
             target_candidates.extend([bb["sma20"], bb["upper_bb"]])
-        target_candidates.extend([recent_high])
+        elif setup_code == "B":
+            target_candidates.extend([recent_high, box_high])
+        else:
+            target_candidates.extend([recent_high])
         target_candidates.extend(resistance_levels[:5])
         target_levels = _dedupe_levels([x for x in target_candidates if x > entry])
         if not target_levels:
             return None, "no valid bullish target above entry"
 
-        sl = raw_sl - fee_buffer
+        sl = raw_sl
         risk = entry - sl
         chosen_tp = None
-        best_rr = 0.0
+        best_rr = -999.0
+        best_gross_rr = 0.0
         best_target = target_levels[0]
         for target in target_levels:
-            tp = target + fee_buffer
-            rr = (tp - entry) / risk if risk > 0 else 0.0
+            tp = target
+            gross_reward = tp - entry
+            net_reward = gross_reward - fee_cost
+            net_risk = risk + fee_cost
+            rr = net_reward / net_risk if net_risk > 0 else 0.0
+            gross_rr = gross_reward / risk if risk > 0 else 0.0
             if rr > best_rr:
                 best_rr = rr
+                best_gross_rr = gross_rr
                 best_target = target
             if rr >= min_rr:
                 chosen_tp = tp
                 best_target = target
                 best_rr = rr
+                best_gross_rr = gross_rr
                 break
 
         if chosen_tp is None:
             return None, f"best RR {best_rr:.2f} < {min_rr:.2f} to target {best_target:.4f}"
 
     else:
-        stop_refs = [recent_high, resistance, bb["upper_bb"]]
-        if not is_setup_e:
-            stop_refs.append(ema89)
+        if setup_code == "A":
+            stop_refs = [pullback_high, resistance, ema89]
+        elif setup_code == "B":
+            stop_refs = [box_high, resistance, ema89]
+        elif setup_code == "C":
+            stop_refs = [pullback_high, recent_high, resistance, ema89]
+        elif setup_code == "D":
+            stop_refs = [resistance, recent_high]
+        elif is_setup_e:
+            stop_refs = [bb["upper_bb"], recent_high]
+        else:
+            stop_refs = [pullback_high, recent_high, resistance, ema89, bb["upper_bb"]]
         stop_candidates = _dedupe_levels([x for x in stop_refs if x is not None and x > entry])
         if not stop_candidates:
             return None, "no valid bearish invalidation above entry"
 
-        stop_anchor = stop_candidates[0]
+        stop_anchor = stop_candidates[-1] if len(stop_candidates) > 1 else stop_candidates[0]
         raw_sl = stop_anchor + base_buffer
         risk = raw_sl - entry
         if risk < min_risk:
@@ -675,27 +721,37 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         target_candidates = []
         if is_setup_e:
             target_candidates.extend([bb["sma20"], bb["lower_bb"]])
-        target_candidates.extend([recent_low])
+        elif setup_code == "B":
+            target_candidates.extend([recent_low, box_low])
+        else:
+            target_candidates.extend([recent_low])
         target_candidates.extend(support_levels[:5])
         target_levels = _dedupe_levels([x for x in target_candidates if x < entry], reverse=True)
         if not target_levels:
             return None, "no valid bearish target below entry"
 
-        sl = raw_sl + fee_buffer
+        sl = raw_sl
         risk = sl - entry
         chosen_tp = None
-        best_rr = 0.0
+        best_rr = -999.0
+        best_gross_rr = 0.0
         best_target = target_levels[0]
         for target in target_levels:
-            tp = target - fee_buffer
-            rr = (entry - tp) / risk if risk > 0 else 0.0
+            tp = target
+            gross_reward = entry - tp
+            net_reward = gross_reward - fee_cost
+            net_risk = risk + fee_cost
+            rr = net_reward / net_risk if net_risk > 0 else 0.0
+            gross_rr = gross_reward / risk if risk > 0 else 0.0
             if rr > best_rr:
                 best_rr = rr
+                best_gross_rr = gross_rr
                 best_target = target
             if rr >= min_rr:
                 chosen_tp = tp
                 best_target = target
                 best_rr = rr
+                best_gross_rr = gross_rr
                 break
 
         if chosen_tp is None:
@@ -710,12 +766,14 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         "stop_loss": round(sl, 6),
         "take_profit": round(chosen_tp, 6),
         "rr": round(best_rr, 2),
+        "gross_rr": round(best_gross_rr, 2),
         "min_rr": round(min_rr, 2),
         "stop_anchor": round(stop_anchor, 6),
         "target_anchor": round(best_target, 6),
+        "estimated_cost": round(fee_cost, 6),
     }
     reason = (
         f"stop@{plan['stop_anchor']} target@{plan['target_anchor']} "
-        f"RR={plan['rr']:.2f} min={plan['min_rr']:.2f}"
+        f"RRnet={plan['rr']:.2f} RRgross={plan['gross_rr']:.2f} min={plan['min_rr']:.2f}"
     )
     return plan, reason
