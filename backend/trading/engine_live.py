@@ -34,7 +34,7 @@ from chart_gen      import generate_chart
 from llm_analyst    import ask_gemini
 from strategy_core  import (
     compute_indicators, compute_score, find_sr_levels,
-    check_macro_bias, check_technical_gates, get_range_bias,
+    check_macro_bias, check_technical_gates, get_range_bias, build_trade_plan,
 )
 from trade_logger   import (
     get_logger, log_cycle_start, log_gate_pass, log_gate_fail,
@@ -672,13 +672,9 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
 
 
 def _signal_follows_trend(signal: str, context: dict) -> tuple[bool, str]:
-    """Hard guard: AI signal must align with directional trend + macro direction."""
+    """Hard guard: AI signal must align with directional trend."""
     if signal not in ("BUY", "SELL"):
         return False, f"invalid signal {signal}"
-
-    allowed = context.get("allowed_direction", "BOTH")
-    if allowed in ("BUY", "SELL") and signal != allowed:
-        return False, f"macro allows {allowed} only"
 
     h1 = context.get("h1_trend", "")
     if h1 == "UPTREND" and signal != "BUY":
@@ -710,7 +706,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_error(f"[{symbol}] Invalid SL/TP from AI", e)
         return False
 
-    entry = float(context.get("current_price", 0))
+    entry = float(decision.get("entry_price") or context.get("current_price", 0))
     if entry == 0:
         try:
             ticker = client.ticker_price(symbol=f"{symbol}USDT")
@@ -726,70 +722,19 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("DIRECTION", f"SELL needs SL({ai_sl}) > entry({entry}) > TP({ai_tp})", symbol)
         return False
 
-    atr = float(context.get("atr_m15") or context.get("atr") or 0.0)
-    atr_min_pct = (SL_ATR_MULTIPLIER * atr / entry) if (atr > 0 and entry > 0) else SL_MIN_PCT
-    effective_min_pct = max(SL_MIN_PCT, atr_min_pct)
-
     risk_pct = abs(entry - ai_sl) / entry * 100
-    if risk_pct < effective_min_pct * 100:
-        log.info(
-            f"  [EXEC] SL {risk_pct:.3f}% < min {effective_min_pct*100:.3f}% "
-            f"({SL_ATR_MULTIPLIER:.2f}xATR), widening SL"
-        )
-        ai_sl = entry * (1 - effective_min_pct) if signal == "BUY" else entry * (1 + effective_min_pct)
-
-    sr = context.get("sr") or {}
-    support = sr.get("support")
-    resistance = sr.get("resistance")
-    sr_buffer = atr * SL_SR_BUFFER_ATR_MULT if atr > 0 else 0.0
-    if signal == "BUY" and support is not None:
-        try:
-            sr_sl = float(support) - sr_buffer
-            if sr_sl < ai_sl and sr_sl < entry:
-                log.info(
-                    f"  [EXEC] SL widened below support ({support}) by ATR buffer "
-                    f"{sr_buffer:.4f}: {ai_sl:.6f} -> {sr_sl:.6f}"
-                )
-                ai_sl = sr_sl
-        except (TypeError, ValueError):
-            pass
-    elif signal == "SELL" and resistance is not None:
-        try:
-            sr_sl = float(resistance) + sr_buffer
-            if sr_sl > ai_sl and sr_sl > entry:
-                log.info(
-                    f"  [EXEC] SL widened above resistance ({resistance}) by ATR buffer "
-                    f"{sr_buffer:.4f}: {ai_sl:.6f} -> {sr_sl:.6f}"
-                )
-                ai_sl = sr_sl
-        except (TypeError, ValueError):
-            pass
-
-    risk_pct = abs(entry - ai_sl) / entry * 100
+    if risk_pct < SL_MIN_PCT * 100:
+        log_gate_fail("SL_MIN", f"SL {risk_pct:.3f}% < min {SL_MIN_PCT*100:.2f}%", symbol)
+        return False
     if risk_pct > STOP_LOSS_PCT * 100:
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
         return False
-
-    # Adjust SL/TP to cover round-trip fees + slippage
-    # Taker fee 0.04% x2 sides + ~0.05% slippage each way = ~0.18% total
-    FEE_BUFFER = 0.0018
-    fee_adj = entry * FEE_BUFFER
-    if signal == "BUY":
-        ai_sl = round(ai_sl - fee_adj, 6)   # widen SL down
-        ai_tp = round(ai_tp + fee_adj, 6)   # push TP further up
-    else:
-        ai_sl = round(ai_sl + fee_adj, 6)   # widen SL up
-        ai_tp = round(ai_tp - fee_adj, 6)   # push TP further down
-    log.info(f"  [EXEC] Fee-adjusted SL={ai_sl} TP={ai_tp} (buffer={FEE_BUFFER*100:.2f}%)")
 
     risk      = abs(entry - ai_sl)
     reward    = abs(ai_tp - entry)
     rr        = reward / risk if risk > 0 else 0
     is_setup_e = "setup_e" in setup.lower() if setup else False
     min_rr    = SETUP_E_MIN_RR if is_setup_e else TAKE_PROFIT_MIN_RR
-    conflict_min_rr = float(context.get("ml_conflict_min_rr", 0) or 0)
-    if conflict_min_rr > 0:
-        min_rr = max(min_rr, conflict_min_rr)
     if rr < min_rr:
         log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr}", symbol)
         return False
@@ -925,33 +870,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     trend_pred = ml_preds.get(trend_key, {})
     trend_dir = trend_pred.get("direction", "")
     trend_conf = float(trend_pred.get("confidence", 0))
-
-    ml_conflict_resolved = False
-    if (
-        ML_REQUIRE_TREND_ALIGNMENT
-        and trend_pred
-        and ml_dir
-        and trend_dir
-        and ml_dir != trend_dir
-    ):
-        align_reason = (
-            f"entry {ml_primary_token}={ml_dir}({ml_conf:.0%}) conflicts with "
-            f"trend {ML_TREND_HORIZON}={trend_dir}({trend_conf:.0%})"
-        )
-        if ML_CONFLICT_MODE == "higher_confidence":
-            if trend_conf > ml_conf:
-                ml_dir = trend_dir
-                ml_conf = trend_conf
-                ml_primary_token = ML_TREND_HORIZON
-            ml_conflict_resolved = True
-            log.warning(
-                f"  [ML_CONFLICT] {align_reason} -> using {ml_primary_token}={ml_dir}({ml_conf:.0%}), "
-                f"enforce RR>={ML_CONFLICT_MIN_RR:.2f}"
-            )
-        else:
-            log_gate_fail("ML_ALIGN", align_reason, symbol, ctx)
-            log_skip("ML_ALIGN", align_reason, ctx, None)
-            return
     fear_greed = market_signals.get("fear_greed")
     funding    = market_signals.get(f"{symbol.lower()}_funding", 0)
 
@@ -961,8 +879,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx["ml_trend_horizon"] = ML_TREND_HORIZON
     ctx["ml_trend_direction"] = trend_dir
     ctx["ml_trend_confidence"] = trend_conf
-    ctx["ml_conflict_resolved"] = ml_conflict_resolved
-    ctx["ml_conflict_min_rr"] = ML_CONFLICT_MIN_RR if ml_conflict_resolved else 0.0
+    ctx["ml_conflict_resolved"] = bool(ml_dir and trend_dir and ml_dir != trend_dir)
+    ctx["ml_conflict_min_rr"] = 0.0
     ctx["fear_greed"]    = fear_greed
     ctx["funding_rate"]  = funding
 
@@ -974,11 +892,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     if not macro_ok:
         log_gate_fail("MACRO", macro_reason, symbol, ctx)
         return
-    trend_str = (
-        f" trend={ML_TREND_HORIZON}:{trend_dir}({trend_conf:.0%})"
-        if trend_pred else " trend=n/a"
-    )
-    conflict_str = f" conflict=resolved RR>={ML_CONFLICT_MIN_RR:.2f}" if ml_conflict_resolved else ""
+    trend_str = f" trend={ML_TREND_HORIZON}:{trend_dir}({trend_conf:.0%})" if trend_pred else " trend=n/a"
+    conflict_str = " conflict=advisory_only" if ctx["ml_conflict_resolved"] else ""
     log_gate_pass(
         "MACRO",
         f"allowed={allowed_dir} ML={ml_primary_token}:{ml_dir}({ml_conf:.0%}){trend_str} F&G={fear_greed}{conflict_str}",
@@ -1033,6 +948,27 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_skip("AI_TREND", trend_reason, ctx, decision)
         log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
+
+    setup_name = decision.get("analysis", {}).get("setup_identified", "")
+    plan, plan_reason = build_trade_plan(signal, setup_name, ctx, df_m5)
+    if not plan:
+        log_gate_fail("TRADE_PLAN", plan_reason, symbol, ctx)
+        log_skip("TRADE_PLAN", plan_reason, ctx, decision)
+        log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
+        return
+
+    decision["entry_price"] = plan["entry_price"]
+    decision["stop_loss"] = plan["stop_loss"]
+    decision["take_profit"] = plan["take_profit"]
+    decision.setdefault("analysis", {})
+    decision["analysis"]["rr_check"] = (
+        f"Python planned Entry={plan['entry_price']} SL={plan['stop_loss']} "
+        f"TP={plan['take_profit']} R:R={plan['rr']:.2f}. Pass."
+    )
+    log.info(
+        f"  [PLAN] entry={plan['entry_price']} SL={plan['stop_loss']} TP={plan['take_profit']} "
+        f"R:R={plan['rr']:.2f} | {plan_reason}"
+    )
 
     executed = execute_trade(client, symbol, decision, balance, ctx, dry_run=dry_run)
     log_cycle_summary(symbol, signal, executed, balance, ctx, decision)

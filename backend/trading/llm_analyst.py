@@ -435,6 +435,15 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
 
     context["candle_summary"] = _build_candle_summary(df_m5)
     system_prompt, user_text  = _build_prompt(context)
+    system_prompt += """
+
+IMPORTANT OVERRIDE:
+- Market mode is the primary directional filter. Treat ML as side information only.
+- Do not reject a valid setup because of stop loss, take profit, or R:R math.
+- Python will calculate entry, stop loss, take profit, and final R:R after your decision.
+- You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
+- If you mention rr_check, say that Python will calculate levels after the decision.
+"""
 
     content_payload = [
         {"type": "text", "text": user_text},
