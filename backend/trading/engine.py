@@ -34,7 +34,7 @@ from chart_gen      import generate_chart
 from llm_analyst    import ask_gemini
 from strategy_core  import (
     compute_indicators, compute_score, find_sr_levels,
-    check_macro_bias, check_technical_gates, get_range_bias, check_fvg_gate,
+    check_macro_bias, check_technical_gates, get_range_bias,
     validate_ai_trade_decision,
 )
 from trade_logger   import (
