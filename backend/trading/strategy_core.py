@@ -141,11 +141,13 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
 
     is_range = (h1_trend == "VOLATILE_RANGE" or m15_trend == "VOLATILE_RANGE")
     is_aligned = (h1_trend == m15_trend and h1_trend not in ("SIDEWAY", "VOLATILE_RANGE"))
-    market_mode = "VOLATILE_RANGE" if is_range else h1_trend
+    primary_trend = m15_trend
+    market_mode = "VOLATILE_RANGE" if is_range else primary_trend
 
     return {
         "h1_trend": h1_trend,
         "m15_trend": m15_trend,
+        "primary_trend": primary_trend,
         "market_mode": market_mode,
         "is_aligned": is_aligned,
         "is_range": is_range,
@@ -220,7 +222,7 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
     """
     score = 0
     details = []
-    h1 = context["h1_trend"]
+    trend = context.get("primary_trend") or context["m15_trend"]
     is_range = context["is_range"]
 
     if context["bb_breakout"]:
@@ -235,7 +237,7 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
         details.append(f"ADX={context['adx']:.1f} (+1)")
 
     rsi = context["rsi"]
-    if (h1 == "UPTREND" and rsi > 55) or (h1 == "DOWNTREND" and rsi < 45):
+    if (trend == "UPTREND" and rsi > 55) or (trend == "DOWNTREND" and rsi < 45):
         score += 1
         details.append(f"RSI={rsi:.1f} (+1)")
     elif is_range and (rsi > 60 or rsi < 40):
@@ -243,7 +245,7 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
         details.append(f"RSI={rsi:.1f} extreme in range (+1)")
 
     obv = context["obv_slope"]
-    if (h1 == "UPTREND" and obv > 0) or (h1 == "DOWNTREND" and obv < 0):
+    if (trend == "UPTREND" and obv > 0) or (trend == "DOWNTREND" and obv < 0):
         score += 1
         details.append("OBV aligned (+1)")
     elif is_range and abs(obv) > 0:
@@ -292,21 +294,17 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     """
     Runs all technical gates in order.
     """
+    primary = context.get("primary_trend") or context["m15_trend"]
     h1 = context["h1_trend"]
-    m15 = context["m15_trend"]
     score = context["score"]
     is_range = context["is_range"]
 
-    if h1 == "SIDEWAY" and m15 == "SIDEWAY":
-        return False, "GATE1: both H1+M15 SIDEWAY"
+    if primary == "SIDEWAY":
+        return False, "GATE1: M15 SIDEWAY"
 
     if not is_range:
-        if (
-            h1 not in ("SIDEWAY", "VOLATILE_RANGE")
-            and m15 not in ("SIDEWAY", "VOLATILE_RANGE")
-            and h1 != m15
-        ):
-            return False, f"GATE2: H1={h1} vs M15={m15} misaligned"
+        if primary == "VOLATILE_RANGE":
+            return False, "GATE2: M15 VOLATILE_RANGE"
 
     threshold = SCORE_THRESHOLD
     if not str(context.get("symbol", "BTC")).startswith("BTC") and context.get("adx", 0) > 45:
@@ -512,17 +510,15 @@ def validate_ai_trade_decision(decision: dict, context: dict,
     if signal not in ("BUY", "SELL"):
         return False, f"invalid signal {signal!r}"
 
-    h1 = context.get("h1_trend", "")
-    if h1 == "UPTREND" and signal != "BUY":
-        return False, f"H1={h1} requires BUY"
-    if h1 == "DOWNTREND" and signal != "SELL":
-        return False, f"H1={h1} requires SELL"
+    primary = context.get("primary_trend") or context.get("m15_trend", "")
+    if primary == "UPTREND" and signal != "BUY":
+        return False, f"M15={primary} requires BUY"
+    if primary == "DOWNTREND" and signal != "SELL":
+        return False, f"M15={primary} requires SELL"
 
-    m15 = context.get("m15_trend", "")
-    if m15 == "UPTREND" and signal != "BUY":
-        return False, f"M15={m15} requires BUY"
-    if m15 == "DOWNTREND" and signal != "SELL":
-        return False, f"M15={m15} requires SELL"
+    timing_ok, timing_reason = _m5_entry_timing_ok(signal, context, df_m5)
+    if not timing_ok:
+        return False, timing_reason
 
     return True, "OK"
 
@@ -582,6 +578,54 @@ def _pullback_cluster_levels(df_m5: pd.DataFrame, signal: str, lookback: int = 1
     green = cluster[cluster["close"] > cluster["open"]]
     highs = green["high"] if not green.empty else cluster["high"]
     return float(cluster["low"].min()), float(highs.max())
+
+
+def _m5_entry_timing_ok(signal: str, context: dict,
+                        df_m5: pd.DataFrame | None) -> tuple[bool, str]:
+    """
+    Fast veto so higher-timeframe trend does not force entries during an active
+    5m counter-impulse.
+    """
+    if df_m5 is None or len(df_m5) < 6:
+        return True, "OK"
+
+    closes = df_m5["close"].astype(float)
+    ema34_m5 = float(closes.ewm(span=34, adjust=False).mean().iloc[-1])
+    latest = df_m5.iloc[-1]
+    latest_open = float(latest["open"])
+    latest_close = float(latest["close"])
+    latest_volume = float(latest.get("volume", 0.0))
+    atr = float(context.get("atr_m15") or context.get("atr") or 0.0)
+    box_low, box_high = _recent_box_levels(df_m5, window=6, exclude_last=1)
+
+    recent = df_m5.tail(4).copy().reset_index(drop=True)
+    three_bar_move = float(recent["close"].iloc[-1] - recent["close"].iloc[0])
+    prev_vol_mean = float(df_m5.tail(6).iloc[:-1]["volume"].mean())
+    vol_expanding = latest_volume > prev_vol_mean * 1.10 if prev_vol_mean > 0 else False
+
+    latest_bearish = latest_close < latest_open
+    latest_bullish = latest_close > latest_open
+
+    if signal == "BUY":
+        if latest_bearish and latest_close < ema34_m5:
+            return False, f"M5 bearish impulse: close {latest_close:.4f} below EMA34 {ema34_m5:.4f}"
+        if atr > 0 and three_bar_move <= -atr and latest_close <= ema34_m5:
+            return False, f"M5 bearish impulse: 3-candle drop {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
+        if latest_close < box_low:
+            return False, f"M5 lost micro support {box_low:.4f}"
+        if vol_expanding and latest_bearish and latest_close <= ema34_m5:
+            return False, "M5 sell pressure expanding on the latest candle"
+        return True, "OK"
+
+    if latest_bullish and latest_close > ema34_m5:
+        return False, f"M5 bullish impulse: close {latest_close:.4f} above EMA34 {ema34_m5:.4f}"
+    if atr > 0 and three_bar_move >= atr and latest_close >= ema34_m5:
+        return False, f"M5 bullish impulse: 3-candle rally {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
+    if latest_close > box_high:
+        return False, f"M5 broke above micro resistance {box_high:.4f}"
+    if vol_expanding and latest_bullish and latest_close >= ema34_m5:
+        return False, "M5 buy pressure expanding on the latest candle"
+    return True, "OK"
 
 
 def _setup_b_breakout_gate(signal: str, entry: float, atr: float,

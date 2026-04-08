@@ -35,7 +35,8 @@ from chart_gen      import generate_chart
 from llm_analyst    import ask_gemini
 from strategy_core  import (
     compute_indicators, compute_score, find_sr_levels,
-    check_macro_bias, check_technical_gates, get_range_bias, build_trade_plan,
+    check_macro_bias, check_technical_gates, get_range_bias,
+    validate_ai_trade_decision, build_trade_plan,
 )
 from trade_logger   import (
     get_logger, log_cycle_start, log_gate_pass, log_gate_fail,
@@ -733,17 +734,11 @@ def _signal_follows_trend(signal: str, context: dict) -> tuple[bool, str]:
     if signal not in ("BUY", "SELL"):
         return False, f"invalid signal {signal}"
 
-    h1 = context.get("h1_trend", "")
-    if h1 == "UPTREND" and signal != "BUY":
-        return False, f"H1={h1} requires BUY"
-    if h1 == "DOWNTREND" and signal != "SELL":
-        return False, f"H1={h1} requires SELL"
-
-    m15 = context.get("m15_trend", "")
-    if m15 == "UPTREND" and signal != "BUY":
-        return False, f"M15={m15} requires BUY"
-    if m15 == "DOWNTREND" and signal != "SELL":
-        return False, f"M15={m15} requires SELL"
+    primary = context.get("primary_trend") or context.get("m15_trend", "")
+    if primary == "UPTREND" and signal != "BUY":
+        return False, f"M15={primary} requires BUY"
+    if primary == "DOWNTREND" and signal != "SELL":
+        return False, f"M15={primary} requires SELL"
 
     return True, "OK"
 
@@ -894,6 +889,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         df_m15 = fetch_ohlcv(client, symbol, "15m", 100)
         df_m5  = fetch_ohlcv(client, symbol, "5m",  100)
         df_btc_h1 = fetch_ohlcv(client, "BTC", "1h", 100) if symbol != "BTC" else df_h1
+        df_btc_m15 = fetch_ohlcv(client, "BTC", "15m", 100) if symbol != "BTC" else df_m15
     except Exception as e:
         log_error(f"[{symbol}] OHLCV fetch failed", e)
         return
@@ -902,11 +898,11 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx["symbol"] = f"{symbol}/USDT"
 
     if symbol != "BTC":
-        btc_ctx   = compute_indicators(df_btc_h1, df_m15, df_m5)
-        btc_trend = btc_ctx["h1_trend"]
+        btc_ctx   = compute_indicators(df_btc_h1, df_btc_m15, df_m5)
+        btc_trend = btc_ctx["m15_trend"]
         ctx["btc_trend"] = btc_trend
     else:
-        ctx["btc_trend"] = ctx["h1_trend"]
+        ctx["btc_trend"] = ctx["m15_trend"]
 
     ctx["sr"] = find_sr_levels(df_h1, ctx["current_price"], df_m15)
 
@@ -968,10 +964,10 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
 
     if symbol != "BTC":
         btc_trend = ctx.get("btc_trend", "")
-        h1        = ctx["h1_trend"]
-        if (h1 == "UPTREND" and btc_trend == "DOWNTREND") or \
-           (h1 == "DOWNTREND" and btc_trend == "UPTREND"):
-            log_gate_fail("BTC_CORR", f"BTC={btc_trend} conflicts with {symbol}={h1}", symbol, ctx)
+        primary = ctx.get("primary_trend") or ctx["m15_trend"]
+        if (primary == "UPTREND" and btc_trend == "DOWNTREND") or \
+           (primary == "DOWNTREND" and btc_trend == "UPTREND"):
+            log_gate_fail("BTC_CORR", f"BTC={btc_trend} conflicts with {symbol}={primary}", symbol, ctx)
             return
         log_gate_pass("BTC_CORR", f"BTC={btc_trend}")
 
@@ -1009,10 +1005,10 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
 
-    trend_ok, trend_reason = _signal_follows_trend(signal, ctx)
-    if not trend_ok:
-        log_gate_fail("AI_TREND", trend_reason, symbol, ctx)
-        log_skip("AI_TREND", trend_reason, ctx, decision)
+    ai_ok, ai_reason = validate_ai_trade_decision(decision, ctx, df_m5)
+    if not ai_ok:
+        log_gate_fail("AI_VALIDATION", ai_reason, symbol, ctx)
+        log_skip("AI_INVALID", ai_reason, ctx, decision)
         log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
 

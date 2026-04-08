@@ -880,6 +880,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         df_m5  = fetch_ohlcv(client, symbol, "5m",  100)
         # BTC as correlation filter
         df_btc_h1 = fetch_ohlcv(client, "BTC", "1h", 100) if symbol != "BTC" else df_h1
+        df_btc_m15 = fetch_ohlcv(client, "BTC", "15m", 100) if symbol != "BTC" else df_m15
     except Exception as e:
         log_error(f"[{symbol}] OHLCV fetch failed", e)
         return
@@ -900,11 +901,11 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
 
     # BTC trend check
     if symbol != "BTC":
-        btc_ctx = compute_indicators(df_btc_h1, df_m15, df_m5)
-        btc_trend = btc_ctx["h1_trend"]
+        btc_ctx = compute_indicators(df_btc_h1, df_btc_m15, df_m5)
+        btc_trend = btc_ctx["m15_trend"]
         ctx["btc_trend"] = btc_trend
     else:
-        ctx["btc_trend"] = ctx["h1_trend"]
+        ctx["btc_trend"] = ctx["m15_trend"]
 
     ctx["sr"] = find_sr_levels(df_h1, ctx["current_price"], df_m15)
 
@@ -967,10 +968,10 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
 
     if symbol != "BTC":
         btc_trend = ctx.get("btc_trend", "")
-        h1        = ctx["h1_trend"]
-        if (h1 == "UPTREND" and btc_trend == "DOWNTREND") or \
-           (h1 == "DOWNTREND" and btc_trend == "UPTREND"):
-            log_gate_fail("BTC_CORR", f"BTC={btc_trend} conflicts with {symbol}={h1}", symbol, ctx)
+        primary = ctx.get("primary_trend") or ctx["m15_trend"]
+        if (primary == "UPTREND" and btc_trend == "DOWNTREND") or \
+           (primary == "DOWNTREND" and btc_trend == "UPTREND"):
+            log_gate_fail("BTC_CORR", f"BTC={btc_trend} conflicts with {symbol}={primary}", symbol, ctx)
             return
         log_gate_pass("BTC_CORR", f"BTC={btc_trend}")
 

@@ -256,7 +256,8 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     """Returns (system_prompt, user_text)."""
 
     h1          = context.get("h1_trend", "?")
-    market_mode = context.get("market_mode", h1)
+    primary     = context.get("primary_trend", context.get("m15_trend", "?"))
+    market_mode = context.get("market_mode", primary)
     score       = context.get("score", 0)
     adx         = context.get("adx", 0)
     rsi         = context.get("rsi", 0)
@@ -279,7 +280,7 @@ def _build_prompt(context: dict) -> tuple[str, str]:
         else:
             patterns = [PATTERN_LIBRARY["wait"]]
             bias_note = "Price is in the middle of the range → WAIT."
-    elif market_mode == "SIDEWAY" or h1 == "SIDEWAY":
+    elif market_mode == "SIDEWAY" or primary == "SIDEWAY":
         # Setup E: direction driven by RSI extreme at BB
         if rsi < 40:
             patterns = [PATTERN_LIBRARY["setup_E_buy"], PATTERN_LIBRARY["wait"]]
@@ -290,22 +291,22 @@ def _build_prompt(context: dict) -> tuple[str, str]:
         else:
             patterns = [PATTERN_LIBRARY["wait"]]
             bias_note = f"SIDEWAY + RSI={rsi:.1f} neutral — no edge. WAIT."
-    elif h1 == "UPTREND":
+    elif primary == "UPTREND":
         if score >= 4:
             patterns = [PATTERN_LIBRARY["setup_B_buy"], PATTERN_LIBRARY["wait"]]
         else:
             patterns = [PATTERN_LIBRARY["setup_A_buy"],
                         PATTERN_LIBRARY["setup_C_buy"],
                         PATTERN_LIBRARY["wait"]]
-        bias_note = f"UPTREND — only BUY setups. Allowed direction: {allowed_dir}."
-    elif h1 == "DOWNTREND":
+        bias_note = f"M15 uptrend — only BUY setups. H1 context: {h1}. Allowed direction: {allowed_dir}."
+    elif primary == "DOWNTREND":
         if score >= 4:
             patterns = [PATTERN_LIBRARY["setup_B_sell"], PATTERN_LIBRARY["wait"]]
         else:
             patterns = [PATTERN_LIBRARY["setup_A_sell"],
                         PATTERN_LIBRARY["setup_C_sell"],
                         PATTERN_LIBRARY["wait"]]
-        bias_note = f"DOWNTREND — only SELL setups. Allowed direction: {allowed_dir}."
+        bias_note = f"M15 downtrend — only SELL setups. H1 context: {h1}. Allowed direction: {allowed_dir}."
     else:
         patterns = [PATTERN_LIBRARY["wait"]]
         bias_note = "Trend unclear → WAIT."
@@ -323,6 +324,7 @@ QUANTITATIVE DATA (Python-confirmed — trust completely)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Symbol        : {symbol}
 Market Mode   : {market_mode}
+Primary Trend : {primary} (M15)
 H1 Trend      : {h1}
 Quant Score   : {score}/5
 ADX (M15)     : {adx:.1f}
@@ -441,6 +443,9 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
 
 IMPORTANT OVERRIDE:
 - Market mode is the primary directional filter. Treat ML as side information only.
+- Do not call BUY during an active 5m bearish impulse, even if M15 is still uptrend.
+- Do not call SELL during an active 5m bullish impulse, even if M15 is still downtrend.
+- If the latest 5m candle closes against the trade and through EMA34 / micro structure, prefer WAIT.
 - Do not reject a valid setup because of stop loss, take profit, or R:R math.
 - Python will calculate entry, stop loss, take profit, and final R:R after your decision.
 - You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
