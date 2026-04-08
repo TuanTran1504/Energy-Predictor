@@ -63,6 +63,33 @@ from feature_engineering import build_features, get_feature_columns  # noqa: E40
 SYMBOLS = ["BTC", "ETH", "SOL", "XRP"]
 MIN_PROMOTION_IMPROVEMENT = 0.0
 LOOKAHEAD_DAYS = int(os.getenv("LOOKAHEAD_DAYS", "1"))
+LOOKAHEAD_HOURS = int(os.getenv("LOOKAHEAD_HOURS", "0"))
+FEATURE_TRAIN_TIMEFRAME = os.getenv("FEATURE_TRAIN_TIMEFRAME", "1D").strip().upper()
+MODEL_NAME_SUFFIX = os.getenv("MODEL_NAME_SUFFIX", "").strip().lower()
+
+
+def _model_variant_suffix() -> str:
+    # Explicit suffix wins (e.g. MODEL_NAME_SUFFIX=exp42)
+    if MODEL_NAME_SUFFIX:
+        return f"-{MODEL_NAME_SUFFIX}"
+    # Default keeps legacy model names for 1D.
+    if FEATURE_TRAIN_TIMEFRAME in {"", "1D", "1DAY", "DAILY"}:
+        return ""
+    return f"-{FEATURE_TRAIN_TIMEFRAME.lower()}"
+
+
+def _horizon_token() -> str:
+    if LOOKAHEAD_HOURS > 0:
+        return f"{LOOKAHEAD_HOURS}h"
+    return f"{LOOKAHEAD_DAYS}d"
+
+
+def _registry_model_name(symbol: str) -> str:
+    return f"{symbol.lower()}-direction-{_horizon_token()}{_model_variant_suffix()}"
+
+
+def _run_name(symbol: str) -> str:
+    return f"{symbol}-direction-{_horizon_token()}{_model_variant_suffix()}"
 
 SHADOW_TRAIN = os.getenv("SHADOW_TRAIN", "false").strip().lower() in {
     "1", "true", "yes", "y"
@@ -101,7 +128,11 @@ def train_model(symbol: str) -> dict:
     print(f"\n{'=' * 50}")
     print(f"Training {symbol} direction model...")
 
-    df = build_features(symbol, lookahead=LOOKAHEAD_DAYS)
+    df = build_features(
+        symbol,
+        lookahead=LOOKAHEAD_DAYS,
+        lookahead_hours=LOOKAHEAD_HOURS if LOOKAHEAD_HOURS > 0 else None,
+    )
     feature_cols = get_feature_columns()
 
     X = df[feature_cols].fillna(0)
@@ -347,7 +378,7 @@ def sync_model_bundle_from_dagshub(
     because local inference expects the custom joblib bundle format.
     """
     symbol = symbol.upper()
-    model_name = f"{symbol.lower()}-direction-24h"
+    model_name = _registry_model_name(symbol)
     artifact_path = f"{symbol}-bundle"
 
     os.environ["MLFLOW_TRACKING_USERNAME"] = username
@@ -435,6 +466,10 @@ def log_result_to_mlflow(result: dict, run_id: str) -> dict:
             "max_depth": 3,
             "learning_rate": 0.05,
             "horizon_days": LOOKAHEAD_DAYS,
+            "horizon_hours": LOOKAHEAD_HOURS,
+            "horizon_token": _horizon_token(),
+            "feature_train_timeframe": FEATURE_TRAIN_TIMEFRAME,
+            "model_name_suffix": _model_variant_suffix() or "legacy",
             "n_features": len(result["features"]),
             "train_size": len(result["X_train"]),
             "val_size": len(result["X_val"]),
@@ -575,7 +610,7 @@ def register_logged_model(run_id: str, symbol: str, result: dict) -> dict:
         }
 
     client = MlflowClient()
-    model_name = f"{symbol.lower()}-direction-{LOOKAHEAD_DAYS}d"
+    model_name = _registry_model_name(symbol)
     artifact_path = f"{symbol}-model"
 
     try:
@@ -625,6 +660,14 @@ def main():
     print(f"Local sync dir:                 {LOCAL_MODEL_SYNC_DIR}")
     print(f"Model registration enabled:     {REGISTER_MODELS}")
     print(f"Promotion metric:               {PROMOTION_METRIC}")
+    print(f"Horizon token:                  {_horizon_token()}")
+    print(f"Feature train timeframe:        {FEATURE_TRAIN_TIMEFRAME}")
+    if FEATURE_TRAIN_TIMEFRAME == "4H" and LOOKAHEAD_HOURS <= 0:
+        print(
+            "WARNING: FEATURE_TRAIN_TIMEFRAME=4H but LOOKAHEAD_HOURS<=0. "
+            "Training will use day-based horizon from LOOKAHEAD_DAYS."
+        )
+    print(f"Model registry suffix:          {_model_variant_suffix() or '(legacy)'}")
     print(f"Walk-forward splits:            {WALK_FORWARD_SPLITS}")
     print(f"Walk-forward val ratio:         {WALK_FORWARD_VAL_RATIO}")
     print(
@@ -635,7 +678,7 @@ def main():
     results = {}
 
     for symbol in SYMBOLS:
-        with mlflow.start_run(run_name=f"{symbol}-direction-{LOOKAHEAD_DAYS}d") as run:
+        with mlflow.start_run(run_name=_run_name(symbol)) as run:
             try:
                 result = train_model(symbol)
             except ValueError as e:

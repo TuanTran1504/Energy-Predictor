@@ -2,12 +2,12 @@
 FastAPI ML inference service for BTC/ETH 24h direction prediction.
 
 Endpoints:
-  GET  /health              — liveness + which models are loaded
-  GET  /models              — model metadata (n_estimators, n_features)
-  POST /predict             — single inference from recent candles
-  GET  /backtest            — historical predicted vs actual (for chart overlay)
-  POST /reload              — hot-reload model from DagsHub without restart
-  POST /cache/bust          — expire Redis cache entry
+  GET  /health              â€” liveness + which models are loaded
+  GET  /models              â€” model metadata (n_estimators, n_features)
+  POST /predict             â€” single inference from recent candles
+  GET  /backtest            â€” historical predicted vs actual (for chart overlay)
+  POST /reload              â€” hot-reload model from DagsHub without restart
+  POST /cache/bust          â€” expire Redis cache entry
 
 Start:
   uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from dotenv import load_dotenv
 
 def _find_env_files() -> list[Path]:
-    """Return [root/.env, backend/.env] — both loaded so all vars are available."""
+    """Return [root/.env, backend/.env] â€” both loaded so all vars are available."""
     found = []
     p = Path(__file__).resolve().parent
     for _ in range(6):
@@ -55,7 +55,7 @@ from model_store import bust_cache, load_all_models, HORIZONS, SYMBOLS
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 log = logging.getLogger(__name__)
 
-PREDICTION_TTL = 90_000   # 25h — survives even if the daily job is late
+PREDICTION_TTL = 90_000   # 25h â€” survives even if the daily job is late
 _redis: Optional[redis_lib.Redis] = None
 
 def _get_redis() -> Optional[redis_lib.Redis]:
@@ -76,8 +76,65 @@ def _get_redis() -> Optional[redis_lib.Redis]:
         log.warning(f"Redis unavailable: {e}")
         return None
 
-def _pred_cache_key(symbol: str, horizon: int) -> str:
-    return f"prediction:{symbol.upper()}:{horizon}d"
+def _normalize_horizon_token(token: str) -> str:
+    t = str(token).strip().lower()
+    if len(t) < 2 or t[-1] not in {"d", "h"} or not t[:-1].isdigit():
+        raise ValueError(f"Invalid horizon token '{token}'. Use forms like 1d, 7d, 4h.")
+    return f"{int(t[:-1])}{t[-1]}"
+
+
+def _token_hours(horizon_token: str) -> int:
+    t = _normalize_horizon_token(horizon_token)
+    value = int(t[:-1])
+    unit = t[-1]
+    return value * 24 if unit == "d" else value
+
+
+def _format_horizon_label(horizon_token: str) -> str:
+    t = _normalize_horizon_token(horizon_token)
+    return f"{int(t[:-1])}{t[-1].upper()}"
+
+
+def _token_to_build_kwargs(horizon_token: str) -> dict:
+    t = _normalize_horizon_token(horizon_token)
+    value = int(t[:-1])
+    if t.endswith("h"):
+        return {"lookahead": 1, "lookahead_hours": value}
+    return {"lookahead": value}
+
+
+def _model_key(symbol: str, horizon_token: str) -> str:
+    return f"{symbol.upper()}_{_normalize_horizon_token(horizon_token)}"
+
+
+def _model_horizon_token(model_key: str) -> str:
+    parts = model_key.split("_", 1)
+    if len(parts) != 2:
+        raise ValueError(f"Invalid model key '{model_key}'")
+    return _normalize_horizon_token(parts[1])
+
+
+def _pred_cache_key(symbol: str, horizon_token: str) -> str:
+    return f"prediction:{symbol.upper()}:{_normalize_horizon_token(horizon_token)}"
+
+
+HORIZON_TOKENS: list[str] = []
+for _h in HORIZONS:
+    try:
+        t = _normalize_horizon_token(_h)
+        if t not in HORIZON_TOKENS:
+            HORIZON_TOKENS.append(t)
+    except Exception:
+        log.warning(f"Ignoring invalid MODEL_HORIZONS token: {_h}")
+
+if not HORIZON_TOKENS:
+    HORIZON_TOKENS = ["1d", "7d"]
+
+DEFAULT_HORIZON_TOKEN = _normalize_horizon_token(
+    os.getenv("DEFAULT_HORIZON_TOKEN", HORIZON_TOKENS[0])
+)
+if DEFAULT_HORIZON_TOKEN not in HORIZON_TOKENS:
+    HORIZON_TOKENS = [DEFAULT_HORIZON_TOKEN] + HORIZON_TOKENS
 
 # Must exactly match get_feature_columns() in feature_engineering.py.
 # Defined inline so this file has no dependency on feature_engineering at prediction time.
@@ -117,8 +174,27 @@ UP_THRESHOLDS: dict[str, float] = {
 SYMBOLS: list[str] = ["BTC", "ETH", "SOL", "XRP"]
 
 models: dict[str, object] = {}
-model_trained_at: dict[str, str] = {}   # key → ISO UTC timestamp from train.py bundle
+model_trained_at: dict[str, str] = {}   # key â†’ ISO UTC timestamp from train.py bundle
 _executor = ThreadPoolExecutor(max_workers=2)
+
+
+def _feature_horizon_for_symbol(symbol: str) -> str:
+    tokens: list[str] = []
+    for key in models.keys():
+        if not key.startswith(symbol + "_"):
+            continue
+        try:
+            tokens.append(_model_horizon_token(key))
+        except Exception:
+            continue
+    if not tokens:
+        return DEFAULT_HORIZON_TOKEN
+    return min(tokens, key=_token_hours)
+
+
+def _build_latest_features(symbol: str, horizon_token: str):
+    from feature_engineering import build_features
+    return build_features(symbol, **_token_to_build_kwargs(horizon_token))
 
 
 def precompute_predictions() -> dict:
@@ -127,17 +203,16 @@ def precompute_predictions() -> dict:
     in Redis with a 25h TTL. Called at startup and every 24h by the scheduler.
     Returns the computed predictions dict for convenience.
     """
-    from feature_engineering import build_features
-
     results = {}
     for symbol in SYMBOLS:
         symbol_models = {k: m for k, m in models.items() if k.startswith(symbol + "_")}
         if not symbol_models:
-            log.warning(f"[precompute] No models loaded for {symbol} — skipping")
+            log.warning(f"[precompute] No models loaded for {symbol} â€” skipping")
             continue
 
+        feature_horizon = _feature_horizon_for_symbol(symbol)
         try:
-            df = build_features(symbol, lookahead=1)   # features are horizon-independent
+            df = _build_latest_features(symbol, feature_horizon)
         except Exception as e:
             log.error(f"[precompute] build_features failed for {symbol}: {e}")
             continue
@@ -150,10 +225,14 @@ def precompute_predictions() -> dict:
         r = _get_redis()
 
         for key, model in symbol_models.items():
-            horizon = int(key.split("_")[1].replace("d", ""))  # "BTC_1d" → 1
+            try:
+                horizon_token = _model_horizon_token(key)
+            except Exception:
+                log.warning(f"[precompute] Invalid model key format: {key} â€” skipping")
+                continue
 
             if X.shape[1] != model.n_features_in_:
-                log.warning(f"[precompute] Feature mismatch for {key} — skipping")
+                log.warning(f"[precompute] Feature mismatch for {key} â€” skipping")
                 continue
 
             proba     = model.predict_proba(X)[0]
@@ -176,11 +255,11 @@ def precompute_predictions() -> dict:
             results[key] = payload
 
             if r:
-                cache_key = _pred_cache_key(symbol, horizon)
+                cache_key = _pred_cache_key(symbol, horizon_token)
                 r.setex(cache_key, PREDICTION_TTL, json.dumps(payload))
-                log.info(f"[precompute] Cached {cache_key} → {direction} ({confidence:.1%})")
+                log.info(f"[precompute] Cached {cache_key} â†’ {direction} ({confidence:.1%})")
 
-    log.info(f"[precompute] Done — {len(results)} predictions cached")
+    log.info(f"[precompute] Done â€” {len(results)} predictions cached")
     return results
 
 
@@ -193,10 +272,10 @@ async def _precompute_scheduler():
         r = _get_redis()
         acquired = False
         if r:
-            # nx=True → atomic acquire; ex=3600 so a crash can't block forever
+            # nx=True â†’ atomic acquire; ex=3600 so a crash can't block forever
             acquired = r.set("precompute:lock", "1", nx=True, ex=3600)
         else:
-            acquired = True  # no Redis — single worker, always run
+            acquired = True  # no Redis â€” single worker, always run
 
         if acquired:
             log.info("[scheduler] Running daily prediction precompute...")
@@ -204,7 +283,7 @@ async def _precompute_scheduler():
             if r:
                 r.delete("precompute:lock")
         else:
-            log.info("[scheduler] Skipping precompute — another worker is running it")
+            log.info("[scheduler] Skipping precompute â€” another worker is running it")
 
         await asyncio.sleep(24 * 3600)
 
@@ -216,7 +295,7 @@ async def lifespan(app: FastAPI):
     log.info("Loading models via model_store...")
     models, model_trained_at = load_all_models()
     if models:
-        log.info(f"Ready — loaded: {list(models.keys())}")
+        log.info(f"Ready â€” loaded: {list(models.keys())}")
     else:
         log.warning(
             "No models loaded. Run train.py first, then restart the service "
@@ -231,7 +310,7 @@ async def lifespan(app: FastAPI):
     models.clear()
 
 
-app = FastAPI(title="ML Inference Service — BTC/ETH direction", lifespan=lifespan)
+app = FastAPI(title="ML Inference Service â€” BTC/ETH direction", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -257,6 +336,7 @@ class CandleIn(BaseModel):
 
 class PredictRequest(BaseModel):
     symbol:  Literal["BTC", "ETH", "SOL", "XRP"]
+    horizon: str = DEFAULT_HORIZON_TOKEN
     candles: list[CandleIn]   # minimum 15, recommended 20
 
 
@@ -319,7 +399,7 @@ def candles_to_features(candles: list[CandleIn]) -> pd.DataFrame:
     Sending 20 is recommended so all windows are fully populated.
 
     Macro/shock features are set to neutral defaults because they are not
-    available in real-time from Binance candles alone. This is intentional —
+    available in real-time from Binance candles alone. This is intentional â€”
     the model degrades gracefully on those features rather than breaking.
     """
     if len(candles) < 15:
@@ -372,12 +452,12 @@ def candles_to_features(candles: list[CandleIn]) -> pd.DataFrame:
         # Market structure: ratio not computable without the other symbol's candles
         "btc_eth_ratio_7d_change": 0.0,
 
-        # Neutral defaults — not available from raw candles
+        # Neutral defaults â€” not available from raw candles
         "fear_greed":           0.5,
         "funding_rate_avg":     0.0,
         "funding_extreme_long": 0,
 
-        # Macro neutral defaults — as-of values not available at candle-only inference time.
+        # Macro neutral defaults â€” as-of values not available at candle-only inference time.
         # Override FED_RATE_DEFAULT env var if the rate changes significantly.
         "macro_fed_rate":     float(os.getenv("FED_RATE_DEFAULT", "5.25")),
         "macro_cpi_surprise": 0.0,
@@ -429,12 +509,18 @@ def predict(req: PredictRequest):
 
     Returns direction (UP/DOWN), confidence (0-1), and raw probabilities.
     """
-    model = models.get(req.symbol)
+    try:
+        horizon_token = _normalize_horizon_token(req.horizon)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    model_key = _model_key(req.symbol, horizon_token)
+    model = models.get(model_key)
     if model is None:
         raise HTTPException(
             status_code=404,
             detail=(
-                f"Model for {req.symbol} is not loaded. "
+                f"Model '{model_key}' is not loaded. "
                 f"Run train.py first, then POST /reload or restart the service. "
                 f"Currently loaded: {list(models.keys()) or 'none'}"
             ),
@@ -464,14 +550,13 @@ def predict(req: PredictRequest):
             ),
         )
 
-    proba     = model.predict_proba(X)[0]   # shape: (2,) → [P(DOWN), P(UP)]
+    proba     = model.predict_proba(X)[0]   # shape: (2,) â†’ [P(DOWN), P(UP)]
     up_prob   = float(proba[1])
     down_prob = float(proba[0])
     threshold = UP_THRESHOLDS.get(req.symbol, 0.5)
     direction = "UP" if up_prob >= threshold else "DOWN"
     confidence = up_prob if direction == "UP" else down_prob
 
-    model_key = f"{req.symbol}_{req.lookahead}d"
     return PredictionOut(
         symbol           = req.symbol,
         direction        = direction,
@@ -488,7 +573,8 @@ def predict(req: PredictRequest):
 def backtest(
     symbol:   Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
     days:     int                                  = Query(default=30, ge=7, le=180),
-    lookahead: int                   = Query(default=1, ge=1, le=30, description="Prediction horizon in days"),
+    horizon: str = Query(default=DEFAULT_HORIZON_TOKEN, description="Prediction horizon token (e.g. 1d, 7d, 4h)."),
+    lookahead: Optional[int] = Query(default=None, ge=1, le=30, description="Deprecated: day horizon. Use 'horizon' token."),
 ):
     """
     Runs the model over the last N days of DB data and returns each day's
@@ -496,20 +582,25 @@ def backtest(
 
     Used by the React ML tab to draw the predicted-vs-actual chart overlay.
     Requires feature_engineering.build_features() which reads from Supabase.
-    This call is slow (~2-5s) due to the DB read — it is only triggered when
+    This call is slow (~2-5s) due to the DB read - it is only triggered when
     the ML tab mounts, not on every prediction.
     """
-    model_key = f"{symbol}_{lookahead}d"
+    raw_horizon = f"{lookahead}d" if lookahead is not None else horizon
+    try:
+        horizon_token = _normalize_horizon_token(raw_horizon)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    model_key = _model_key(symbol, horizon_token)
     model = models.get(model_key)
     if model is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Model '{model_key}' not loaded. Run train.py with LOOKAHEAD_DAYS={lookahead} then POST /reload.",
+            detail=f"Model '{model_key}' not loaded. Train that horizon, then POST /reload.",
         )
 
     try:
-        from feature_engineering import build_features
-        df = build_features(symbol, lookahead=lookahead)
+        df = _build_latest_features(symbol, horizon_token)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -523,7 +614,7 @@ def backtest(
         )
 
     df = df.tail(days).reset_index(drop=True)
-    X  = df[FEATURE_COLS].fillna(0)
+    X = df[FEATURE_COLS].fillna(0)
 
     if X.shape[1] != model.n_features_in_:
         raise HTTPException(
@@ -534,37 +625,36 @@ def backtest(
             ),
         )
 
-    proba    = model.predict_proba(X)   # shape: (N, 2)
+    proba = model.predict_proba(X)
     up_probs = proba[:, 1]
 
     points: list[BacktestPoint] = []
     correct_count = 0
 
     for idx, row in df.iterrows():
-        up_prob    = float(up_probs[idx])
-        pred_dir   = "UP" if up_prob >= 0.5 else "DOWN"
+        up_prob = float(up_probs[idx])
+        pred_dir = "UP" if up_prob >= 0.5 else "DOWN"
         actual_dir = "UP" if int(row["target"]) == 1 else "DOWN"
         is_correct = pred_dir == actual_dir
         if is_correct:
             correct_count += 1
 
         points.append(BacktestPoint(
-            date          = row["date"].strftime("%b %d"),
-            actual_price  = round(float(row["close_usd"]), 2),
-            predicted_dir = pred_dir,
-            up_prob       = round(up_prob, 4),
-            correct       = is_correct,
+            date=row["date"].strftime("%b %d"),
+            actual_price=round(float(row["close_usd"]), 2),
+            predicted_dir=pred_dir,
+            up_prob=round(up_prob, 4),
+            correct=is_correct,
         ))
 
     accuracy = correct_count / len(points) if points else 0.0
 
     return BacktestOut(
-        symbol   = symbol,
-        days     = days,
-        accuracy = round(accuracy, 4),
-        points   = points,
+        symbol=symbol,
+        days=days,
+        accuracy=round(accuracy, 4),
+        points=points,
     )
-
 
 @app.get("/predict/live/all")
 def predict_live_all(
@@ -572,84 +662,89 @@ def predict_live_all(
 ):
     """
     Returns predictions for all horizons for one symbol.
-    Serves from Redis cache (precomputed daily) — falls back to live computation on cache miss.
+    Serves from Redis cache (precomputed daily) - falls back to live computation on cache miss.
     """
     r = _get_redis()
-    log.info(f"[predict/live/all] redis={r is not None}, HORIZONS={HORIZONS}")
+    log.info(f"[predict/live/all] redis={r is not None}, HORIZONS={HORIZON_TOKENS}")
     results = {}
-    missing_horizons = []
+    missing_horizons: list[str] = []
 
-    # Try Redis cache first
-    for horizon in HORIZONS:
-        key = f"{symbol}_{horizon}d"
-        cache_key = _pred_cache_key(symbol, horizon)
+    for horizon_token in HORIZON_TOKENS:
+        key = _model_key(symbol, horizon_token)
+        cache_key = _pred_cache_key(symbol, horizon_token)
         cached = r.get(cache_key) if r else None
-        log.info(f"[predict/live/all] {cache_key} → {'HIT' if cached else 'MISS'}")
+        log.info(f"[predict/live/all] {cache_key} -> {'HIT' if cached else 'MISS'}")
         if cached:
             results[key] = json.loads(cached)
         else:
-            missing_horizons.append(horizon)
+            missing_horizons.append(horizon_token)
 
-    # Cache miss — compute live for missing horizons
     if missing_horizons:
-        log.info(f"[predict/live/all] Cache miss for {symbol} horizons={missing_horizons} — computing live")
-        from feature_engineering import build_features
+        log.info(f"[predict/live/all] Cache miss for {symbol} horizons={missing_horizons} -> computing live")
+        feature_horizon = _feature_horizon_for_symbol(symbol)
         try:
-            df = build_features(symbol, lookahead=1)
+            df = _build_latest_features(symbol, feature_horizon)
         except Exception as e:
             if results:
-                return results   # return whatever we got from cache
+                return results
             raise HTTPException(status_code=500, detail=f"Feature build failed: {e}")
 
         if not df.empty:
             X = df[FEATURE_COLS].fillna(0).tail(1)
-            for horizon in missing_horizons:
-                key = f"{symbol}_{horizon}d"
+            for horizon_token in missing_horizons:
+                key = _model_key(symbol, horizon_token)
                 model = models.get(key)
                 if model is None or X.shape[1] != model.n_features_in_:
                     continue
-                proba     = model.predict_proba(X)[0]
-                up_prob   = float(proba[1])
+
+                proba = model.predict_proba(X)[0]
+                up_prob = float(proba[1])
                 down_prob = float(proba[0])
                 direction = "UP" if up_prob >= 0.5 else "DOWN"
                 confidence = up_prob if direction == "UP" else down_prob
                 payload = {
-                    "symbol":           symbol,
-                    "direction":        direction,
-                    "confidence":       round(confidence, 4),
-                    "up_prob":          round(up_prob, 4),
-                    "down_prob":        round(down_prob, 4),
-                    "predicted_at":     datetime.utcnow().isoformat(),
+                    "symbol": symbol,
+                    "direction": direction,
+                    "confidence": round(confidence, 4),
+                    "up_prob": round(up_prob, 4),
+                    "down_prob": round(down_prob, 4),
+                    "predicted_at": datetime.utcnow().isoformat(),
                     "model_trained_at": model_trained_at.get(key, datetime.utcnow().isoformat()),
                 }
                 results[key] = payload
                 if r:
-                    r.setex(_pred_cache_key(symbol, horizon), PREDICTION_TTL, json.dumps(payload))
+                    r.setex(_pred_cache_key(symbol, horizon_token), PREDICTION_TTL, json.dumps(payload))
 
     return results
 
-
 @app.get("/predict/live", response_model=PredictionOut)
 def predict_live(
-    symbol:    Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
-    lookahead: int                                  = Query(default=1, ge=1, le=30, description="Prediction horizon in days"),
+    symbol: Literal["BTC", "ETH", "SOL", "XRP"] = Query(..., description="BTC, ETH, SOL or XRP"),
+    horizon: str = Query(default=DEFAULT_HORIZON_TOKEN, description="Prediction horizon token (e.g. 1d, 7d, 4h)."),
+    lookahead: Optional[int] = Query(default=None, ge=1, le=30, description="Deprecated: day horizon. Use 'horizon' token."),
 ):
     """
     Predict direction using the most recent row from the database.
-    No candles need to be sent — uses the same feature pipeline as training.
+    No candles need to be sent - uses the same feature pipeline as training.
     Called by the Go service to populate live prediction cards in the dashboard.
     """
-    model_key = f"{symbol}_{lookahead}d"
+    raw_horizon = f"{lookahead}d" if lookahead is not None else horizon
+    try:
+        horizon_token = _normalize_horizon_token(raw_horizon)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    model_key = _model_key(symbol, horizon_token)
     model = models.get(model_key)
     if model is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Model '{model_key}' not loaded. Run train.py with LOOKAHEAD_DAYS={lookahead} then POST /reload.",
+            detail=f"Model '{model_key}' not loaded. Train that horizon, then POST /reload.",
         )
 
+    feature_horizon = _feature_horizon_for_symbol(symbol)
     try:
-        from feature_engineering import build_features
-        df = build_features(symbol, lookahead=lookahead)
+        df = _build_latest_features(symbol, feature_horizon)
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -670,24 +765,23 @@ def predict_live(
             detail=f"Feature mismatch: model expects {model.n_features_in_}, got {X.shape[1]}.",
         )
 
-    proba     = model.predict_proba(X)[0]
-    up_prob   = float(proba[1])
+    proba = model.predict_proba(X)[0]
+    up_prob = float(proba[1])
     down_prob = float(proba[0])
     threshold = UP_THRESHOLDS.get(symbol, 0.5)
     direction = "UP" if up_prob >= threshold else "DOWN"
     confidence = up_prob if direction == "UP" else down_prob
 
     return PredictionOut(
-        symbol           = symbol,
-        direction        = direction,
-        confidence       = round(confidence, 4),
-        up_prob          = round(up_prob, 4),
-        down_prob        = round(down_prob, 4),
-        threshold        = threshold,
-        predicted_at     = datetime.utcnow().isoformat(),
-        model_trained_at = model_trained_at.get(model_key, datetime.utcnow().isoformat()),
+        symbol=symbol,
+        direction=direction,
+        confidence=round(confidence, 4),
+        up_prob=round(up_prob, 4),
+        down_prob=round(down_prob, 4),
+        threshold=threshold,
+        predicted_at=datetime.utcnow().isoformat(),
+        model_trained_at=model_trained_at.get(model_key, datetime.utcnow().isoformat()),
     )
-
 
 @app.get("/debug/cache")
 def debug_cache():
@@ -708,7 +802,7 @@ def debug_cache():
 def market_signals():
     """
     Returns the latest Fear & Greed value, BTC/ETH funding rates, and
-    BTC/ETH price ratio change — displayed as market context on the dashboard.
+    BTC/ETH price ratio change â€” displayed as market context on the dashboard.
     """
     import os
     import psycopg2
@@ -721,7 +815,7 @@ def market_signals():
         conn = psycopg2.connect(DATABASE_URL, sslmode="require")
         cur  = conn.cursor()
 
-        # Fear & Greed — latest value
+        # Fear & Greed â€” latest value
         cur.execute("""
             SELECT date, value FROM fear_greed_index
             ORDER BY date DESC LIMIT 1
@@ -729,7 +823,7 @@ def market_signals():
         fg_row = cur.fetchone()
         fear_greed = {"date": str(fg_row[0]), "value": fg_row[1]} if fg_row else None
 
-        # Funding rates — latest for BTC and ETH
+        # Funding rates â€” latest for BTC and ETH
         funding = {}
         for sym in ("BTC", "ETH"):
             cur.execute("""
@@ -740,7 +834,7 @@ def market_signals():
             if row:
                 funding[sym] = {"date": str(row[0]), "rate_avg": row[1]}
 
-        # BTC/ETH ratio — last 8 days to compute 7d change
+        # BTC/ETH ratio â€” last 8 days to compute 7d change
         cur.execute("""
             SELECT symbol, fetched_at::date AS d, AVG(close_usd) AS price
             FROM crypto_prices
@@ -787,7 +881,7 @@ def market_signals():
 def trigger_precompute():
     """
     Manually triggers prediction precomputation and caches results in Redis.
-    Call this after retraining a model (POST /reload → POST /predict/precompute).
+    Call this after retraining a model (POST /reload â†’ POST /predict/precompute).
     """
     if not models:
         raise HTTPException(status_code=503, detail="No models loaded. POST /reload first.")
@@ -824,13 +918,13 @@ async def analyze(request: Request):
 
     # ML predictions
     for symbol in SYMBOLS:
-        for horizon in HORIZONS:
-            key = f"{symbol}_{horizon}d"
-            cached = r.get(_pred_cache_key(symbol, horizon)) if r else None
+        for horizon_token in HORIZON_TOKENS:
+            key = _model_key(symbol, horizon_token)
+            cached = r.get(_pred_cache_key(symbol, horizon_token)) if r else None
             if cached:
                 p = json.loads(cached)
                 context_parts.append(
-                    f"{symbol} {horizon}D forecast: {p['direction']} "
+                    f"{symbol} {_format_horizon_label(horizon_token)} forecast: {p['direction']} "
                     f"(confidence {p['confidence']*100:.1f}%, "
                     f"UP {p['up_prob']*100:.1f}% / DOWN {p['down_prob']*100:.1f}%)"
                 )
@@ -891,10 +985,10 @@ CURRENT MARKET CONTEXT:
 
 IMPORTANT RULES:
 - Always reference the specific data above when making assessments
-- Be concise but thorough — bullet points where appropriate
+- Be concise but thorough â€” bullet points where appropriate
 - Always end with a risk disclaimer
 - Never give specific price targets
-- Acknowledge uncertainty — crypto is volatile
+- Acknowledge uncertainty â€” crypto is volatile
 - The ML model predictions are probabilistic, not guarantees
 """
 
@@ -929,12 +1023,12 @@ IMPORTANT RULES:
 async def trade_chat(request: Request):
     """
     Trading-aware chat endpoint.
-    Detects trading intent → analyses → proposes order with full reasoning.
+    Detects trading intent â†’ analyses â†’ proposes order with full reasoning.
     Returns streaming text + optionally a pending_order JSON at the end
     (delimited by \\n---ORDER_JSON---\\n so the frontend can parse it).
 
     Body: {"message": "...", "history": [...], "confirm": false}
-    If confirm=true and history contains a pending order → executes it.
+    If confirm=true and history contains a pending order â†’ executes it.
     """
     import openai as _openai
     import sys
@@ -957,12 +1051,12 @@ async def trade_chat(request: Request):
     r = _get_redis()
     context_parts = []
     for symbol in SYMBOLS:
-        for horizon in HORIZONS:
-            cached = r.get(_pred_cache_key(symbol, horizon)) if r else None
+        for horizon_token in HORIZON_TOKENS:
+            cached = r.get(_pred_cache_key(symbol, horizon_token)) if r else None
             if cached:
                 p = json.loads(cached)
                 context_parts.append(
-                    f"{symbol} {horizon}D: {p['direction']} "
+                    f"{symbol} {_format_horizon_label(horizon_token)}: {p['direction']} "
                     f"(UP {p['up_prob']*100:.1f}% / DOWN {p['down_prob']*100:.1f}%)"
                 )
 
@@ -1001,7 +1095,7 @@ async def trade_chat(request: Request):
                 """, (sym,))
                 rows = cur.fetchall()
                 if rows:
-                    price_str = " → ".join([f"${round(r[1],0):,.0f}" for r in rows])
+                    price_str = " â†’ ".join([f"${round(r[1],0):,.0f}" for r in rows])
                     context_parts.append(f"{sym} recent prices (newest first): {price_str}")
 
             # Open positions with live Binance data
@@ -1051,7 +1145,7 @@ async def trade_chat(request: Request):
             else:
                 context_parts.append("Open positions: None")
 
-            # Trade history — last 15 closed trades
+            # Trade history â€” last 15 closed trades
             cur.execute("""
                 SELECT symbol, side, entry_price, exit_price, pnl_usdt, pnl_pct,
                        close_reason,
@@ -1256,7 +1350,7 @@ async def trade_execute(request: Request):
             "notes":            f"Manual via AI chat: {order.get('reasoning','')}",
         })
 
-        # Place native SL/TP on Binance — fires even if engine is offline
+        # Place native SL/TP on Binance â€” fires even if engine is offline
         from engine import _place_native_sl_tp
         _place_native_sl_tp(client, symbol, side, stop_loss, take_profit)
 
@@ -1291,8 +1385,8 @@ def reload_models(
     without a process restart.
 
     Examples:
-      POST /reload            — reload both BTC and ETH
-      POST /reload?symbol=BTC — reload only BTC
+      POST /reload            â€” reload both BTC and ETH
+      POST /reload?symbol=BTC â€” reload only BTC
     """
     global models, model_trained_at
     bust_cache(symbol)
@@ -1338,7 +1432,7 @@ def positions_sync():
     """
     Fetches live open position data from Binance Testnet for BTC and ETH.
     Returns mark price, real entry, actual quantity, and unrealized PnL
-    directly from Binance — not from the local DB.
+    directly from Binance â€” not from the local DB.
 
     The dashboard uses this to show accurate real-time P&L instead of
     relying on stale DB values that may not match what was actually filled.
@@ -1384,10 +1478,11 @@ def cache_bust(
     """
     Expires the Redis cache entry without reloading.
     Next restart or POST /reload will pull a fresh model from DagsHub.
-    Useful for forcing a version rollback — bust cache, then restart.
+    Useful for forcing a version rollback â€” bust cache, then restart.
     """
     bust_cache(symbol)
     return {
         "busted":    symbol.upper() if symbol else "ALL",
         "timestamp": datetime.utcnow().isoformat(),
     }
+

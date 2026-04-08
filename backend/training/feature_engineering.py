@@ -1,15 +1,19 @@
 """
-Feature engineering for BTC/ETH 24h direction prediction.
+Feature engineering for crypto direction prediction.
 
-For each day in crypto_prices, computes:
-  - Price momentum features (1, 3, 7, 14 day returns)
+Supports two training modes:
+  - 1D (default): aggregate seeded 30m candles to daily bars (legacy behavior)
+  - 4H: aggregate seeded 30m candles to 4-hour bars
+
+For each bar, computes:
+  - Price momentum features
   - Volatility / volume / price position
   - Fear & Greed index (sentiment)
   - Funding rate (derivatives market positioning)
   - BTC/ETH ratio change (dominance proxy)
   - Calendar features
 
-Target: 1 if next day close > today close, 0 otherwise (UP/DOWN)
+Target: 1 if close at lookahead horizon > current close, else 0 (UP/DOWN)
 """
 import json
 import os
@@ -23,6 +27,25 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 DATABASE_URL = os.getenv("DATABASE_URL")
+FEATURE_TRAIN_TIMEFRAME = os.getenv("FEATURE_TRAIN_TIMEFRAME", "1D").strip().upper()
+
+
+def _to_utc_naive_datetime(values) -> pd.Series:
+    """
+    Normalize any datetime-like sequence to UTC then drop tz info.
+    This prevents merge errors between tz-aware and tz-naive columns.
+    """
+    return pd.to_datetime(values, utc=True, errors="coerce").dt.tz_localize(None)
+
+
+def _bars_per_day() -> int:
+    if FEATURE_TRAIN_TIMEFRAME == "4H":
+        return 6
+    return 1
+
+
+def _bars(days: int) -> int:
+    return max(1, days * _bars_per_day())
 
 
 @contextmanager
@@ -38,26 +61,42 @@ def load_crypto_prices(symbol: str) -> pd.DataFrame:
     with get_conn() as conn:
         df = pd.read_sql("""
             SELECT
-                DATE(fetched_at) as date,
+                fetched_at as date,
                 open_usd, high_usd, low_usd,
                 close_usd, volume_usd, change_pct
             FROM crypto_prices
             WHERE symbol = %s
+              AND interval_minutes = 30
             ORDER BY fetched_at ASC
         """, conn, params=(symbol,))
-    df["date"] = pd.to_datetime(df["date"])
-    # Aggregate 30-min candles to daily OHLCV correctly:
-    # open=first, high=max, low=min, close=last, volume=sum
-    df = df.groupby("date").agg(
-        open_usd   = ("open_usd",   "first"),
-        high_usd   = ("high_usd",   "max"),
-        low_usd    = ("low_usd",    "min"),
-        close_usd  = ("close_usd",  "last"),
-        volume_usd = ("volume_usd", "sum"),
-    ).reset_index()
-    df["change_pct"] = (
-        (df["close_usd"] - df["open_usd"]) / df["open_usd"] * 100
-    ).round(4)
+    df["date"] = _to_utc_naive_datetime(df["date"])
+    if FEATURE_TRAIN_TIMEFRAME == "4H":
+        # Build 4H candles from seeded 30m data.
+        df = (
+            df.set_index("date")
+            .resample("4h")
+            .agg(
+                open_usd=("open_usd", "first"),
+                high_usd=("high_usd", "max"),
+                low_usd=("low_usd", "min"),
+                close_usd=("close_usd", "last"),
+                volume_usd=("volume_usd", "sum"),
+            )
+            .dropna(subset=["open_usd", "high_usd", "low_usd", "close_usd"])
+            .reset_index()
+        )
+    else:
+        # Legacy behavior: aggregate seeded 30m candles to daily OHLCV.
+        df["date"] = df["date"].dt.normalize()
+        df = df.groupby("date").agg(
+            open_usd=("open_usd", "first"),
+            high_usd=("high_usd", "max"),
+            low_usd=("low_usd", "min"),
+            close_usd=("close_usd", "last"),
+            volume_usd=("volume_usd", "sum"),
+        ).reset_index()
+
+    df["change_pct"] = ((df["close_usd"] - df["open_usd"]) / df["open_usd"] * 100).round(4)
     return df
 
 
@@ -74,7 +113,7 @@ def load_fear_greed() -> pd.DataFrame:
                 FROM fear_greed_index
                 ORDER BY date ASC
             """, conn)
-        df["date"] = pd.to_datetime(df["date"])
+        df["date"] = _to_utc_naive_datetime(df["date"]).dt.normalize()
         df["fear_greed"] = df["fear_greed"] / 100.0
         if not df.empty:
             print(f"  Fear & Greed rows (DB): {len(df)}")
@@ -82,8 +121,8 @@ def load_fear_greed() -> pd.DataFrame:
     except Exception as e:
         print(f"Warning: Fear & Greed DB read failed: {e}")
 
-    # Fallback — hit the API directly if DB is empty
-    print("  Fear & Greed DB empty — falling back to live API fetch")
+    # Fallback â€” hit the API directly if DB is empty
+    print("  Fear & Greed DB empty â€” falling back to live API fetch")
     try:
         url = "https://api.alternative.me/fng/?limit=500&format=json"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -100,7 +139,7 @@ def load_fear_greed() -> pd.DataFrame:
         print(f"  Fear & Greed rows (API fallback): {len(df)}")
         return df
     except Exception as e:
-        print(f"Warning: Fear & Greed API fallback failed: {e} — using neutral defaults")
+        print(f"Warning: Fear & Greed API fallback failed: {e} â€” using neutral defaults")
         return pd.DataFrame(columns=["date", "fear_greed"])
 
 
@@ -118,15 +157,15 @@ def load_funding_rates(symbol: str) -> pd.DataFrame:
                 WHERE symbol = %s
                 ORDER BY date ASC
             """, conn, params=(symbol,))
-        df["date"] = pd.to_datetime(df["date"])
+        df["date"] = _to_utc_naive_datetime(df["date"]).dt.normalize()
         if not df.empty:
             print(f"  Funding rate rows ({symbol}, DB): {len(df)}")
             return df
     except Exception as e:
         print(f"Warning: Funding rate DB read failed for {symbol}: {e}")
 
-    # Fallback — hit Bybit directly if DB is empty (Binance blocks US servers)
-    print(f"  Funding rate DB empty for {symbol} — falling back to Bybit API")
+    # Fallback â€” hit Bybit directly if DB is empty (Binance blocks US servers)
+    print(f"  Funding rate DB empty for {symbol} â€” falling back to Bybit API")
     try:
         bybit_sym = f"{symbol}USDT"
         url = (
@@ -150,7 +189,7 @@ def load_funding_rates(symbol: str) -> pd.DataFrame:
         print(f"  Funding rate rows ({symbol}, Bybit fallback): {len(df)}")
         return df
     except Exception as e:
-        print(f"Warning: Funding rate Bybit fallback failed for {symbol}: {e} — using neutral defaults")
+        print(f"Warning: Funding rate Bybit fallback failed for {symbol}: {e} â€” using neutral defaults")
         return pd.DataFrame(columns=["date", "funding_rate_avg"])
 
 
@@ -165,7 +204,7 @@ def load_macro_features(dates: pd.Series) -> pd.DataFrame:
     - Values are forward-filled between release dates.
     - Returns neutral defaults if the table is empty or unreachable.
     """
-    base = pd.DataFrame({"date": pd.to_datetime(dates)}).sort_values("date").reset_index(drop=True)
+    base = pd.DataFrame({"date": _to_utc_naive_datetime(dates)}).sort_values("date").reset_index(drop=True)
 
     try:
         with get_conn() as conn:
@@ -196,11 +235,11 @@ def load_macro_features(dates: pd.Series) -> pd.DataFrame:
         result["macro_days_since_fed"] = 365
         result["macro_cpi_surprise"] = 0.0
         result["macro_nfp_surprise"] = 0.0
-        print("  Macro features: table empty — using neutral defaults")
+        print("  Macro features: table empty â€” using neutral defaults")
         return result
 
-    rel_df["release_date"] = pd.to_datetime(rel_df["release_date"])
-    rel_df["actual_date"] = pd.to_datetime(rel_df["actual_date"])
+    rel_df["release_date"] = _to_utc_naive_datetime(rel_df["release_date"])
+    rel_df["actual_date"] = _to_utc_naive_datetime(rel_df["actual_date"])
 
     # FED rate
     fed = (
@@ -210,7 +249,7 @@ def load_macro_features(dates: pd.Series) -> pd.DataFrame:
     )
     if not fed.empty:
         m = pd.merge_asof(result, fed, left_on="date", right_on="release_date", direction="backward")
-        # FED actual is always stamped at release_time — no pre/post split needed.
+        # FED actual is always stamped at release_time â€” no pre/post split needed.
         result["macro_fed_rate"] = m["actual_value"].ffill().fillna(5.25).values
         result["macro_days_since_fed"] = (
             (m["date"] - m["actual_date"]).dt.days.clip(0, 365).fillna(365).values
@@ -263,7 +302,7 @@ def load_etf_flow_features(dates: pd.Series) -> pd.DataFrame:
     known at or before each training date. Forward-fills weekends / gaps.
     Returns 0 if the table is empty or unreachable.
     """
-    base = pd.DataFrame({"date": pd.to_datetime(dates)}).sort_values("date").reset_index(drop=True)
+    base = pd.DataFrame({"date": _to_utc_naive_datetime(dates)}).sort_values("date").reset_index(drop=True)
 
     try:
         with get_conn() as conn:
@@ -285,7 +324,7 @@ def load_etf_flow_features(dates: pd.Series) -> pd.DataFrame:
         base["macro_etf_flow_7d"] = 0.0
         return base
 
-    df["date"] = pd.to_datetime(df["date"])
+    df["date"] = _to_utc_naive_datetime(df["date"]).dt.normalize()
 
     # Build a dense daily series and compute 7-day rolling sum.
     full_range = pd.date_range(df["date"].min(), df["date"].max(), freq="D")
@@ -325,58 +364,77 @@ def compute_technical_columns(df: pd.DataFrame) -> pd.DataFrame:
     volume = out["volume_usd"].astype(float)
 
     out["daily_return"] = close.pct_change().fillna(0.0)
-    out["volatility_3d"] = out["daily_return"].rolling(3, min_periods=3).std()
-    out["volatility_7d"] = out["daily_return"].rolling(7, min_periods=7).std()
-    out["volatility_14d"] = out["daily_return"].rolling(14, min_periods=14).std()
+    out["volatility_3d"] = out["daily_return"].rolling(_bars(3), min_periods=_bars(3)).std()
+    out["volatility_7d"] = out["daily_return"].rolling(_bars(7), min_periods=_bars(7)).std()
+    out["volatility_14d"] = out["daily_return"].rolling(_bars(14), min_periods=_bars(14)).std()
 
-    out["rsi_7"] = compute_rsi(close, window=7)
-    out["rsi_14"] = compute_rsi(close, window=14)
+    out["rsi_7"] = compute_rsi(close, window=_bars(7))
+    out["rsi_14"] = compute_rsi(close, window=_bars(14))
 
-    out["ema_12"] = close.ewm(span=12, adjust=False, min_periods=12).mean()
-    out["ema_26"] = close.ewm(span=26, adjust=False, min_periods=26).mean()
-    out["ema_50"] = close.ewm(span=50, adjust=False, min_periods=50).mean()
+    out["ema_12"] = close.ewm(span=_bars(12), adjust=False, min_periods=_bars(12)).mean()
+    out["ema_26"] = close.ewm(span=_bars(26), adjust=False, min_periods=_bars(26)).mean()
+    out["ema_50"] = close.ewm(span=_bars(50), adjust=False, min_periods=_bars(50)).mean()
 
     out["macd_line"] = out["ema_12"] - out["ema_26"]
     out["macd_signal"] = out["macd_line"].ewm(span=9, adjust=False, min_periods=9).mean()
     out["macd_hist"] = out["macd_line"] - out["macd_signal"]
 
-    stoch_low = low.rolling(14, min_periods=14).min()
-    stoch_high = high.rolling(14, min_periods=14).max()
+    stoch_low = low.rolling(_bars(14), min_periods=_bars(14)).min()
+    stoch_high = high.rolling(_bars(14), min_periods=_bars(14)).max()
     stoch_range = (stoch_high - stoch_low).replace(0, pd.NA)
     out["stoch_k"] = ((close - stoch_low) / stoch_range * 100).fillna(50.0)
     out["stoch_d"] = out["stoch_k"].rolling(3, min_periods=3).mean().fillna(50.0)
 
     for window in (7, 14, 30, 50, 100, 200):
-        out[f"ma_{window}"] = close.rolling(window, min_periods=window).mean()
+        bars = _bars(window)
+        out[f"ma_{window}"] = close.rolling(bars, min_periods=bars).mean()
 
-    out["ema_12_slope_3"] = out["ema_12"].pct_change(3)
-    out["ema_26_slope_3"] = out["ema_26"].pct_change(3)
+    out["ema_12_slope_3"] = out["ema_12"].pct_change(_bars(3))
+    out["ema_26_slope_3"] = out["ema_26"].pct_change(_bars(3))
 
     out["volume_change"] = volume.pct_change()
-    out["volume_ma_7"] = volume.rolling(7, min_periods=7).mean()
-    out["volume_ma_30"] = volume.rolling(30, min_periods=30).mean()
+    out["volume_ma_7"] = volume.rolling(_bars(7), min_periods=_bars(7)).mean()
+    out["volume_ma_30"] = volume.rolling(_bars(30), min_periods=_bars(30)).mean()
 
     return out
 
 
-def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
+def build_features(symbol: str, lookahead: int = 1, lookahead_hours: int | None = None) -> pd.DataFrame:
     """
     Builds the complete feature matrix for one symbol (BTC or ETH).
-    Each row = one trading day.
+    Each row = one bar in the configured timeframe.
     Target = 1 if close N days ahead > today close, 0 otherwise.
-    lookahead=1 → next-day direction (default)
-    lookahead=7 → 7-day direction
+    lookahead=1 -> 1-day horizon
+    lookahead=7 -> 7-day horizon
+    lookahead_hours=4 -> 4-hour horizon (true intraday target)
     """
     print(f"Loading data for {symbol}...")
+    print(f"  Timeframe mode: {FEATURE_TRAIN_TIMEFRAME}")
     target_threshold_pct = float(os.getenv("TARGET_RETURN_THRESHOLD_PCT", "0"))
     target_threshold = target_threshold_pct / 100.0
     dropped_neutral = 0
+    bars_per_day = _bars_per_day()
+    bar_hours = int(24 / bars_per_day)
+    if lookahead_hours is not None:
+        if lookahead_hours <= 0:
+            raise ValueError("lookahead_hours must be > 0")
+        if lookahead_hours % bar_hours != 0:
+            raise ValueError(
+                f"lookahead_hours={lookahead_hours} is not aligned with "
+                f"timeframe bar size {bar_hours}h"
+            )
+        lookahead_steps = lookahead_hours // bar_hours
+        horizon_label = f"{lookahead_hours}h"
+    else:
+        lookahead_steps = lookahead * bars_per_day
+        horizon_label = f"{lookahead}d"
 
-    crypto_df  = load_crypto_prices(symbol)
+    crypto_df = load_crypto_prices(symbol)
     if crypto_df.empty:
         raise ValueError(f"No price data found for {symbol} in crypto_prices table. Run seed_crypto.py first.")
-    other_sym  = "ETH" if symbol == "BTC" else "BTC"
-    other_df   = load_crypto_prices(other_sym)[["date", "close_usd"]].rename(
+
+    other_sym = "ETH" if symbol == "BTC" else "BTC"
+    other_df = load_crypto_prices(other_sym)[["date", "close_usd"]].rename(
         columns={"close_usd": "other_close_usd"}
     )
     crypto_df = crypto_df.merge(other_df, on="date", how="left")
@@ -384,19 +442,25 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
     crypto_df = compute_technical_columns(crypto_df)
 
     fear_greed_df = load_fear_greed()
-    funding_df    = load_funding_rates(symbol)
+    funding_df = load_funding_rates(symbol)
+
+    crypto_df["join_day"] = _to_utc_naive_datetime(crypto_df["date"]).dt.normalize()
 
     if not fear_greed_df.empty:
-        crypto_df = crypto_df.merge(fear_greed_df, on="date", how="left")
+        fear_greed_df = fear_greed_df.rename(columns={"date": "join_day"})
+        crypto_df = crypto_df.merge(fear_greed_df, on="join_day", how="left")
         crypto_df["fear_greed"] = crypto_df["fear_greed"].ffill().fillna(0.5)
     else:
         crypto_df["fear_greed"] = 0.5
 
     if not funding_df.empty:
-        crypto_df = crypto_df.merge(funding_df, on="date", how="left")
+        funding_df = funding_df.rename(columns={"date": "join_day"})
+        crypto_df = crypto_df.merge(funding_df, on="join_day", how="left")
         crypto_df["funding_rate_avg"] = crypto_df["funding_rate_avg"].ffill().fillna(0.0)
     else:
         crypto_df["funding_rate_avg"] = 0.0
+
+    crypto_df = crypto_df.drop(columns=["join_day"], errors="ignore")
 
     macro_df = load_macro_features(crypto_df["date"])
     crypto_df = crypto_df.merge(macro_df, on="date", how="left")
@@ -417,26 +481,30 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
     print(f"  Crypto rows:   {len(crypto_df)}")
 
     rows = []
+    b3 = _bars(3)
+    b7 = _bars(7)
+    b14 = _bars(14)
+    start_idx = _bars(200)
 
-    for i in range(200, len(crypto_df) - lookahead):
-        today    = crypto_df.iloc[i]
-        future   = crypto_df.iloc[i + lookahead]
-        date     = today["date"]
+    for i in range(start_idx, len(crypto_df) - lookahead_steps):
+        today = crypto_df.iloc[i]
+        future = crypto_df.iloc[i + lookahead_steps]
+        date = today["date"]
 
         close_today = float(today["close_usd"])
 
-        ret_1d  = float(today["change_pct"]) / 100
-        ret_3d  = close_today / float(crypto_df.iloc[i - 3]["close_usd"]) - 1
-        ret_7d  = close_today / float(crypto_df.iloc[i - 7]["close_usd"]) - 1
-        ret_14d = close_today / float(crypto_df.iloc[i - 14]["close_usd"]) - 1
+        ret_1d = float(today["change_pct"]) / 100
+        ret_3d = close_today / float(crypto_df.iloc[i - b3]["close_usd"]) - 1
+        ret_7d = close_today / float(crypto_df.iloc[i - b7]["close_usd"]) - 1
+        ret_14d = close_today / float(crypto_df.iloc[i - b14]["close_usd"]) - 1
 
-        hl_range   = (float(today["high_usd"]) - float(today["low_usd"])) / close_today
-        vol_today  = float(today["volume_usd"]) if today["volume_usd"] else 0
-        vol_7d_avg = crypto_df.iloc[i - 7:i]["volume_usd"].astype(float).mean()
-        vol_trend  = (vol_today / vol_7d_avg - 1) if vol_7d_avg > 0 else 0
+        hl_range = (float(today["high_usd"]) - float(today["low_usd"])) / close_today
+        vol_today = float(today["volume_usd"]) if today["volume_usd"] else 0
+        vol_7d_avg = crypto_df.iloc[i - b7:i]["volume_usd"].astype(float).mean()
+        vol_trend = (vol_today / vol_7d_avg - 1) if vol_7d_avg > 0 else 0
 
-        high_14d = float(crypto_df.iloc[i - 14:i + 1]["high_usd"].max())
-        low_14d  = float(crypto_df.iloc[i - 14:i + 1]["low_usd"].min())
+        high_14d = float(crypto_df.iloc[i - b14:i + 1]["high_usd"].max())
+        low_14d = float(crypto_df.iloc[i - b14:i + 1]["low_usd"].min())
         price_position = (
             (close_today - low_14d) / (high_14d - low_14d)
             if high_14d > low_14d else 0.5
@@ -475,34 +543,28 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
         volume_ma30_ratio = (vol_today / volume_ma30 - 1) if volume_ma30 > 0 else 0.0
         volume_spike_2x = int(volume_ma7 > 0 and vol_today > 2 * volume_ma7)
 
-        # Fear & Greed: 0=extreme fear, 1=extreme greed (normalised from 0-100)
-        fg_today  = float(today["fear_greed"])
-        fg_7d_avg = float(crypto_df.iloc[i - 7:i + 1]["fear_greed"].mean())
+        fg_today = float(today["fear_greed"])
+        fg_7d_avg = float(crypto_df.iloc[i - b7:i + 1]["fear_greed"].mean())
         fear_greed_feats = {
-            "fear_greed":         fg_today,
-            "fear_greed_7d_avg":  fg_7d_avg,
-            # 1 when index is in extreme zone (< 20 fear or > 80 greed)
+            "fear_greed": fg_today,
+            "fear_greed_7d_avg": fg_7d_avg,
             "fear_greed_extreme": int(fg_today < 0.2 or fg_today > 0.8),
         }
 
-        # Funding rate: positive = longs paying (overcrowded), negative = shorts paying (squeeze risk)
-        fr_today  = float(today["funding_rate_avg"])
-        fr_7d_avg = float(crypto_df.iloc[i - 7:i + 1]["funding_rate_avg"].mean())
+        fr_today = float(today["funding_rate_avg"])
+        fr_7d_avg = float(crypto_df.iloc[i - b7:i + 1]["funding_rate_avg"].mean())
         funding_feats = {
-            "funding_rate_avg":      fr_today,
-            "funding_rate_7d_avg":   fr_7d_avg,
-            # > 0.01% per 8h = longs significantly overleveraged
-            "funding_extreme_long":  int(fr_today > 0.0001),
-            # < -0.01% per 8h = shorts significantly overleveraged
+            "funding_rate_avg": fr_today,
+            "funding_rate_7d_avg": fr_7d_avg,
+            "funding_extreme_long": int(fr_today > 0.0001),
             "funding_extreme_short": int(fr_today < -0.0001),
         }
 
-        # BTC/ETH ratio: rising = BTC dominance up (ETH may lag), falling = alt season
-        other_today  = float(today["other_close_usd"])
-        other_7d_ago = float(crypto_df.iloc[i - 7]["other_close_usd"])
-        ratio_today  = close_today / other_today if other_today > 0 else 1.0
+        other_today = float(today["other_close_usd"])
+        other_7d_ago = float(crypto_df.iloc[i - b7]["other_close_usd"])
+        ratio_today = close_today / other_today if other_today > 0 else 1.0
         ratio_7d_ago = (
-            float(crypto_df.iloc[i - 7]["close_usd"]) / other_7d_ago
+            float(crypto_df.iloc[i - b7]["close_usd"]) / other_7d_ago
             if other_7d_ago > 0 else ratio_today
         )
         btc_eth_ratio_7d_change = (
@@ -510,22 +572,21 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
             if ratio_7d_ago != 0 else 0.0
         )
 
-        # bull_regime: above 200-day MA = bull market; strongest single regime filter
         ma200 = today["ma_200"]
         bull_regime = int(pd.notna(ma200) and float(ma200) > 0 and close_today > float(ma200))
 
         macro_feats = {
-            "macro_fed_rate":       float(today["macro_fed_rate"])       if pd.notna(today["macro_fed_rate"])       else 5.25,
+            "macro_fed_rate": float(today["macro_fed_rate"]) if pd.notna(today["macro_fed_rate"]) else 5.25,
             "macro_days_since_fed": float(today["macro_days_since_fed"]) if pd.notna(today["macro_days_since_fed"]) else 365.0,
-            "macro_cpi_surprise":   float(today["macro_cpi_surprise"])   if pd.notna(today["macro_cpi_surprise"])   else 0.0,
-            "macro_nfp_surprise":   float(today["macro_nfp_surprise"])   if pd.notna(today["macro_nfp_surprise"])   else 0.0,
-            "macro_etf_flow_7d":    float(today["macro_etf_flow_7d"])    if pd.notna(today["macro_etf_flow_7d"])    else 0.0,
+            "macro_cpi_surprise": float(today["macro_cpi_surprise"]) if pd.notna(today["macro_cpi_surprise"]) else 0.0,
+            "macro_nfp_surprise": float(today["macro_nfp_surprise"]) if pd.notna(today["macro_nfp_surprise"]) else 0.0,
+            "macro_etf_flow_7d": float(today["macro_etf_flow_7d"]) if pd.notna(today["macro_etf_flow_7d"]) else 0.0,
         }
 
         calendar = {
-            "day_of_week":  date.dayofweek,
-            "month":        date.month,
-            "is_weekend":   int(date.dayofweek >= 5),
+            "day_of_week": date.dayofweek,
+            "month": date.month,
+            "is_weekend": int(date.dayofweek >= 5),
             "is_month_end": int(date.day >= 28),
         }
 
@@ -536,16 +597,15 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
         target = int(future_return > 0)
 
         row = {
-            "date":      date,
-            "symbol":    symbol,
+            "date": date,
+            "symbol": symbol,
             "close_usd": close_today,
-
-            "ret_1d":         ret_1d,
-            "ret_3d":         ret_3d,
-            "ret_7d":         ret_7d,
-            "ret_14d":        ret_14d,
-            "hl_range":       hl_range,
-            "vol_trend":      vol_trend,
+            "ret_1d": ret_1d,
+            "ret_3d": ret_3d,
+            "ret_7d": ret_7d,
+            "ret_14d": ret_14d,
+            "hl_range": hl_range,
+            "vol_trend": vol_trend,
             "price_position": price_position,
             "volatility_3d": volatility_3d,
             "volatility_7d": volatility_7d,
@@ -572,16 +632,12 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
             "volume_ma7_ratio": volume_ma7_ratio,
             "volume_ma30_ratio": volume_ma30_ratio,
             "volume_spike_2x": volume_spike_2x,
-
             **fear_greed_feats,
             **funding_feats,
             "btc_eth_ratio_7d_change": btc_eth_ratio_7d_change,
             "bull_regime": bull_regime,
-
             **macro_feats,
-
             **calendar,
-
             "target": target,
         }
         rows.append(row)
@@ -592,7 +648,8 @@ def build_features(symbol: str, lookahead: int = 1) -> pd.DataFrame:
             f"  Target threshold: +/-{target_threshold_pct:.2f}% "
             f"(dropped {dropped_neutral} neutral rows)"
         )
-    print(f"  Feature matrix: {df.shape[0]} rows × {df.shape[1]} cols")
+    print(f"  Lookahead steps: {lookahead_steps} bars ({horizon_label} horizon)")
+    print(f"  Feature matrix: {df.shape[0]} rows x {df.shape[1]} cols")
     print(f"  Target distribution: {df['target'].value_counts().to_dict()}")
     return df
 
@@ -605,9 +662,9 @@ def get_feature_columns() -> list:
     # splits evenly across correlated features and learns nothing robust.
     # Each feature here contributes a genuinely independent source of information.
     return [
-        # Price momentum — 3 timeframes; ret_1d dropped (too noisy solo)
+        # Price momentum â€” 3 timeframes; ret_1d dropped (too noisy solo)
         "ret_3d", "ret_7d", "ret_14d",
-        # Volatility regime — single mid-term window
+        # Volatility regime â€” single mid-term window
         "volatility_7d",
         # Price position within recent range (summarises all the MA/EMA signals
         # without needing 10 separate collinear MA columns)
@@ -616,19 +673,19 @@ def get_feature_columns() -> list:
         "hl_range",
         # Volume confirmation
         "vol_trend",
-        # Momentum — one normalised oscillator + one trend-cross indicator
+        # Momentum â€” one normalised oscillator + one trend-cross indicator
         "rsi_14", "macd_hist",
-        # Regime — above/below 200-day MA; single most powerful regime filter
+        # Regime â€” above/below 200-day MA; single most powerful regime filter
         "bull_regime",
-        # Market structure — BTC/ETH relative strength
+        # Market structure â€” BTC/ETH relative strength
         "btc_eth_ratio_7d_change",
-        # Sentiment — unique external signal (not derived from price)
+        # Sentiment â€” unique external signal (not derived from price)
         "fear_greed",
-        # Derivatives positioning — unique external signal
+        # Derivatives positioning â€” unique external signal
         "funding_rate_avg", "funding_extreme_long",
-        # Macro — unique external signals (as-of joined, no lookahead)
+        # Macro â€” unique external signals (as-of joined, no lookahead)
         "macro_fed_rate", "macro_cpi_surprise", "macro_nfp_surprise",
-        # Calendar — day-of-week effect is real in crypto
+        # Calendar â€” day-of-week effect is real in crypto
         "day_of_week",
     ]
 
@@ -642,3 +699,4 @@ if __name__ == "__main__":
         print(f"\nFeature correlations with target:")
         correlations = df[get_feature_columns() + ["target"]].corr()["target"].drop("target")
         print(correlations.sort_values(ascending=False).to_string())
+

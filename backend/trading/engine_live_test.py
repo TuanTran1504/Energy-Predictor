@@ -1,31 +1,31 @@
 """
-engine_v2.py — 5-minute LLM + Vision trading engine for BTC/ETH.
+engine_live.py — Live account trading engine (BTC, ETH, SOL only).
 
-Strategy layers:
-  1. Macro bias  — ML model direction + Fear&Greed + funding rate
-  2. Technical gates — H1/M15 trend, score ≥ 3/5, range position
-  3. BTC correlation filter — don't trade against BTC trend
-  4. Gemini Flash vision — chart pattern confirmation (Setup A/B/C/D)
-  5. Execution — Binance Futures market order + native SL/TP
-
-Run modes:
-  python engine_v2.py --loop      # continuous 5-min cycle
-  python engine_v2.py --once      # single cycle and exit
-  python engine_v2.py --dry-run   # single cycle, no order execution
-
-Logs written to backend/trading/logs/
+Identical strategy to engine.py but:
+  - Uses BINANCE_LIVE_API_KEY / BINANCE_LIVE_SECRET_KEY (real Binance, not testnet)
+  - Trades BTC, ETH, SOL only (XRP excluded — min notional risk at small balance)
+  - Exchange-side STOP_MARKET / TAKE_PROFIT_MARKET for SL/TP (works on live)
+  - Software monitor as backup SL/TP in case exchange orders fail
+  - account_type='live' on all DB records — separate from testnet trades
+  - Min notional check: skips trades where order value < $5 USDT
 """
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
 import time
 import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 UTC = timezone.utc
 from pathlib import Path
 
 import psycopg2
+from psycopg2 import errors
 import redis
 from binance.um_futures import UMFutures
 from dotenv import load_dotenv
@@ -34,8 +34,7 @@ from chart_gen      import generate_chart
 from llm_analyst    import ask_gemini
 from strategy_core  import (
     compute_indicators, compute_score, find_sr_levels,
-    check_macro_bias, check_technical_gates, get_range_bias, check_fvg_gate,
-    validate_ai_trade_decision,
+    check_macro_bias, check_technical_gates, get_range_bias,
 )
 from trade_logger   import (
     get_logger, log_cycle_start, log_gate_pass, log_gate_fail,
@@ -48,35 +47,43 @@ load_dotenv(ROOT / ".env")
 
 log = get_logger()
 
-API_KEY      = os.getenv("BINANCE_FUTURES_API_KEY", "")
-API_SECRET   = os.getenv("BINANCE_FUTURES_SECRET_KEY", "")
+API_KEY      = os.getenv("BINANCE_LIVE_API_KEY", "")
+API_SECRET   = os.getenv("BINANCE_LIVE_SECRET_KEY", "")
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 REDIS_URL    = os.getenv("REDIS_URL", "")
-USE_FVG_FILTER = os.getenv("USE_FVG_FILTER", "0") == "1"
 
-SYMBOLS        = ["BTC", "ETH", "SOL", "XRP"]
+ACCOUNT_TYPE   = "live"
+TRADES_TABLE   = "trades_live"
+SYMBOLS        = ["BTC", "ETH", "SOL"]
 LEVERAGE       = 5
+MIN_NOTIONAL   = 5.0   # USD — skip trades with position value below this
 
-# Binance Futures quantity step sizes (decimal precision per coin)
 QTY_PRECISION  = {
-    "BTC": 3,   # step 0.001
-    "ETH": 2,   # step 0.01
-    "SOL": 1,   # step 0.1
-    "XRP": 0,   # step 1 (integer lots)
+    "BTC": 3,
+    "ETH": 2,
+    "SOL": 1,
 }
-STOP_LOSS_PCT  = 0.008    # 0.8% hard max SL
-SL_MIN_PCT     = 0.002    # 0.2% hard min SL
+PRICE_PRECISION = {
+    "BTC": 1,   # tick size 0.1  → e.g. 84234.5
+    "ETH": 2,   # tick size 0.01 → e.g. 2113.95
+    "SOL": 2,   # tick size 0.01 → e.g. 79.87
+    "XRP": 4,   # tick size 0.0001 → e.g. 2.1234
+}
+STOP_LOSS_PCT         = 0.008
+SL_MIN_PCT            = 0.002
 TAKE_PROFIT_MIN_RR    = 1.5
-SETUP_E_MIN_RR        = 1.0   # lower bar for BB mean reversion (tighter TP target)
-POSITION_RISK_PCT  = 0.01  # risk 1% of balance per trade
-MAX_POSITION_FRACTION = 0.10  # max 10% of balance * leverage per position
+SETUP_E_MIN_RR        = 1.0
+POSITION_RISK_PCT     = 0.01
+STRICT_NON_TREND_MIN_RR       = 1.8
+STRICT_NON_TREND_EDGE_MAX_PCT = 0.20
+STRICT_NON_TREND_VOL_MULT      = 1.2
+STRICT_NON_TREND_SIZE_FACTOR   = 0.5
+MAX_POSITION_FRACTION = 0.10  # default cap: 10% of balance * leverage
 MAX_POSITION_FRACTION_BY_SYMBOL = {
-    "BTC": 0.25,  # allow smaller accounts to reach 0.001 BTC step
+    "BTC": 0.25,  # higher cap so small balances can still reach 0.001 BTC
 }
-CYCLE_INTERVAL     = 5 * 60  # 5 minutes
-
-TESTNET_BASE    = "https://testnet.binancefuture.com"
-MONITOR_INTERVAL = 5   # seconds between DB↔Binance sync checks
+CYCLE_INTERVAL        = 5 * 60
+MONITOR_INTERVAL      = 5
 
 
 def _normalize_horizon_token(token: str) -> str:
@@ -111,7 +118,29 @@ ML_REQUIRE_TREND_ALIGNMENT = os.getenv("ML_REQUIRE_TREND_ALIGNMENT", "1") == "1"
 
 
 def get_client() -> UMFutures:
-    return UMFutures(key=API_KEY, secret=API_SECRET, base_url=TESTNET_BASE)
+    return UMFutures(key=API_KEY, secret=API_SECRET)  # no base_url = live
+
+
+def _algo_order(symbol: str, side: str, order_type: str, trigger_price: float) -> dict:
+    """Place SL/TP via Binance Algo Order API (/fapi/v1/algoOrder)."""
+    base      = symbol.replace("USDT", "")
+    precision = PRICE_PRECISION.get(base, 2)
+    params = {
+        "algoType":    "CONDITIONAL",
+        "symbol":      symbol,
+        "side":        side,
+        "type":        order_type,
+        "triggerPrice": f"{trigger_price:.{precision}f}",
+        "workingType": "MARK_PRICE",
+        "closePosition": "true",
+        "timestamp":   int(time.time() * 1000),
+    }
+    query = urllib.parse.urlencode(params)
+    sig   = hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+    url   = f"https://fapi.binance.com/fapi/v1/algoOrder?{query}&signature={sig}"
+    req   = urllib.request.Request(url, method="POST", headers={"X-MBX-APIKEY": API_KEY})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read())
 
 
 def _get_conn():
@@ -119,12 +148,11 @@ def _get_conn():
 
 
 def db_ensure_trades_table():
-    """Create trades table if it doesn't exist, and add any missing columns (idempotent)."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS trades (
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {TRADES_TABLE} (
                     id                BIGSERIAL PRIMARY KEY,
                     symbol            TEXT        NOT NULL,
                     side              TEXT        NOT NULL,
@@ -147,17 +175,22 @@ def db_ensure_trades_table():
                     closed_at         TIMESTAMPTZ
                 )
             """)
-            # Add columns that may be missing from older table versions
             for col, definition in [
-                ("setup", "TEXT"),
-                ("notes", "TEXT"),
-                ("confidence", "FLOAT"),
+                ("setup",            "TEXT"),
+                ("notes",            "TEXT"),
+                ("confidence",       "FLOAT"),
                 ("binance_order_id", "TEXT"),
-                ("close_reason", "TEXT"),
+                ("close_reason",     "TEXT"),
+                ("account_type",     "TEXT DEFAULT 'testnet'"),
             ]:
                 cur.execute(f"""
-                    ALTER TABLE trades ADD COLUMN IF NOT EXISTS {col} {definition}
+                    ALTER TABLE {TRADES_TABLE} ADD COLUMN IF NOT EXISTS {col} {definition}
                 """)
+            cur.execute(f"""
+                CREATE UNIQUE INDEX IF NOT EXISTS {TRADES_TABLE}_one_open_position_per_account_symbol_idx
+                ON {TRADES_TABLE} (account_type, symbol)
+                WHERE status = 'OPEN'
+            """)
         conn.commit()
     finally:
         conn.close()
@@ -165,17 +198,16 @@ def db_ensure_trades_table():
 
 def db_create_pending(symbol: str, side: str, setup: str,
                       confidence: float = 0.0) -> int:
-    """INSERT a PENDING record before placing the market order. Returns trade id."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO trades
+            cur.execute(f"""
+                INSERT INTO {TRADES_TABLE}
                   (symbol, side, status, entry_price, quantity, leverage,
-                   stop_loss, take_profit, confidence, setup, horizon)
-                VALUES (%s,%s,'PENDING', 0, 0, %s, 0, 0, %s,%s, 1)
+                   stop_loss, take_profit, confidence, setup, horizon, account_type)
+                VALUES (%s,%s,'PENDING', 0, 0, %s, 0, 0, %s,%s, 1, %s)
                 RETURNING id
-            """, (symbol, side, LEVERAGE, confidence, setup))
+            """, (symbol, side, LEVERAGE, confidence, setup, ACCOUNT_TYPE))
             tid = cur.fetchone()[0]
         conn.commit()
     finally:
@@ -186,12 +218,11 @@ def db_create_pending(symbol: str, side: str, setup: str,
 def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
                     stop_loss: float, take_profit: float,
                     order_id: str, notes: str):
-    """UPDATE PENDING → OPEN once entry + SL/TP are all confirmed on exchange."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE trades SET
+            cur.execute(f"""
+                UPDATE {TRADES_TABLE} SET
                     status='OPEN', entry_price=%s, quantity=%s,
                     stop_loss=%s, take_profit=%s,
                     binance_order_id=%s, notes=%s
@@ -204,36 +235,13 @@ def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
 
 
 def db_cancel_pending(trade_id: int):
-    """DELETE a PENDING record when entry or SL/TP placement failed."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM trades WHERE id=%s AND status='PENDING'",
-                        (trade_id,))
+            cur.execute(f"DELETE FROM {TRADES_TABLE} WHERE id=%s AND status='PENDING'", (trade_id,))
         conn.commit()
     finally:
         conn.close()
-
-
-def db_save_trade(symbol: str, side: str, entry_price: float, quantity: float,
-                  stop_loss: float, take_profit: float, order_id: str,
-                  setup: str, notes: str, confidence: float = 0.0) -> int:
-    conn = _get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO trades
-                  (symbol, side, status, entry_price, quantity, leverage,
-                   stop_loss, take_profit, confidence, binance_order_id, setup, notes)
-                VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                RETURNING id
-            """, (symbol, side, entry_price, quantity, LEVERAGE,
-                  stop_loss, take_profit, confidence, order_id, setup, notes))
-            tid = cur.fetchone()[0]
-        conn.commit()
-    finally:
-        conn.close()
-    return tid
 
 
 def db_close_trade(trade_id: int, exit_price: float, reason: str):
@@ -241,8 +249,7 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
     try:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT entry_price, quantity, side FROM trades WHERE id=%s",
-                (trade_id,)
+                f"SELECT entry_price, quantity, side FROM {TRADES_TABLE} WHERE id=%s", (trade_id,)
             )
             row = cur.fetchone()
             if not row:
@@ -254,13 +261,12 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
                 pnl_pct = (entry - exit_price) / entry * LEVERAGE
             margin   = qty * entry / LEVERAGE
             pnl_usdt = pnl_pct * margin
-            cur.execute("""
-                UPDATE trades SET
+            cur.execute(f"""
+                UPDATE {TRADES_TABLE} SET
                     status='CLOSED', exit_price=%s, pnl_usdt=%s,
                     pnl_pct=%s, close_reason=%s, closed_at=NOW()
                 WHERE id=%s
-            """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4),
-                  reason, trade_id))
+            """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason, trade_id))
         conn.commit()
     finally:
         conn.close()
@@ -271,11 +277,11 @@ def db_get_open_trades() -> list[dict]:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            cur.execute(f"""
                 SELECT id, symbol, side, entry_price, quantity,
                        stop_loss, take_profit, binance_order_id, opened_at
-                FROM trades WHERE status='OPEN'
-            """)
+                FROM {TRADES_TABLE} WHERE status='OPEN' AND account_type=%s
+            """, (ACCOUNT_TYPE,))
             cols = [d[0] for d in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
     except Exception as e:
@@ -286,19 +292,19 @@ def db_get_open_trades() -> list[dict]:
 
 
 def db_cleanup_stale_pending(max_age_seconds: int = 120):
-    """Delete PENDING records older than max_age_seconds (crash mid-execution)."""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
-                DELETE FROM trades
+            cur.execute(f"""
+                DELETE FROM {TRADES_TABLE}
                 WHERE status='PENDING'
+                  AND account_type=%s
                   AND opened_at < NOW() - INTERVAL '%s seconds'
                 RETURNING id, symbol
-            """, (max_age_seconds,))
+            """, (ACCOUNT_TYPE, max_age_seconds))
             rows = cur.fetchall()
             for tid, sym in rows:
-                log.warning(f"[DB] Cleaned up stale PENDING record id={tid} symbol={sym}")
+                log.warning(f"[DB] Cleaned up stale PENDING id={tid} symbol={sym}")
         conn.commit()
     except Exception as e:
         log.warning(f"[DB] cleanup_stale_pending failed: {e}")
@@ -306,163 +312,140 @@ def db_cleanup_stale_pending(max_age_seconds: int = 120):
         conn.close()
 
 
-def log_demo_trade_open(symbol: str, side: str, entry: float, sl: float, tp: float,
-                        rr: float, setup: str, reason: str, trade_id: str | None = None,
-                        context: dict = None):
-    record = {
-        "event": "OPEN",
-        "ts": datetime.now(UTC).isoformat(),
-        "id": trade_id,
-        "symbol": symbol,
-        "side": side,
-        "entry": entry,
-        "sl": sl,
-        "tp": tp,
-        "rr": round(rr, 2),
-        "setup": setup,
-        "reason": reason,
-        "score": context.get("score") if context else None,
-        "mode": context.get("market_mode") if context else None,
-        "funding": context.get("funding_rate") if context else None,
-        "fear_greed": context.get("fear_greed") if context else None,
-        "ml_direction": context.get("ml_direction") if context else None,
-    }
-    from trade_logger import _append_jsonl, _trade_log
-
-    _trade_log.info(json.dumps(record))
-    _append_jsonl(record)
-    log.info(
-        f"  [TRADE OPEN] {side} {symbol} | entry={entry} SL={sl} TP={tp} "
-        f"R:R={rr:.2f} | setup={setup} | telegram=off (demo)"
-    )
-
-
-def _get_exit_price_from_binance(client: UMFutures, symbol: str) -> float | None:
-    """Get fill price of the most recent closing trade from Binance account trades."""
+def _get_exit_fill_from_binance(client: UMFutures, symbol: str, trade_side: str) -> dict | None:
     try:
         trades = client.get_account_trades(symbol=f"{symbol}USDT", limit=10)
-        if trades:
-            return float(trades[-1]["price"])
+        if not trades:
+            return None
+
+        closing_side = "SELL" if trade_side == "BUY" else "BUY"
+        closing_fills = []
+        for trade in reversed(trades):
+            if trade.get("side") != closing_side:
+                continue
+            qty = abs(float(trade.get("qty", 0) or 0))
+            price = float(trade.get("price", 0) or 0)
+            if qty <= 0 or price <= 0:
+                continue
+            closing_fills.append(trade)
+            # Stop once the fill set changes timestamp significantly.
+            if len(closing_fills) >= 1:
+                first_time = int(closing_fills[0].get("time", 0) or 0)
+                current_time = int(trade.get("time", 0) or 0)
+                if first_time and current_time and abs(first_time - current_time) > 5000:
+                    closing_fills.pop()
+                    break
+
+        if not closing_fills:
+            return None
+
+        total_qty = sum(abs(float(t.get("qty", 0) or 0)) for t in closing_fills)
+        if total_qty <= 0:
+            return None
+
+        weighted_exit = sum(
+            float(t.get("price", 0) or 0) * abs(float(t.get("qty", 0) or 0))
+            for t in closing_fills
+        ) / total_qty
+        realized_pnl = sum(float(t.get("realizedPnl", 0) or 0) for t in closing_fills)
+        latest_time = max(int(t.get("time", 0) or 0) for t in closing_fills)
+        return {
+            "exit_price": weighted_exit,
+            "qty": total_qty,
+            "realized_pnl": realized_pnl,
+            "time": latest_time,
+            "fills": len(closing_fills),
+        }
     except Exception as e:
-        log.warning(f"[MONITOR] Could not fetch exit price for {symbol}: {e}")
-    return None
+        log.warning(f"[MONITOR] Could not fetch exit fills for {symbol}: {e}")
+        return None
 
 
-_ORPHAN_SL_PCT = 0.005   # 0.5% default SL for recovered positions
-_ORPHAN_TP_PCT = 0.010   # 1.0% default TP for recovered positions (R:R = 2)
+_ORPHAN_SL_PCT = 0.005
+_ORPHAN_TP_PCT = 0.010
+_POSITION_MISS_COUNTS: dict[int, int] = {}
 
 
 def _recover_orphaned_positions(client: UMFutures, open_trades: list[dict]):
-    """
-    Scans Binance for open positions that have no matching OPEN record in the DB.
-    Inserts a recovery record and places default SL/TP orders on Binance.
-    """
     tracked_symbols = {t["symbol"] for t in open_trades}
     try:
         all_positions = client.get_position_risk()
     except Exception as e:
-        log.warning(f"[MONITOR] Could not fetch Binance positions for orphan check: {e}")
+        log.warning(f"[MONITOR] Could not fetch Binance positions: {e}")
         return
 
     for pos in all_positions:
         amt = float(pos.get("positionAmt", 0))
         if amt == 0:
-            continue  # no position
-
+            continue
         sym = pos["symbol"].replace("USDT", "")
-        if sym in tracked_symbols:
-            continue  # already tracked in DB
+        if sym not in SYMBOLS or sym in tracked_symbols:
+            continue
 
-        side = "BUY" if amt > 0 else "SELL"
+        side  = "BUY" if amt > 0 else "SELL"
         entry = float(pos["entryPrice"])
         qty   = abs(amt)
         mark  = float(pos["markPrice"])
 
-        # Compute default SL/TP from entry price
         if side == "BUY":
             sl = round(entry * (1 - _ORPHAN_SL_PCT), 2)
             tp = round(entry * (1 + _ORPHAN_TP_PCT), 2)
-            close_side = "SELL"
         else:
             sl = round(entry * (1 + _ORPHAN_SL_PCT), 2)
             tp = round(entry * (1 - _ORPHAN_TP_PCT), 2)
-            close_side = "BUY"
 
         log.warning(
-            f"[MONITOR] Orphaned position detected: {sym} {side} qty={qty} "
-            f"entry={entry} mark={mark} — recovering with SL={sl} TP={tp}"
+            f"[MONITOR] Orphaned position: {sym} {side} qty={qty} "
+            f"entry={entry} mark={mark} — recovering SL={sl} TP={tp}"
         )
 
-        sym_pair = f"{sym}USDT"
-
-        # Place SL order on Binance
-        sl_price = round(sl * (0.998 if close_side == "SELL" else 1.002), 2)
-        try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="STOP",
-                stopPrice=str(sl), price=str(sl_price),
-                quantity=qty, reduceOnly="true",
-            )
-            log.info(f"[MONITOR] Recovery SL placed @ {sl}")
-        except Exception as e:
-            log.warning(f"[MONITOR] Could not place recovery SL for {sym}: {e}")
-
-        # Place TP order on Binance
-        tp_price = round(tp * (0.999 if close_side == "SELL" else 1.001), 2)
-        try:
-            client.new_order(
-                symbol=sym_pair, side=close_side, type="TAKE_PROFIT",
-                stopPrice=str(tp), price=str(tp_price),
-                quantity=qty, reduceOnly="true",
-            )
-            log.info(f"[MONITOR] Recovery TP placed @ {tp}")
-        except Exception as e:
-            log.warning(f"[MONITOR] Could not place recovery TP for {sym}: {e}")
-
-        # Insert DB record with the computed SL/TP
+        claimed_trade_id = None
         conn = _get_conn()
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO trades
+                cur.execute(f"""
+                    INSERT INTO {TRADES_TABLE}
                       (symbol, side, status, entry_price, quantity, leverage,
-                       stop_loss, take_profit, confidence, horizon)
-                    VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s, 0, 1)
-                """, (sym, side, entry, qty, LEVERAGE, sl, tp))
+                       stop_loss, take_profit, confidence, horizon, account_type)
+                    VALUES (%s,%s,'OPEN',%s,%s,%s,%s,%s, 0, 1, %s)
+                    RETURNING id
+                """, (sym, side, entry, qty, LEVERAGE, sl, tp, ACCOUNT_TYPE))
+                claimed_trade_id = cur.fetchone()[0]
             conn.commit()
-            log.info(f"[MONITOR] Recovery record inserted for {sym} {side} @ {entry}")
+            log.info(f"[MONITOR] Recovery record inserted for {sym} {side} @ {entry} id={claimed_trade_id}")
+        except errors.UniqueViolation:
+            conn.rollback()
+            log.info(f"[MONITOR] Orphan {sym} already claimed by another monitor - skipping recovery insert")
+            continue
         except Exception as e:
+            conn.rollback()
             log.warning(f"[MONITOR] Failed to insert recovery record for {sym}: {e}")
+            continue
         finally:
             conn.close()
 
 
 def _monitor_loop(client: UMFutures):
-    """
-    1. Detects when a native Binance SL/TP has fired and records the close in DB.
-    2. Detects positions open on Binance but missing from DB and auto-recovers them.
-    Runs in a background daemon thread.
-    """
-    log.info("[MONITOR] Background sync thread started (60s interval)")
+    log.info("[MONITOR] Live monitor thread started (5s interval)")
     while True:
         try:
             db_cleanup_stale_pending()
             open_trades = db_get_open_trades()
 
-            # --- Phase 1: software SL/TP enforcement ---
-            # Exchange-side conditional orders are not supported on this account.
-            # The monitor enforces SL/TP by checking mark price every cycle.
+            # --- Phase 1: software SL/TP backup ---
             for trade in list(open_trades):
                 sl = trade.get("stop_loss") or 0
                 tp = trade.get("take_profit") or 0
                 if not sl and not tp:
                     continue
+
                 sym = trade["symbol"]
                 try:
                     ticker = client.ticker_price(symbol=f"{sym}USDT")
                     mark = float(ticker["price"])
                 except Exception:
                     continue
+
                 trade_side = trade["side"]
                 hit = None
                 if trade_side == "BUY":
@@ -475,39 +458,59 @@ def _monitor_loop(client: UMFutures):
                         hit = "stop_loss"
                     elif tp and mark <= tp:
                         hit = "take_profit"
+
                 if hit:
                     close_side = "SELL" if trade_side == "BUY" else "BUY"
                     qty = trade["quantity"]
-                    log.warning(f"[MONITOR] {sym} {hit} hit (mark={mark}) — closing position")
+                    log.warning(f"[MONITOR] {sym} {hit} hit (mark={mark}) - closing position")
                     try:
-                        client.new_order(symbol=f"{sym}USDT", side=close_side,
-                                         type="MARKET", quantity=qty)
+                        client.new_order(
+                            symbol=f"{sym}USDT",
+                            side=close_side,
+                            type="MARKET",
+                            quantity=qty,
+                            reduceOnly="true",
+                        )
                         db_close_trade(trade["id"], mark, hit)
                         open_trades = [t for t in open_trades if t["id"] != trade["id"]]
                     except Exception as e:
                         log.warning(f"[MONITOR] Failed to close {sym} on {hit}: {e}")
 
-            # --- Phase 2: recover orphaned Binance positions ---
+            # --- Phase 2: recover orphaned positions ---
             _recover_orphaned_positions(client, open_trades)
 
             # --- Phase 3: close DB records when Binance position is gone ---
             for trade in open_trades:
                 sym = trade["symbol"]
+                trade_id = trade["id"]
                 pos = get_open_position(client, sym)
                 if pos is not None:
-                    continue  # still open — nothing to do
+                    _POSITION_MISS_COUNTS.pop(trade_id, None)
+                    continue
 
-                # SL/TP fired or manually closed
-                exit_price = _get_exit_price_from_binance(client, sym)
-                if exit_price is None:
+                miss_count = _POSITION_MISS_COUNTS.get(trade_id, 0) + 1
+                _POSITION_MISS_COUNTS[trade_id] = miss_count
+                if miss_count < 3:
+                    log.info(
+                        f"[MONITOR] {sym} position miss {miss_count}/3 - waiting before DB close"
+                    )
+                    continue
+
+                exit_fill = _get_exit_fill_from_binance(client, sym, trade["side"])
+                if exit_fill is not None:
+                    exit_price = float(exit_fill["exit_price"])
+                    log.info(
+                        f"[MONITOR] {sym} exit fills={exit_fill['fills']} "
+                        f"qty={exit_fill['qty']:.6f} pnl={exit_fill['realized_pnl']:.4f}"
+                    )
+                else:
                     try:
                         ticker = client.ticker_price(symbol=f"{sym}USDT")
                         exit_price = float(ticker["price"])
                     except Exception:
                         continue
-
-                sl = trade["stop_loss"]
-                tp = trade["take_profit"]
+                sl   = trade["stop_loss"]
+                tp   = trade["take_profit"]
                 side = trade["side"]
                 if side == "BUY":
                     reason = ("take_profit" if exit_price >= tp
@@ -517,9 +520,9 @@ def _monitor_loop(client: UMFutures):
                     reason = ("take_profit" if exit_price <= tp
                               else "stop_loss" if exit_price >= sl
                               else "native_close")
-
-                log.info(f"[MONITOR] {sym} closed on Binance → reason={reason} exit={exit_price}")
+                log.info(f"[MONITOR] {sym} closed → reason={reason} exit={exit_price}")
                 db_close_trade(trade["id"], exit_price, reason)
+                _POSITION_MISS_COUNTS.pop(trade_id, None)
 
         except Exception as e:
             log.warning(f"[MONITOR] Sync error: {e}")
@@ -542,7 +545,6 @@ def _get_redis():
 
 
 def get_ml_predictions() -> dict:
-    """Pull latest ML predictions from Redis cache."""
     try:
         r = _get_redis()
         if r is None:
@@ -560,23 +562,18 @@ def get_ml_predictions() -> dict:
 
 
 def get_market_signals() -> dict:
-    """Pull fear/greed + funding rates from DB."""
     signals = {}
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT value FROM fear_greed_index ORDER BY date DESC LIMIT 1"
-            )
+            cur.execute("SELECT value FROM fear_greed_index ORDER BY date DESC LIMIT 1")
             row = cur.fetchone()
             if row:
                 signals["fear_greed"] = int(row[0])
-
             for sym in SYMBOLS:
                 cur.execute(
                     "SELECT rate_avg FROM funding_rates WHERE symbol=%s "
-                    "ORDER BY date DESC LIMIT 1",
-                    (sym,)
+                    "ORDER BY date DESC LIMIT 1", (sym,)
                 )
                 row = cur.fetchone()
                 if row:
@@ -593,10 +590,7 @@ import pandas as pd
 
 def fetch_ohlcv(client: UMFutures, symbol: str, interval: str,
                 limit: int = 200) -> pd.DataFrame:
-    """Fetch klines and return OHLCV DataFrame. Drops the last (incomplete) candle."""
-    raw = client.klines(
-        symbol=f"{symbol}USDT", interval=interval, limit=limit
-    )
+    raw = client.klines(symbol=f"{symbol}USDT", interval=interval, limit=limit)
     df = pd.DataFrame(raw, columns=[
         "timestamp", "open", "high", "low", "close", "volume",
         "close_time", "quote_vol", "trades", "taker_buy_base",
@@ -605,7 +599,7 @@ def fetch_ohlcv(client: UMFutures, symbol: str, interval: str,
     for col in ["open", "high", "low", "close", "volume"]:
         df[col] = pd.to_numeric(df[col])
     df["timestamp"] = pd.to_numeric(df["timestamp"])
-    return df.iloc[:-1].reset_index(drop=True)   # drop incomplete candle
+    return df.iloc[:-1].reset_index(drop=True)
 
 
 def get_account_balance(client: UMFutures) -> float:
@@ -622,10 +616,10 @@ def get_account_balance(client: UMFutures) -> float:
 
 
 def get_open_position(client: UMFutures, symbol: str) -> dict | None:
-    """Returns position dict if open, else None."""
     try:
         risk = client.get_position_risk(symbol=f"{symbol}USDT")
-        for pos in risk:
+        positions = risk if isinstance(risk, list) else [risk]
+        for pos in positions:
             amt = float(pos.get("positionAmt", 0))
             if abs(amt) > 0:
                 return {
@@ -646,49 +640,131 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     sl_distance   = abs(entry - sl)
     if sl_distance == 0:
         return 0.0
-    max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
     position_value = (risk_usdt / sl_distance) * entry
+    max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
     position_value = min(position_value, balance * max_fraction * LEVERAGE)
+    # Min notional check — Binance rejects orders below $5
+    if position_value < MIN_NOTIONAL:
+        return 0.0
     qty       = position_value / entry
     precision = QTY_PRECISION.get(symbol, 2)
     return round(qty, precision)
 
 
-def min_balance_required_for_symbol(symbol: str, entry_price: float) -> float:
+def _signal_follows_trend(signal: str, context: dict) -> tuple[bool, str]:
+    """Hard guard: AI signal must align with directional trend + macro direction."""
+    if signal not in ("BUY", "SELL"):
+        return False, f"invalid signal {signal}"
+
+    allowed = context.get("allowed_direction", "BOTH")
+    if allowed in ("BUY", "SELL") and signal != allowed:
+        return False, f"macro allows {allowed} only"
+
+    h1 = context.get("h1_trend", "")
+    if h1 == "UPTREND" and signal != "BUY":
+        return False, f"H1={h1} requires BUY"
+    if h1 == "DOWNTREND" and signal != "SELL":
+        return False, f"H1={h1} requires SELL"
+
+    m15 = context.get("m15_trend", "")
+    if m15 == "UPTREND" and signal != "BUY":
+        return False, f"M15={m15} requires BUY"
+    if m15 == "DOWNTREND" and signal != "SELL":
+        return False, f"M15={m15} requires SELL"
+
+    return True, "OK"
+
+
+def _is_non_trend_mode(context: dict) -> bool:
+    mode = str(context.get("market_mode", ""))
+    return mode in ("VOLATILE_RANGE", "SIDEWAY") or bool(context.get("is_range", False))
+
+
+def _strict_non_trend_confirmation(signal: str, context: dict, df_m5) -> tuple[bool, str]:
     """
-    Minimum balance needed so capped position size can still produce at least
-    one exchange step-size unit (e.g., BTC 0.001).
+    Extra hard filters for volatile-range/sideway entries.
+    Keeps non-trend trades selective and reduces fake bounces/breakouts.
     """
-    precision = QTY_PRECISION.get(symbol, 2)
-    min_qty_step = 10 ** (-precision)
-    min_notional_for_step = entry_price * min_qty_step
-    max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
-    denom = max_fraction * LEVERAGE
-    if denom <= 0:
-        return float("inf")
-    return min_notional_for_step / denom
+    if not _is_non_trend_mode(context):
+        return True, "OK"
+
+    sr = context.get("sr") or {}
+    support = float(sr.get("support", 0) or 0)
+    resistance = float(sr.get("resistance", 0) or 0)
+    price = float(context.get("current_price", 0) or 0)
+    if price <= 0 or support <= 0 or resistance <= 0:
+        return False, "missing S/R context for non-trend confirmation"
+
+    dist_r = abs(resistance - price) / price * 100
+    dist_s = abs(price - support) / price * 100
+    edge = STRICT_NON_TREND_EDGE_MAX_PCT
+
+    # Must be at the intended range edge, not just "somewhere near".
+    if signal == "BUY":
+        if dist_s > edge:
+            return False, f"BUY not close enough to support ({dist_s:.2f}% > {edge:.2f}%)"
+        if dist_s > dist_r:
+            return False, "BUY rejected: closer to resistance than support"
+    else:
+        if dist_r > edge:
+            return False, f"SELL not close enough to resistance ({dist_r:.2f}% > {edge:.2f}%)"
+        if dist_r > dist_s:
+            return False, "SELL rejected: closer to support than resistance"
+
+    if len(df_m5) < 6:
+        return False, "not enough M5 candles for strict confirmation"
+
+    c1 = df_m5.iloc[-2]  # setup candle
+    c2 = df_m5.iloc[-1]  # confirmation candle
+    o1, h1, l1, cl1 = float(c1["open"]), float(c1["high"]), float(c1["low"]), float(c1["close"])
+    o2, h2, l2, cl2 = float(c2["open"]), float(c2["high"]), float(c2["low"]), float(c2["close"])
+
+    # 2-candle directional confirmation.
+    if signal == "BUY":
+        if not (cl2 > o2 and cl2 > cl1):
+            return False, "BUY missing 2-candle bullish confirmation"
+        if not (l1 <= support * 1.0015 or l2 <= support * 1.0015):
+            return False, "BUY missing clear support rejection touch"
+    else:
+        if not (cl2 < o2 and cl2 < cl1):
+            return False, "SELL missing 2-candle bearish confirmation"
+        if not (h1 >= resistance * 0.9985 or h2 >= resistance * 0.9985):
+            return False, "SELL missing clear resistance rejection touch"
+
+    # Volume confirmation on confirmation candle.
+    vol_now = float(c2["volume"])
+    vol_ma = float(df_m5["volume"].tail(20).mean())
+    prev3_max = float(df_m5["volume"].iloc[-5:-2].max())
+    if vol_now < vol_ma * STRICT_NON_TREND_VOL_MULT:
+        return False, f"volume weak ({vol_now:.0f} < {STRICT_NON_TREND_VOL_MULT:.1f}x MA)"
+    if vol_now <= prev3_max:
+        return False, "volume not stronger than previous 3 candles"
+
+    # Reject if range already broke (momentum continuation risk).
+    last2_closes = [cl1, cl2]
+    if signal == "BUY" and all(c < support for c in last2_closes):
+        return False, "support already broken by 2 closes"
+    if signal == "SELL" and all(c > resistance for c in last2_closes):
+        return False, "resistance already broken by 2 closes"
+
+    return True, "OK"
 
 
 def execute_trade(client: UMFutures, symbol: str, decision: dict,
                   balance: float, context: dict, dry_run: bool = False) -> bool:
-    """
-    Places market entry + native SL/TP orders.
-    Returns True if trade was opened.
-    """
     signal = decision.get("signal")
     if signal not in ("BUY", "SELL"):
         return False
 
     try:
-        ai_sl   = float(decision.get("stop_loss", 0))
-        ai_tp   = float(decision.get("take_profit", 0))
-        reason  = decision.get("reason", "")
-        setup   = decision.get("analysis", {}).get("setup_identified", "?")
+        ai_sl  = float(decision.get("stop_loss", 0))
+        ai_tp  = float(decision.get("take_profit", 0))
+        reason = decision.get("reason", "")
+        setup  = decision.get("analysis", {}).get("setup_identified", "?")
     except (TypeError, ValueError) as e:
         log_error(f"[{symbol}] Invalid SL/TP from AI", e)
         return False
 
-    # Use price already fetched during analysis to avoid tick drift between analysis and execution
     entry = float(context.get("current_price", 0))
     if entry == 0:
         try:
@@ -705,7 +781,6 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("DIRECTION", f"SELL needs SL({ai_sl}) > entry({entry}) > TP({ai_tp})", symbol)
         return False
 
-    # Enforce ATR-based minimum SL to avoid noise stop-outs on volatile coins
     atr = context.get("atr", 0)
     atr_min_pct = (1.5 * atr / entry) if (atr > 0 and entry > 0) else SL_MIN_PCT
     effective_min_pct = max(SL_MIN_PCT, atr_min_pct)
@@ -719,29 +794,37 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
         return False
 
-    # Adjust SL/TP to cover round-trip fees + slippage (~0.18% total)
+    # Adjust SL/TP to cover round-trip fees + slippage
+    # Taker fee 0.04% x2 sides + ~0.05% slippage each way = ~0.18% total
     FEE_BUFFER = 0.0018
     fee_adj = entry * FEE_BUFFER
     if signal == "BUY":
-        ai_sl = round(ai_sl - fee_adj, 6)
-        ai_tp = round(ai_tp + fee_adj, 6)
+        ai_sl = round(ai_sl - fee_adj, 6)   # widen SL down
+        ai_tp = round(ai_tp + fee_adj, 6)   # push TP further up
     else:
-        ai_sl = round(ai_sl + fee_adj, 6)
-        ai_tp = round(ai_tp - fee_adj, 6)
+        ai_sl = round(ai_sl + fee_adj, 6)   # widen SL up
+        ai_tp = round(ai_tp - fee_adj, 6)   # push TP further down
     log.info(f"  [EXEC] Fee-adjusted SL={ai_sl} TP={ai_tp} (buffer={FEE_BUFFER*100:.2f}%)")
 
-    risk   = abs(entry - ai_sl)
-    reward  = abs(ai_tp - entry)
-    rr      = reward / risk if risk > 0 else 0
+    risk      = abs(entry - ai_sl)
+    reward    = abs(ai_tp - entry)
+    rr        = reward / risk if risk > 0 else 0
     is_setup_e = "setup_e" in setup.lower() if setup else False
-    min_rr  = SETUP_E_MIN_RR if is_setup_e else TAKE_PROFIT_MIN_RR
+    min_rr    = SETUP_E_MIN_RR if is_setup_e else TAKE_PROFIT_MIN_RR
+    if _is_non_trend_mode(context):
+        min_rr = max(min_rr, STRICT_NON_TREND_MIN_RR)
     if rr < min_rr:
-        log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr} ({'Setup E' if is_setup_e else 'standard'})", symbol)
+        log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr}", symbol)
         return False
 
     qty = calc_quantity(balance, entry, ai_sl, symbol)
+    if _is_non_trend_mode(context):
+        precision = QTY_PRECISION.get(symbol, 2)
+        qty = round(qty * STRICT_NON_TREND_SIZE_FACTOR, precision)
+        if qty > 0 and (qty * entry) < MIN_NOTIONAL:
+            qty = 0.0
     if qty <= 0:
-        log_gate_fail("QTY", f"Quantity too small for balance {balance:.2f}", symbol)
+        log_gate_fail("QTY", f"Quantity too small or below min notional ${MIN_NOTIONAL} for balance {balance:.2f}", symbol)
         return False
 
     log.info(
@@ -750,15 +833,16 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     )
 
     if dry_run:
-        log_demo_trade_open(symbol, signal, entry, ai_sl, ai_tp, rr, setup, reason,
-                            trade_id="DRY_RUN", context=context)
+        log_trade_open(symbol, signal, entry, ai_sl, ai_tp, rr, setup, reason,
+                       trade_id="DRY_RUN", context=context)
         return True
 
-    side     = "BUY" if signal == "BUY" else "SELL"
-    sym_pair = f"{symbol}USDT"
+    side       = "BUY" if signal == "BUY" else "SELL"
+    close_side = "SELL" if signal == "BUY" else "BUY"
+    sym_pair   = f"{symbol}USDT"
     confidence = context.get("ml_confidence", 0.0)
 
-    # --- Step 1: reserve DB slot before touching the exchange ---
+    # --- Step 1: reserve DB slot ---
     pending_id = None
     try:
         pending_id = db_create_pending(symbol, signal, setup, confidence)
@@ -771,17 +855,31 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         client.change_leverage(symbol=sym_pair, leverage=LEVERAGE)
 
         # --- Step 2: entry order ---
-        order = client.new_order(
-            symbol=sym_pair, side=side, type="MARKET", quantity=qty,
-        )
+        order = client.new_order(symbol=sym_pair, side=side, type="MARKET", quantity=qty)
         order_id     = str(order.get("orderId", ""))
         actual_price = float(order.get("avgPrice", entry)) or entry
         log.info(f"  [EXEC] Entry filled @ {actual_price} orderId={order_id}")
 
-        # --- Step 3: confirm OPEN — SL/TP enforced by software monitor ---
+        time.sleep(0.5)
+
+        # --- Step 3: SL via Algo Order API ---
+        try:
+            resp = _algo_order(sym_pair, close_side, "STOP_MARKET", ai_sl)
+            log.info(f"  [EXEC] SL algo order placed @ {ai_sl} id={resp.get('algoId','?')}")
+        except Exception as e:
+            log.warning(f"  [EXEC] SL algo order failed ({e}) — software monitor will enforce")
+
+        # --- Step 4: TP via Algo Order API ---
+        try:
+            resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", ai_tp)
+            log.info(f"  [EXEC] TP algo order placed @ {ai_tp} id={resp.get('algoId','?')}")
+        except Exception as e:
+            log.warning(f"  [EXEC] TP algo order failed ({e}) — software monitor will enforce")
+
+        # --- Step 5: confirm OPEN ---
         db_confirm_open(pending_id, actual_price, qty, ai_sl, ai_tp, order_id, reason)
-        log_demo_trade_open(symbol, signal, actual_price, ai_sl, ai_tp, rr,
-                            setup, reason, trade_id=order_id, context=context)
+        log_trade_open(symbol, signal, actual_price, ai_sl, ai_tp, rr,
+                       setup, reason, trade_id=order_id, context=context)
         return True
 
     except Exception as e:
@@ -811,7 +909,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         df_h1  = fetch_ohlcv(client, symbol, "1h",  200)
         df_m15 = fetch_ohlcv(client, symbol, "15m", 100)
         df_m5  = fetch_ohlcv(client, symbol, "5m",  100)
-        # BTC as correlation filter
         df_btc_h1 = fetch_ohlcv(client, "BTC", "1h", 100) if symbol != "BTC" else df_h1
     except Exception as e:
         log_error(f"[{symbol}] OHLCV fetch failed", e)
@@ -820,19 +917,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx = compute_indicators(df_h1, df_m15, df_m5)
     ctx["symbol"] = f"{symbol}/USDT"
 
-    required_balance = min_balance_required_for_symbol(symbol, ctx["current_price"])
-    if balance < required_balance:
-        reason = (
-            f"balance {balance:.2f} below tradable minimum {required_balance:.2f} "
-            f"for {symbol} at price {ctx['current_price']:.2f}"
-        )
-        log_gate_fail("BALANCE", reason, symbol, ctx)
-        log_skip("BALANCE", reason, ctx, None)
-        return
-
-    # BTC trend check
     if symbol != "BTC":
-        btc_ctx = compute_indicators(df_btc_h1, df_m15, df_m5)
+        btc_ctx   = compute_indicators(df_btc_h1, df_m15, df_m5)
         btc_trend = btc_ctx["h1_trend"]
         ctx["btc_trend"] = btc_trend
     else:
@@ -840,9 +926,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
 
     ctx["sr"] = find_sr_levels(df_h1, ctx["current_price"], df_m15)
 
-    ctx["use_fvg_scoring"] = USE_FVG_FILTER
     score, score_details = compute_score(ctx)
-    ctx["score"]        = score
+    ctx["score"]         = score
     ctx["score_details"] = score_details
 
     log_cycle_start(symbol, ctx["market_mode"], score)
@@ -883,8 +968,9 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_gate_fail("ML_ALIGN", align_reason, symbol, ctx)
         log_skip("ML_ALIGN", align_reason, ctx, None)
         return
-    fear_greed  = market_signals.get("fear_greed")
-    funding     = market_signals.get(f"{symbol.lower()}_funding", 0)
+
+    fear_greed = market_signals.get("fear_greed")
+    funding    = market_signals.get(f"{symbol.lower()}_funding", 0)
 
     ctx["ml_direction"]  = ml_dir
     ctx["ml_confidence"] = ml_conf
@@ -936,14 +1022,12 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
 
     log.info("  All gates passed → generating chart...")
     chart_b64 = generate_chart(df_m5, ctx)
-
     if not chart_b64:
         log_error(f"[{symbol}] Chart generation failed")
         return
 
     log_ai_request(symbol, ctx.get("market_mode", "?"))
     decision = ask_gemini(chart_b64, ctx, df_m5)
-
     if decision is None:
         log_error(f"[{symbol}] Gemini returned no response")
         return
@@ -957,11 +1041,18 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
 
-    ai_ok, ai_reason = validate_ai_trade_decision(decision, ctx, df_m5)
-    if not ai_ok:
-        log_gate_fail("AI_VALIDATION", ai_reason, symbol, ctx)
-        log_skip("AI_INVALID", ai_reason, ctx, decision)
-        log_cycle_summary(symbol, signal, False, balance, ctx, decision)
+    trend_ok, trend_reason = _signal_follows_trend(signal, ctx)
+    if not trend_ok:
+        log_gate_fail("AI_TREND", trend_reason, symbol, ctx)
+        log_skip("AI_TREND", trend_reason, ctx, decision)
+        log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
+        return
+
+    strict_ok, strict_reason = _strict_non_trend_confirmation(signal, ctx, df_m5)
+    if not strict_ok:
+        log_gate_fail("NON_TREND_STRICT", strict_reason, symbol, ctx)
+        log_skip("NON_TREND_STRICT", strict_reason, ctx, decision)
+        log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
 
     executed = execute_trade(client, symbol, decision, balance, ctx, dry_run=dry_run)
@@ -970,8 +1061,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
 
 def run_once(dry_run: bool = False):
     log.info("=" * 60)
-    variant = "FVG" if USE_FVG_FILTER else "BASELINE"
-    log.info(f"ENGINE V2 {variant} {'DRY RUN' if dry_run else 'LIVE'}  {datetime.now(UTC).isoformat()}")
+    log.info(f"ENGINE LIVE  {'DRY RUN' if dry_run else 'LIVE'}  {datetime.now(UTC).isoformat()}")
     log.info("=" * 60)
 
     client         = get_client()
@@ -998,35 +1088,39 @@ def run_once(dry_run: bool = False):
 
 
 def run_loop(dry_run: bool = False):
-    log.info("Engine V2 started — 5-min cycle loop")
+    log.info("Engine LIVE started — 5-min cycle loop")
 
     try:
         db_ensure_trades_table()
     except Exception as e:
-        log.warning(f"DB table init failed (will retry): {e}")
+        log.warning(f"DB table init failed: {e}")
 
     client_monitor = get_client()
     t = threading.Thread(target=_monitor_loop, args=(client_monitor,), daemon=True)
     t.start()
+
+    from trade_logger import _tg_send
+    _tg_send("🟢 *Live engine started* — monitoring BTC / ETH / SOL")
 
     while True:
         try:
             run_once(dry_run=dry_run)
         except Exception as e:
             log_error("Loop-level error", e)
+            _tg_send(f"⚠️ *Live engine error*: {e}")
         log.info(f"  Sleeping {CYCLE_INTERVAL}s until next cycle...")
         time.sleep(CYCLE_INTERVAL)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Energy Forecaster Trading Engine V2")
-    parser.add_argument("--loop",    action="store_true", help="Run continuously every 5 min")
-    parser.add_argument("--once",    action="store_true", help="Run one cycle and exit")
-    parser.add_argument("--dry-run", action="store_true", help="No real orders — log only")
+    parser = argparse.ArgumentParser(description="Live Trading Engine — BTC/ETH/SOL")
+    parser.add_argument("--loop",    action="store_true")
+    parser.add_argument("--once",    action="store_true")
+    parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
     if not API_KEY or not API_SECRET:
-        print("ERROR: BINANCE_FUTURES_API_KEY / BINANCE_FUTURES_SECRET_KEY not set")
+        print("ERROR: BINANCE_LIVE_API_KEY / BINANCE_LIVE_SECRET_KEY not set in .env")
         exit(1)
 
     if args.loop:

@@ -82,6 +82,37 @@ CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
 
 
+def _normalize_horizon_token(token: str) -> str:
+    t = str(token).strip().lower()
+    if len(t) < 2 or t[-1] not in {"d", "h"} or not t[:-1].isdigit():
+        raise ValueError(f"Invalid horizon token '{token}'. Use values like 1d, 7d, 4h.")
+    return f"{int(t[:-1])}{t[-1]}"
+
+
+def _parse_horizon_tokens(raw: str) -> list[str]:
+    tokens: list[str] = []
+    for part in raw.split(","):
+        p = part.strip()
+        if not p:
+            continue
+        token = _normalize_horizon_token(p)
+        if token not in tokens:
+            tokens.append(token)
+    return tokens or ["1d", "7d"]
+
+
+ML_HORIZONS = _parse_horizon_tokens(os.getenv("ML_HORIZONS", "1d,7d"))
+ML_PRIMARY_HORIZON = _normalize_horizon_token(
+    os.getenv("ML_PRIMARY_HORIZON", ML_HORIZONS[0])
+)
+if ML_PRIMARY_HORIZON not in ML_HORIZONS:
+    ML_HORIZONS = [ML_PRIMARY_HORIZON] + ML_HORIZONS
+ML_TREND_HORIZON = _normalize_horizon_token(
+    os.getenv("ML_TREND_HORIZON", "1d")
+)
+ML_REQUIRE_TREND_ALIGNMENT = os.getenv("ML_REQUIRE_TREND_ALIGNMENT", "1") == "1"
+
+
 def get_client() -> UMFutures:
     return UMFutures(key=API_KEY, secret=API_SECRET)  # no base_url = live
 
@@ -516,10 +547,10 @@ def get_ml_predictions() -> dict:
             return {}
         result = {}
         for sym in SYMBOLS:
-            for h in [1, 7]:
-                val = r.get(f"prediction:{sym}:{h}d")
+            for horizon_token in ML_HORIZONS:
+                val = r.get(f"prediction:{sym}:{horizon_token}")
                 if val:
-                    result[f"{sym}_{h}d"] = json.loads(val)
+                    result[f"{sym}_{horizon_token}"] = json.loads(val)
         return result
     except Exception as e:
         log.warning(f"Redis ML read failed: {e}")
@@ -819,15 +850,47 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     log.info(f"  Score {score}/5: {', '.join(score_details) or 'none'}")
     log.info(f"  ADX={ctx['adx']:.1f} RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f}")
 
-    ml_key     = f"{symbol}_1d"
-    ml_pred    = ml_preds.get(ml_key, {})
-    ml_dir     = ml_pred.get("direction", "")
-    ml_conf    = float(ml_pred.get("confidence", 0))
+    ml_primary_token = ML_PRIMARY_HORIZON
+    ml_pred = {}
+    for horizon_token in [ML_PRIMARY_HORIZON] + [h for h in ML_HORIZONS if h != ML_PRIMARY_HORIZON]:
+        candidate_key = f"{symbol}_{horizon_token}"
+        candidate = ml_preds.get(candidate_key, {})
+        if candidate:
+            ml_pred = candidate
+            ml_primary_token = horizon_token
+            break
+
+    ml_dir = ml_pred.get("direction", "")
+    ml_conf = float(ml_pred.get("confidence", 0))
+
+    trend_key = f"{symbol}_{ML_TREND_HORIZON}"
+    trend_pred = ml_preds.get(trend_key, {})
+    trend_dir = trend_pred.get("direction", "")
+    trend_conf = float(trend_pred.get("confidence", 0))
+
+    if (
+        ML_REQUIRE_TREND_ALIGNMENT
+        and trend_pred
+        and ml_dir
+        and trend_dir
+        and ml_dir != trend_dir
+    ):
+        align_reason = (
+            f"entry {ml_primary_token}={ml_dir}({ml_conf:.0%}) conflicts with "
+            f"trend {ML_TREND_HORIZON}={trend_dir}({trend_conf:.0%})"
+        )
+        log_gate_fail("ML_ALIGN", align_reason, symbol, ctx)
+        log_skip("ML_ALIGN", align_reason, ctx, None)
+        return
     fear_greed = market_signals.get("fear_greed")
     funding    = market_signals.get(f"{symbol.lower()}_funding", 0)
 
     ctx["ml_direction"]  = ml_dir
     ctx["ml_confidence"] = ml_conf
+    ctx["ml_entry_horizon"] = ml_primary_token
+    ctx["ml_trend_horizon"] = ML_TREND_HORIZON
+    ctx["ml_trend_direction"] = trend_dir
+    ctx["ml_trend_confidence"] = trend_conf
     ctx["fear_greed"]    = fear_greed
     ctx["funding_rate"]  = funding
 
@@ -839,7 +902,14 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     if not macro_ok:
         log_gate_fail("MACRO", macro_reason, symbol, ctx)
         return
-    log_gate_pass("MACRO", f"allowed={allowed_dir} ML={ml_dir}({ml_conf:.0%}) F&G={fear_greed}")
+    trend_str = (
+        f" trend={ML_TREND_HORIZON}:{trend_dir}({trend_conf:.0%})"
+        if trend_pred else " trend=n/a"
+    )
+    log_gate_pass(
+        "MACRO",
+        f"allowed={allowed_dir} ML={ml_primary_token}:{ml_dir}({ml_conf:.0%}){trend_str} F&G={fear_greed}",
+    )
 
     if symbol != "BTC":
         btc_trend = ctx.get("btc_trend", "")
@@ -906,6 +976,10 @@ def run_once(dry_run: bool = False):
     balance        = get_account_balance(client)
 
     log.info(f"Balance: {balance:.2f} USDT | ML preds loaded: {list(ml_preds.keys())}")
+    log.info(
+        f"ML mode: entry={ML_PRIMARY_HORIZON} trend={ML_TREND_HORIZON} "
+        f"require_alignment={ML_REQUIRE_TREND_ALIGNMENT}"
+    )
     funding_str = "  ".join(
         f"{s} funding={market_signals.get(f'{s.lower()}_funding', 0):+.4f}%"
         for s in SYMBOLS

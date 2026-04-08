@@ -46,6 +46,10 @@ if str(TRAINING_PARENT) not in sys.path:
     sys.path.append(str(TRAINING_PARENT))
 SYMBOLS = ["BTC", "ETH", "SOL", "XRP"]
 MIN_PROMOTION_IMPROVEMENT = 0.0
+LOOKAHEAD_DAYS = int(os.getenv("LOOKAHEAD_DAYS", "1"))
+LOOKAHEAD_HOURS = int(os.getenv("LOOKAHEAD_HOURS", "0"))
+FEATURE_TRAIN_TIMEFRAME = os.getenv("FEATURE_TRAIN_TIMEFRAME", "1D").strip().upper()
+MODEL_NAME_SUFFIX = os.getenv("MODEL_NAME_SUFFIX", "").strip().lower()
 
 REGISTER_MODELS = os.getenv("MLFLOW_REGISTER_MODELS", "false").strip().lower() in {
     "1", "true", "yes", "y"
@@ -61,6 +65,24 @@ LOCAL_MODEL_SYNC_DIR = os.getenv(
     "LOCAL_MODEL_SYNC_DIR",
     str(BACKEND_DIR / "api" / "models"),
 ).strip()
+
+
+def _model_variant_suffix() -> str:
+    if MODEL_NAME_SUFFIX:
+        return f"-{MODEL_NAME_SUFFIX}"
+    if FEATURE_TRAIN_TIMEFRAME in {"", "1D", "1DAY", "DAILY"}:
+        return ""
+    return f"-{FEATURE_TRAIN_TIMEFRAME.lower()}"
+
+
+def _horizon_token() -> str:
+    if LOOKAHEAD_HOURS > 0:
+        return f"{LOOKAHEAD_HOURS}h"
+    return f"{LOOKAHEAD_DAYS}d"
+
+
+def _registry_model_name(symbol: str) -> str:
+    return f"{symbol.lower()}-direction-{_horizon_token()}{_model_variant_suffix()}"
 
 def sync_model_bundle_from_dagshub(
     symbol: str,
@@ -82,7 +104,7 @@ def sync_model_bundle_from_dagshub(
     because local inference expects the custom joblib bundle format.
     """
     symbol = symbol.upper()
-    model_name = f"{symbol.lower()}-direction-24h"
+    model_name = _registry_model_name(symbol)
     artifact_path = f"{symbol}-bundle"
 
     os.environ["MLFLOW_TRACKING_USERNAME"] = username
@@ -178,7 +200,7 @@ def main():
     results = {}
 
     for symbol in SYMBOLS:
-        with mlflow.start_run(run_name=f"{symbol}-direction-24h") as run:
+        with mlflow.start_run(run_name=f"{symbol}-direction-{_horizon_token()}{_model_variant_suffix()}") as run:
             sync_info = sync_model_bundle_from_dagshub(
                     symbol=symbol,
                     local_dir=LOCAL_MODEL_SYNC_DIR,
