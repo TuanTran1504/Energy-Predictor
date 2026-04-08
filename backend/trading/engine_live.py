@@ -7,7 +7,7 @@ Identical strategy to engine.py but:
   - Exchange-side STOP_MARKET / TAKE_PROFIT_MARKET for SL/TP (works on live)
   - Software monitor as backup SL/TP in case exchange orders fail
   - account_type='live' on all DB records — separate from testnet trades
-  - Min notional check: skips trades where order value < $5 USDT
+  - Min notional check: skips trades where order value is below Binance minimum
 """
 
 import argparse
@@ -56,7 +56,13 @@ ACCOUNT_TYPE   = "live"
 TRADES_TABLE   = "trades_live"
 SYMBOLS        = ["BTC", "ETH", "SOL"]
 LEVERAGE       = 5
-MIN_NOTIONAL   = 5.0   # USD — skip trades with position value below this
+try:
+    MIN_NOTIONAL = max(
+        0.0,
+        float(os.getenv("BINANCE_LIVE_MIN_NOTIONAL", os.getenv("BINANCE_MIN_NOTIONAL", "100"))),
+    )
+except (TypeError, ValueError):
+    MIN_NOTIONAL = 100.0
 
 QTY_PRECISION  = {
     "BTC": 3,
@@ -84,7 +90,7 @@ SETUP_E_MIN_RR        = 1.0
 POSITION_RISK_PCT     = 0.01
 MAX_POSITION_FRACTION = 0.10  # default cap: 10% of balance * leverage
 MAX_POSITION_FRACTION_BY_SYMBOL = {
-    "BTC": 0.25,  # higher cap so small balances can still reach 0.001 BTC
+    "BTC": 0.35,  # higher cap so small balances can still reach Binance min notional
 }
 CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
@@ -663,13 +669,23 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     position_value = (risk_usdt / sl_distance) * entry
     max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
     position_value = min(position_value, balance * max_fraction * LEVERAGE)
-    # Min notional check — Binance rejects orders below $5
+    # Binance rejects orders below its minimum order notional.
     if position_value < MIN_NOTIONAL:
         return 0.0
     qty       = position_value / entry
     precision = QTY_PRECISION.get(symbol, 2)
-    return round(qty, precision)
+    qty = round(qty, precision)
+    if qty <= 0 or (qty * entry) < MIN_NOTIONAL:
+        return 0.0
+    return qty
 
+
+def min_balance_required_for_symbol(symbol: str) -> float:
+    max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
+    denom = max_fraction * LEVERAGE
+    if denom <= 0:
+        return float("inf")
+    return MIN_NOTIONAL / denom
 
 def _signal_follows_trend(signal: str, context: dict) -> tuple[bool, str]:
     """Hard guard: AI signal must align with directional trend."""
@@ -741,7 +757,16 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
     qty = calc_quantity(balance, entry, ai_sl, symbol)
     if qty <= 0:
-        log_gate_fail("QTY", f"Quantity too small or below min notional ${MIN_NOTIONAL} for balance {balance:.2f}", symbol)
+        min_balance = min_balance_required_for_symbol(symbol)
+        log_gate_fail(
+            "QTY",
+            (
+                f"Quantity too small or below min notional ${MIN_NOTIONAL:.2f}. "
+                f"balance={balance:.2f} requires>={min_balance:.2f} with leverage={LEVERAGE} "
+                f"and cap={MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION):.2f}"
+            ),
+            symbol,
+        )
         return False
 
     log.info(

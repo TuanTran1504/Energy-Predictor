@@ -56,6 +56,13 @@ USE_FVG_FILTER = os.getenv("USE_FVG_FILTER", "0") == "1"
 
 SYMBOLS        = ["BTC", "ETH", "SOL", "XRP"]
 LEVERAGE       = 5
+try:
+    MIN_NOTIONAL = max(
+        0.0,
+        float(os.getenv("BINANCE_TESTNET_MIN_NOTIONAL", os.getenv("BINANCE_MIN_NOTIONAL", "100"))),
+    )
+except (TypeError, ValueError):
+    MIN_NOTIONAL = 100.0
 
 # Binance Futures quantity step sizes (decimal precision per coin)
 QTY_PRECISION  = {
@@ -79,7 +86,7 @@ SETUP_E_MIN_RR        = 1.0   # lower bar for BB mean reversion (tighter TP targ
 POSITION_RISK_PCT  = 0.01  # risk 1% of balance per trade
 MAX_POSITION_FRACTION = 0.10  # max 10% of balance * leverage per position
 MAX_POSITION_FRACTION_BY_SYMBOL = {
-    "BTC": 0.25,  # allow smaller accounts to reach 0.001 BTC step
+    "BTC": 0.35,  # allow smaller accounts to reach Binance min notional
 }
 CYCLE_INTERVAL     = 5 * 60  # 5 minutes
 
@@ -673,9 +680,14 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
     position_value = (risk_usdt / sl_distance) * entry
     position_value = min(position_value, balance * max_fraction * LEVERAGE)
+    if position_value < MIN_NOTIONAL:
+        return 0.0
     qty       = position_value / entry
     precision = QTY_PRECISION.get(symbol, 2)
-    return round(qty, precision)
+    qty = round(qty, precision)
+    if qty <= 0 or (qty * entry) < MIN_NOTIONAL:
+        return 0.0
+    return qty
 
 
 def min_balance_required_for_symbol(symbol: str, entry_price: float) -> float:
@@ -690,7 +702,7 @@ def min_balance_required_for_symbol(symbol: str, entry_price: float) -> float:
     denom = max_fraction * LEVERAGE
     if denom <= 0:
         return float("inf")
-    return min_notional_for_step / denom
+    return max(min_notional_for_step, MIN_NOTIONAL) / denom
 
 
 def execute_trade(client: UMFutures, symbol: str, decision: dict,
@@ -748,7 +760,16 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
     qty = calc_quantity(balance, entry, ai_sl, symbol)
     if qty <= 0:
-        log_gate_fail("QTY", f"Quantity too small for balance {balance:.2f}", symbol)
+        min_balance = min_balance_required_for_symbol(symbol, entry)
+        log_gate_fail(
+            "QTY",
+            (
+                f"Quantity too small or below min notional ${MIN_NOTIONAL:.2f}. "
+                f"balance={balance:.2f} requires>={min_balance:.2f} with leverage={LEVERAGE} "
+                f"and cap={MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION):.2f}"
+            ),
+            symbol,
+        )
         return False
 
     log.info(

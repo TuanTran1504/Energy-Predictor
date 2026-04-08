@@ -88,7 +88,7 @@ STRICT_NON_TREND_VOL_MULT      = 1.2
 STRICT_NON_TREND_SIZE_FACTOR   = 0.5
 MAX_POSITION_FRACTION = 0.10  # default cap: 10% of balance * leverage
 MAX_POSITION_FRACTION_BY_SYMBOL = {
-    "BTC": 0.25,  # higher cap so small balances can still reach 0.001 BTC
+    "BTC": 0.35,  # higher cap so small balances can still reach Binance min notional
 }
 CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
