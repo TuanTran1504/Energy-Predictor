@@ -57,7 +57,13 @@ ACCOUNT_TYPE   = "live"
 TRADES_TABLE   = "trades_live"
 SYMBOLS        = ["BTC", "ETH", "SOL"]
 LEVERAGE       = 5
-MIN_NOTIONAL   = 5.0   # USD — skip trades with position value below this
+try:
+    DEFAULT_MIN_NOTIONAL = max(
+        0.0,
+        float(os.getenv("BINANCE_LIVE_MIN_NOTIONAL", os.getenv("BINANCE_MIN_NOTIONAL", "100"))),
+    )
+except (TypeError, ValueError):
+    DEFAULT_MIN_NOTIONAL = 100.0
 
 QTY_PRECISION  = {
     "BTC": 3,
@@ -93,6 +99,7 @@ MAX_POSITION_FRACTION_BY_SYMBOL = {
 }
 CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
+_SYMBOL_MIN_NOTIONAL_CACHE: dict[str, float] = {}
 ALLOWED_ML_HORIZONS = {"4h", "1d"}
 
 
@@ -660,7 +667,42 @@ def get_open_position(client: UMFutures, symbol: str) -> dict | None:
     return None
 
 
-def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float:
+def get_symbol_min_notional(client: UMFutures, symbol: str) -> float:
+    cached = _SYMBOL_MIN_NOTIONAL_CACHE.get(symbol)
+    if cached is not None:
+        return cached
+
+    sym_pair = f"{symbol}USDT"
+    min_notional = DEFAULT_MIN_NOTIONAL
+    try:
+        info = client.exchange_info()
+        for sym_info in info.get("symbols", []):
+            if sym_info.get("symbol") != sym_pair:
+                continue
+            candidates: list[float] = []
+            for filt in sym_info.get("filters", []):
+                if filt.get("filterType") not in {"MIN_NOTIONAL", "NOTIONAL"}:
+                    continue
+                for key in ("notional", "minNotional"):
+                    raw = filt.get(key)
+                    try:
+                        value = float(raw)
+                    except (TypeError, ValueError):
+                        continue
+                    if value > 0:
+                        candidates.append(value)
+            if candidates:
+                min_notional = max(candidates)
+            break
+    except Exception as e:
+        log.warning(f"[{symbol}] exchange_info min notional lookup failed, using fallback {DEFAULT_MIN_NOTIONAL:.2f}: {e}")
+
+    _SYMBOL_MIN_NOTIONAL_CACHE[symbol] = min_notional
+    return min_notional
+
+
+def calc_quantity(balance: float, entry: float, sl: float, symbol: str,
+                  min_notional: float) -> float:
     risk_usdt     = balance * POSITION_RISK_PCT
     sl_distance   = abs(entry - sl)
     if sl_distance == 0:
@@ -669,12 +711,15 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
     position_value = min(position_value, balance * max_fraction * LEVERAGE)
     # Min notional check — Binance rejects orders below $5
-    if position_value < MIN_NOTIONAL:
+    if position_value < min_notional:
         return 0.0
     qty       = position_value / entry
     precision = QTY_PRECISION.get(symbol, 2)
     factor = 10 ** precision
-    return math.floor(qty * factor) / factor
+    qty = math.floor(qty * factor) / factor
+    if qty <= 0 or (qty * entry) < min_notional:
+        return 0.0
+    return qty
 
 
 def _signal_follows_trend(signal: str, context: dict) -> tuple[bool, str]:
@@ -877,14 +922,15 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr}", symbol)
         return False
 
-    qty = calc_quantity(balance, entry, ai_sl, symbol)
+    min_notional = get_symbol_min_notional(client, symbol)
+    qty = calc_quantity(balance, entry, ai_sl, symbol, min_notional)
     if _is_non_trend_mode(context):
         precision = QTY_PRECISION.get(symbol, 2)
         qty = round(qty * STRICT_NON_TREND_SIZE_FACTOR, precision)
-        if qty > 0 and (qty * entry) < MIN_NOTIONAL:
+        if qty > 0 and (qty * entry) < min_notional:
             qty = 0.0
     if qty <= 0:
-        log_gate_fail("QTY", f"Quantity too small or below min notional ${MIN_NOTIONAL} for balance {balance:.2f}", symbol)
+        log_gate_fail("QTY", f"Quantity too small or below min notional ${min_notional:.2f} for balance {balance:.2f}", symbol)
         return False
 
     log.info(

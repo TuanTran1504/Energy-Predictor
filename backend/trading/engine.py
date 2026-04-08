@@ -58,12 +58,12 @@ USE_FVG_FILTER = os.getenv("USE_FVG_FILTER", "0") == "1"
 SYMBOLS        = ["BTC", "ETH", "SOL", "XRP"]
 LEVERAGE       = 5
 try:
-    MIN_NOTIONAL = max(
+    DEFAULT_MIN_NOTIONAL = max(
         0.0,
         float(os.getenv("BINANCE_TESTNET_MIN_NOTIONAL", os.getenv("BINANCE_MIN_NOTIONAL", "100"))),
     )
 except (TypeError, ValueError):
-    MIN_NOTIONAL = 100.0
+    DEFAULT_MIN_NOTIONAL = 100.0
 
 # Binance Futures quantity step sizes (decimal precision per coin)
 QTY_PRECISION  = {
@@ -94,6 +94,7 @@ CYCLE_INTERVAL     = 5 * 60  # 5 minutes
 TESTNET_BASE    = "https://testnet.binancefuture.com"
 MONITOR_INTERVAL = 5   # seconds between DB↔Binance sync checks
 ALLOWED_ML_HORIZONS = {"4h", "1d"}
+_SYMBOL_MIN_NOTIONAL_CACHE: dict[str, float] = {}
 
 
 def _normalize_horizon_token(token: str) -> str:
@@ -672,8 +673,42 @@ def get_open_position(client: UMFutures, symbol: str) -> dict | None:
         log.warning(f"Position fetch failed for {symbol}: {e}")
     return None
 
+def get_symbol_min_notional(client: UMFutures, symbol: str) -> float:
+    cached = _SYMBOL_MIN_NOTIONAL_CACHE.get(symbol)
+    if cached is not None:
+        return cached
 
-def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float:
+    sym_pair = f"{symbol}USDT"
+    min_notional = DEFAULT_MIN_NOTIONAL
+    try:
+        info = client.exchange_info()
+        for sym_info in info.get("symbols", []):
+            if sym_info.get("symbol") != sym_pair:
+                continue
+            candidates: list[float] = []
+            for filt in sym_info.get("filters", []):
+                if filt.get("filterType") not in {"MIN_NOTIONAL", "NOTIONAL"}:
+                    continue
+                for key in ("notional", "minNotional"):
+                    raw = filt.get(key)
+                    try:
+                        value = float(raw)
+                    except (TypeError, ValueError):
+                        continue
+                    if value > 0:
+                        candidates.append(value)
+            if candidates:
+                min_notional = max(candidates)
+            break
+    except Exception as e:
+        log.warning(f"[{symbol}] exchange_info min notional lookup failed, using fallback {DEFAULT_MIN_NOTIONAL:.2f}: {e}")
+
+    _SYMBOL_MIN_NOTIONAL_CACHE[symbol] = min_notional
+    return min_notional
+
+
+def calc_quantity(balance: float, entry: float, sl: float, symbol: str,
+                  min_notional: float) -> float:
     risk_usdt     = balance * POSITION_RISK_PCT
     sl_distance   = abs(entry - sl)
     if sl_distance == 0:
@@ -681,18 +716,19 @@ def calc_quantity(balance: float, entry: float, sl: float, symbol: str) -> float
     max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
     position_value = (risk_usdt / sl_distance) * entry
     position_value = min(position_value, balance * max_fraction * LEVERAGE)
-    if position_value < MIN_NOTIONAL:
+    if position_value < min_notional:
         return 0.0
     qty       = position_value / entry
     precision = QTY_PRECISION.get(symbol, 2)
     factor = 10 ** precision
     qty = math.floor(qty * factor) / factor
-    if qty <= 0 or (qty * entry) < MIN_NOTIONAL:
+    if qty <= 0 or (qty * entry) < min_notional:
         return 0.0
     return qty
 
 
-def min_balance_required_for_symbol(symbol: str, entry_price: float) -> float:
+def min_balance_required_for_symbol(symbol: str, entry_price: float,
+                                   min_notional: float) -> float:
     """
     Minimum balance needed so capped position size can still produce at least
     one exchange step-size unit (e.g., BTC 0.001).
@@ -704,7 +740,7 @@ def min_balance_required_for_symbol(symbol: str, entry_price: float) -> float:
     denom = max_fraction * LEVERAGE
     if denom <= 0:
         return float("inf")
-    return max(min_notional_for_step, MIN_NOTIONAL) / denom
+    return max(min_notional_for_step, min_notional) / denom
 
 
 def execute_trade(client: UMFutures, symbol: str, decision: dict,
@@ -760,13 +796,14 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr} ({'Setup E' if is_setup_e else 'standard'})", symbol)
         return False
 
-    qty = calc_quantity(balance, entry, ai_sl, symbol)
+    min_notional = get_symbol_min_notional(client, symbol)
+    qty = calc_quantity(balance, entry, ai_sl, symbol, min_notional)
     if qty <= 0:
-        min_balance = min_balance_required_for_symbol(symbol, entry)
+        min_balance = min_balance_required_for_symbol(symbol, entry, min_notional)
         log_gate_fail(
             "QTY",
             (
-                f"Quantity too small or below min notional ${MIN_NOTIONAL:.2f}. "
+                f"Quantity too small or below min notional ${min_notional:.2f}. "
                 f"balance={balance:.2f} requires>={min_balance:.2f} with leverage={LEVERAGE} "
                 f"and cap={MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION):.2f}"
             ),
@@ -850,7 +887,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx = compute_indicators(df_h1, df_m15, df_m5)
     ctx["symbol"] = f"{symbol}/USDT"
 
-    required_balance = min_balance_required_for_symbol(symbol, ctx["current_price"])
+    min_notional = get_symbol_min_notional(client, symbol)
+    required_balance = min_balance_required_for_symbol(symbol, ctx["current_price"], min_notional)
     if balance < required_balance:
         reason = (
             f"balance {balance:.2f} below tradable minimum {required_balance:.2f} "
