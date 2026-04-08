@@ -125,6 +125,13 @@ ML_TREND_HORIZON = _sanitize_horizon(
     "1d",
 )
 ML_REQUIRE_TREND_ALIGNMENT = os.getenv("ML_REQUIRE_TREND_ALIGNMENT", "1") == "1"
+ML_CONFLICT_MODE = os.getenv("ML_CONFLICT_MODE", "higher_confidence").strip().lower()
+if ML_CONFLICT_MODE not in {"skip", "higher_confidence"}:
+    ML_CONFLICT_MODE = "higher_confidence"
+try:
+    ML_CONFLICT_MIN_RR = max(TAKE_PROFIT_MIN_RR, float(os.getenv("ML_CONFLICT_MIN_RR", "2.0")))
+except (TypeError, ValueError):
+    ML_CONFLICT_MIN_RR = 2.0
 
 
 def get_client() -> UMFutures:
@@ -783,6 +790,9 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     rr      = reward / risk if risk > 0 else 0
     is_setup_e = "setup_e" in setup.lower() if setup else False
     min_rr  = SETUP_E_MIN_RR if is_setup_e else TAKE_PROFIT_MIN_RR
+    conflict_min_rr = float(context.get("ml_conflict_min_rr", 0) or 0)
+    if conflict_min_rr > 0:
+        min_rr = max(min_rr, conflict_min_rr)
     if rr < min_rr:
         log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr} ({'Setup E' if is_setup_e else 'standard'})", symbol)
         return False
@@ -917,6 +927,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     trend_dir = trend_pred.get("direction", "")
     trend_conf = float(trend_pred.get("confidence", 0))
 
+    ml_conflict_resolved = False
     if (
         ML_REQUIRE_TREND_ALIGNMENT
         and trend_pred
@@ -928,9 +939,20 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             f"entry {ml_primary_token}={ml_dir}({ml_conf:.0%}) conflicts with "
             f"trend {ML_TREND_HORIZON}={trend_dir}({trend_conf:.0%})"
         )
-        log_gate_fail("ML_ALIGN", align_reason, symbol, ctx)
-        log_skip("ML_ALIGN", align_reason, ctx, None)
-        return
+        if ML_CONFLICT_MODE == "higher_confidence":
+            if trend_conf > ml_conf:
+                ml_dir = trend_dir
+                ml_conf = trend_conf
+                ml_primary_token = ML_TREND_HORIZON
+            ml_conflict_resolved = True
+            log.warning(
+                f"  [ML_CONFLICT] {align_reason} -> using {ml_primary_token}={ml_dir}({ml_conf:.0%}), "
+                f"enforce RR>={ML_CONFLICT_MIN_RR:.2f}"
+            )
+        else:
+            log_gate_fail("ML_ALIGN", align_reason, symbol, ctx)
+            log_skip("ML_ALIGN", align_reason, ctx, None)
+            return
     fear_greed  = market_signals.get("fear_greed")
     funding     = market_signals.get(f"{symbol.lower()}_funding", 0)
 
@@ -940,6 +962,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx["ml_trend_horizon"] = ML_TREND_HORIZON
     ctx["ml_trend_direction"] = trend_dir
     ctx["ml_trend_confidence"] = trend_conf
+    ctx["ml_conflict_resolved"] = ml_conflict_resolved
+    ctx["ml_conflict_min_rr"] = ML_CONFLICT_MIN_RR if ml_conflict_resolved else 0.0
     ctx["fear_greed"]    = fear_greed
     ctx["funding_rate"]  = funding
 
@@ -955,9 +979,10 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         f" trend={ML_TREND_HORIZON}:{trend_dir}({trend_conf:.0%})"
         if trend_pred else " trend=n/a"
     )
+    conflict_str = f" conflict=resolved RR>={ML_CONFLICT_MIN_RR:.2f}" if ml_conflict_resolved else ""
     log_gate_pass(
         "MACRO",
-        f"allowed={allowed_dir} ML={ml_primary_token}:{ml_dir}({ml_conf:.0%}){trend_str} F&G={fear_greed}",
+        f"allowed={allowed_dir} ML={ml_primary_token}:{ml_dir}({ml_conf:.0%}){trend_str} F&G={fear_greed}{conflict_str}",
     )
 
     if symbol != "BTC":
