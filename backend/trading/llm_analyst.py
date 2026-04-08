@@ -396,6 +396,9 @@ OUTPUT FORMAT:
   }},
   "signal":       "BUY" | "SELL" | "WAIT",
   "reason":       "Brief explanation in English.",
+  "seek_entry_low":  number | null,
+  "seek_entry_high": number | null,
+  "seek_entry_basis": "Brief note describing the preferred buy/sell area or trigger.",
   "entry_price":  number,
   "stop_loss":    number,
   "take_profit":  number
@@ -449,6 +452,9 @@ IMPORTANT OVERRIDE:
 - Do not reject a valid setup because of stop loss, take profit, or R:R math.
 - Python will calculate entry, stop loss, take profit, and final R:R after your decision.
 - You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
+- Recommend a seek-entry zone only as an advisory area to monitor, not as a hard executable order.
+- If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on M5.
+- If no clear area exists yet, choose WAIT and set seek-entry fields to null.
 - If you mention rr_check, say that Python will calculate levels after the decision.
 """
 
@@ -484,7 +490,24 @@ IMPORTANT OVERRIDE:
                 print(f"    [AI] VOL  : {a.get('volume_check','')}")
                 print(f"    [AI] R:R  : {a.get('rr_check','')}")
                 print(f"    [AI] Match: {a.get('pattern_match','')}")
+                print(
+                    "    [AI] Zone : "
+                    f"{result.get('seek_entry_low')} - {result.get('seek_entry_high')} "
+                    f"({result.get('seek_entry_basis', '')})"
+                )
                 print(f"    [AI] Reason: {result.get('reason','')}")
+
+            result["seek_entry_low"] = _to_float_or_none(result.get("seek_entry_low"))
+            result["seek_entry_high"] = _to_float_or_none(result.get("seek_entry_high"))
+            if (
+                result["seek_entry_low"] is not None
+                and result["seek_entry_high"] is not None
+                and result["seek_entry_low"] > result["seek_entry_high"]
+            ):
+                result["seek_entry_low"], result["seek_entry_high"] = (
+                    result["seek_entry_high"],
+                    result["seek_entry_low"],
+                )
 
             return result
 
@@ -523,3 +546,12 @@ def _safe_parse(raw: str) -> dict:
     except json.JSONDecodeError:
         pass
     raise ValueError(f"Cannot parse Gemini JSON (len={len(raw)}): {raw[:300]!r}")
+
+
+def _to_float_or_none(value):
+    if value in (None, "", "null"):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None

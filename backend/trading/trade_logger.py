@@ -130,9 +130,20 @@ def log_ai_response(decision: dict):
     entry  = decision.get("entry_price", "?")
     sl     = decision.get("stop_loss", "?")
     tp     = decision.get("take_profit", "?")
+    zone_lo = decision.get("seek_entry_low")
+    zone_hi = decision.get("seek_entry_high")
+    zone_basis = decision.get("seek_entry_basis", "")
+    zone_text = (
+        f"\n          seek_zone={zone_lo} -> {zone_hi}"
+        + (f"  basis={zone_basis}" if zone_basis else "")
+        if zone_lo is not None or zone_hi is not None or zone_basis
+        else ""
+    )
     _cycle_log.info(
         f"  [AI ◀] signal={sig}  setup={setup}\n"
         f"          entry={entry}  SL={sl}  TP={tp}\n"
+        f"{zone_text}"
+        f"\n"
         f"          reason: {reason}"
     )
 
@@ -239,14 +250,25 @@ def log_cycle_summary(symbol: str, signal: str, executed: bool, balance: float,
     entry = dec.get("entry_price") or ctx.get("setup_e_entry", "—")
     sl    = dec.get("stop_loss",  "—")
     tp    = dec.get("take_profit","—")
+    zone_lo = dec.get("seek_entry_low")
+    zone_hi = dec.get("seek_entry_high")
+    zone_basis = dec.get("seek_entry_basis", "")
     reason = dec.get("reason", ctx.get("skip_reason", "—"))
     setup  = dec.get("analysis", {}).get("setup_identified") or ctx.get("setup", "—")
     status = "EXECUTED" if executed else ("SIGNAL" if signal not in ("WAIT", "SKIP") else signal)
+    zone_line = (
+        f"  │  seek_zone={zone_lo} -> {zone_hi}"
+        + (f"  basis={zone_basis}" if zone_basis else "")
+        + "\n"
+        if zone_lo is not None or zone_hi is not None or zone_basis
+        else ""
+    )
     _cycle_log.info(
         f"\n  ┌─ DECISION  {symbol}  {'─'*40}\n"
         f"  │  mode={mode}  score={score}/5  price={price}\n"
         f"  │  signal={signal}  setup={setup}  status={status}\n"
         f"  │  entry={entry}  SL={sl}  TP={tp}\n"
+        f"{zone_line}"
         f"  │  reason: {reason}\n"
         f"  │  balance={balance:.2f} USDT\n"
         f"  └{'─'*50}"
