@@ -122,13 +122,17 @@ SEQUENCE — all steps in order:
   Candle low is AT or BELOW EMA34/89. Close is ABOVE EMA34.
   OR: Bullish Engulfing that engulfs the entire fake drop cluster.
 [STEP 3] REVERSAL VOLUME: Volume on the reversal candle is clearly HIGHER than during the fake drop.
+[STEP 4] QUALITY FILTER: Prefer only strong reversals.
+  Best case = Bullish Engulfing with a decisive close back above EMA34.
+  Acceptable alternative = strong Bullish Pinbar / rejection wick with clearly higher volume.
 [4] ENTRY: at reversal candle close. SL below fake drop low minus 0.25%.
     TP at next H1 resistance.
 
 FALSE SIGNALS — output WAIT if:
   - Volume during the drop is HIGH or spikes: real breakdown, not fake
   - Price drops more than 1% below EMA89
-  - Reversal candle does not have a long lower wick
+  - Reversal candle is weak, small-bodied, or closes only marginally above EMA34
+  - Reversal candle does not have a long lower wick and is not a clear bullish engulfing
   - Next candle after reversal closes lower (trap failed)
 """,
 
@@ -145,8 +149,16 @@ SEQUENCE — all steps in order:
   Candle high is AT or ABOVE EMA34/89. Close is BELOW EMA34.
   OR: Bearish Engulfing that engulfs the entire fake pump cluster.
 [STEP 3] REVERSAL VOLUME: Clearly higher than during the fake pump.
+[STEP 4] QUALITY FILTER: Prefer only strong reversals.
+  Best case = Bearish Engulfing with a decisive close back below EMA34.
+  Acceptable alternative = strong Bearish Pinbar / rejection wick with clearly higher volume.
 [4] ENTRY: at reversal candle close. SL above fake pump high plus 0.25%.
     TP at next H1 support.
+
+FALSE SIGNALS — output WAIT if:
+  - Reversal candle is weak, small-bodied, or closes only marginally below EMA34
+  - Reversal candle does not have a long upper wick and is not a clear bearish engulfing
+  - Next candle after reversal closes higher (trap failed)
 """,
 
     "setup_D_buy": """
@@ -449,6 +461,8 @@ IMPORTANT OVERRIDE:
 - Do not call BUY during an active 5m bearish impulse, even if M15 is still uptrend.
 - Do not call SELL during an active 5m bullish impulse, even if M15 is still downtrend.
 - If the latest 5m candle closes against the trade and through EMA34 / micro structure, prefer WAIT.
+- After a sharp 5m flush, do not call BUY on the first reclaim candle alone; prefer WAIT until price reclaims EMA34 / micro structure and holds.
+- After a sharp 5m squeeze-up, do not call SELL on the first breakdown candle alone; prefer WAIT until price loses EMA34 / micro structure and holds below it.
 - Do not reject a valid setup because of stop loss, take profit, or R:R math.
 - Python will calculate entry, stop loss, take profit, and final R:R after your decision.
 - You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
@@ -555,3 +569,5 @@ def _to_float_or_none(value):
         return float(value)
     except (TypeError, ValueError):
         return None
+
+

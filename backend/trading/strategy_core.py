@@ -34,6 +34,7 @@ MIN_RR = 1.5
 ADX_TREND_THRESHOLD = 45
 BREAKOUT_CONFIRM_ATR_MULT = 0.20
 BREAKOUT_CONFIRM_PCT = 0.0008
+ROLLOVER_ATR_MULT = 0.75
 
 
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
@@ -49,6 +50,67 @@ def classify_trend(gap_pct: float, ema34: float, ema89: float,
     if atr_pct >= ATR_VOLATILE_PCT:
         return "VOLATILE_RANGE"
     return "SIDEWAY"
+
+
+def detect_m15_rollover(raw_trend: str, df_m15: pd.DataFrame,
+                        atr: float, rsi: float) -> tuple[bool, str]:
+    """
+    Detects when an M15 trend still qualifies by slow EMA rules but has already
+    deteriorated into a short-term rollover.
+    """
+    if raw_trend not in ("UPTREND", "DOWNTREND") or len(df_m15) < 5:
+        return False, ""
+
+    closes = df_m15["close"].astype(float)
+    highs = df_m15["high"].astype(float)
+    lows = df_m15["low"].astype(float)
+    ema34_series = closes.ewm(span=34, adjust=False).mean()
+    ema89_series = closes.ewm(span=89, adjust=False).mean()
+
+    last_close = float(closes.iloc[-1])
+    ema34_last = float(ema34_series.iloc[-1])
+    ema34_prev2 = float(ema34_series.iloc[-3])
+    ema89_last = float(ema89_series.iloc[-1])
+    three_bar_move = float(closes.iloc[-1] - closes.iloc[-4])
+
+    if raw_trend == "UPTREND":
+        below_ema34 = last_close < ema34_last
+        below_ema89 = last_close < ema89_last
+        ema_slope_down = ema34_last <= ema34_prev2
+        lower_highs = bool(highs.iloc[-1] < highs.iloc[-2] <= highs.iloc[-3])
+        sharp_drop = atr > 0 and three_bar_move <= -(atr * ROLLOVER_ATR_MULT)
+        weak_rsi = rsi < 48
+
+        if below_ema89 and sharp_drop:
+            return True, (
+                f"M15 uptrend rolling over: close {last_close:.4f} below EMA89 "
+                f"{ema89_last:.4f} after {abs(three_bar_move):.4f} drop"
+            )
+        if below_ema34 and (ema_slope_down or lower_highs) and (sharp_drop or weak_rsi):
+            return True, (
+                f"M15 uptrend rolling over: close {last_close:.4f} below EMA34 "
+                f"{ema34_last:.4f} with weakening structure"
+            )
+        return False, ""
+
+    above_ema34 = last_close > ema34_last
+    above_ema89 = last_close > ema89_last
+    ema_slope_up = ema34_last >= ema34_prev2
+    higher_lows = bool(lows.iloc[-1] > lows.iloc[-2] >= lows.iloc[-3])
+    sharp_rally = atr > 0 and three_bar_move >= atr * ROLLOVER_ATR_MULT
+    strong_rsi = rsi > 52
+
+    if above_ema89 and sharp_rally:
+        return True, (
+            f"M15 downtrend rolling over: close {last_close:.4f} above EMA89 "
+            f"{ema89_last:.4f} after {abs(three_bar_move):.4f} rally"
+        )
+    if above_ema34 and (ema_slope_up or higher_lows) and (sharp_rally or strong_rsi):
+        return True, (
+            f"M15 downtrend rolling over: close {last_close:.4f} above EMA34 "
+            f"{ema34_last:.4f} with improving structure"
+        )
+    return False, ""
 
 
 def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
@@ -112,7 +174,7 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     m15_ema34 = df_m15["ema34"].iloc[-1]
     m15_ema89 = df_m15["ema89"].iloc[-1]
     m15_gap = abs(m15_ema34 - m15_ema89) / m15_ema89 * 100
-    m15_trend = classify_trend(m15_gap, m15_ema34, m15_ema89, M15_TREND_GAP, h1_atr_pct, adx)
+    raw_m15_trend = classify_trend(m15_gap, m15_ema34, m15_ema89, M15_TREND_GAP, h1_atr_pct, adx)
     atr_m15 = df_m15["atr"].iloc[-1]
 
     delta = df_m15["close"].diff()
@@ -120,6 +182,11 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     loss = (-delta.clip(upper=0)).ewm(span=14, adjust=False).mean()
     rs = gain / loss.replace(0, np.nan)
     rsi = (100 - 100 / (1 + rs)).iloc[-1]
+
+    m15_rollover, m15_rollover_reason = detect_m15_rollover(
+        raw_m15_trend, df_m15, float(atr_m15), float(rsi)
+    )
+    m15_trend = "SIDEWAY" if m15_rollover else raw_m15_trend
 
     direction = np.sign(df_m15["close"].diff()).fillna(0)
     obv = (direction * df_m15["volume"]).cumsum()
@@ -147,10 +214,13 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     return {
         "h1_trend": h1_trend,
         "m15_trend": m15_trend,
+        "m15_trend_raw": raw_m15_trend,
         "primary_trend": primary_trend,
         "market_mode": market_mode,
         "is_aligned": is_aligned,
         "is_range": is_range,
+        "trend_rollover": bool(m15_rollover),
+        "trend_rollover_reason": m15_rollover_reason,
         "h1_gap": round(h1_gap, 3),
         "m15_gap": round(m15_gap, 3),
         "h1_atr_pct": round(h1_atr_pct, 4),
@@ -256,6 +326,10 @@ def compute_score(context: dict) -> tuple[int, list[str]]:
         score += 1
         details.append("Vol spike 1.5x (+1)")
 
+    if context.get("trend_rollover"):
+        score = max(0, score - 1)
+        details.append("M15 rollover (-1)")
+
     return score, details
 
 
@@ -298,6 +372,9 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     h1 = context["h1_trend"]
     score = context["score"]
     is_range = context["is_range"]
+
+    if context.get("trend_rollover"):
+        return False, f"GATE0: {context.get('trend_rollover_reason', 'M15 rollover detected')}"
 
     if primary == "SIDEWAY":
         return False, "GATE1: M15 SIDEWAY"
@@ -516,7 +593,13 @@ def validate_ai_trade_decision(decision: dict, context: dict,
     if primary == "DOWNTREND" and signal != "SELL":
         return False, f"M15={primary} requires SELL"
 
-    timing_ok, timing_reason = _m5_entry_timing_ok(signal, context, df_m5)
+    setup_code = _setup_code(decision.get("analysis", {}).get("setup_identified", ""))
+    if setup_code == "C":
+        setup_c_ok, setup_c_reason = _setup_c_reversal_ok(signal, context, df_m5)
+        if not setup_c_ok:
+            return False, setup_c_reason
+
+    timing_ok, timing_reason = _m5_entry_timing_ok(signal, context, df_m5, setup_code=setup_code)
     if not timing_ok:
         return False, timing_reason
 
@@ -580,8 +663,76 @@ def _pullback_cluster_levels(df_m5: pd.DataFrame, signal: str, lookback: int = 1
     return float(cluster["low"].min()), float(highs.max())
 
 
+def _setup_c_reversal_ok(signal: str, context: dict,
+                         df_m5: pd.DataFrame | None) -> tuple[bool, str]:
+    """
+    Setup C gets a little more freedom, but only when the reversal candle is
+    genuinely strong.
+    """
+    if df_m5 is None or len(df_m5) < 5:
+        return False, "Setup C needs more M5 candles"
+
+    closes = df_m5["close"].astype(float)
+    ema34_series = closes.ewm(span=34, adjust=False).mean()
+    ema89_series = closes.ewm(span=89, adjust=False).mean()
+    latest = df_m5.iloc[-1]
+    latest_close = float(latest["close"])
+    latest_open = float(latest["open"])
+    latest_volume = float(latest.get("volume", 0.0))
+    prev_vol_mean = float(df_m5.tail(5).iloc[:-1]["volume"].mean())
+    atr = float(context.get("atr_m15") or context.get("atr") or 0.0)
+    pattern = detect_candle_pattern(df_m5, len(df_m5) - 1)
+    recent_move = float(closes.iloc[-2] - closes.iloc[-4])
+    recent_low = float(df_m5.tail(4)["low"].min())
+    recent_high = float(df_m5.tail(4)["high"].max())
+
+    candle_range = float(latest["high"] - latest["low"])
+    body = abs(latest_close - latest_open)
+    lower_wick = min(latest_open, latest_close) - float(latest["low"])
+    upper_wick = float(latest["high"]) - max(latest_open, latest_close)
+    body_ratio = body / candle_range if candle_range > 0 else 0.0
+
+    if signal == "BUY":
+        strong_engulf = pattern["pattern"] == "bullish_engulfing"
+        strong_pin = (
+            pattern["pattern"] == "bullish_pinbar"
+            and lower_wick >= body * 2.5
+            and latest_close > latest_open
+        )
+        if not (strong_engulf or strong_pin):
+            return False, "Setup C BUY needs bullish engulfing or strong rejection pinbar"
+        if latest_close <= float(ema34_series.iloc[-1]):
+            return False, "Setup C BUY needs close back above M5 EMA34"
+        if latest_volume <= prev_vol_mean * 1.10:
+            return False, "Setup C BUY needs reversal volume above recent candles"
+        if atr > 0 and recent_move > -(atr * 0.35):
+            return False, "Setup C BUY needs a real fake-drop before reversal"
+        if latest_close <= recent_low:
+            return False, "Setup C BUY reversal has not reclaimed local structure"
+        return True, "OK"
+
+    strong_engulf = pattern["pattern"] == "bearish_engulfing"
+    strong_pin = (
+        pattern["pattern"] == "bearish_pinbar"
+        and upper_wick >= body * 2.5
+        and latest_close < latest_open
+    )
+    if not (strong_engulf or strong_pin):
+        return False, "Setup C SELL needs bearish engulfing or strong rejection pinbar"
+    if latest_close >= float(ema34_series.iloc[-1]):
+        return False, "Setup C SELL needs close back below M5 EMA34"
+    if latest_volume <= prev_vol_mean * 1.10:
+        return False, "Setup C SELL needs reversal volume above recent candles"
+    if atr > 0 and recent_move < atr * 0.35:
+        return False, "Setup C SELL needs a real fake-pump before reversal"
+    if latest_close >= recent_high:
+        return False, "Setup C SELL reversal has not lost local structure"
+    return True, "OK"
+
+
 def _m5_entry_timing_ok(signal: str, context: dict,
-                        df_m5: pd.DataFrame | None) -> tuple[bool, str]:
+                        df_m5: pd.DataFrame | None,
+                        setup_code: str = "?") -> tuple[bool, str]:
     """
     Fast veto so higher-timeframe trend does not force entries during an active
     5m counter-impulse.
@@ -590,27 +741,45 @@ def _m5_entry_timing_ok(signal: str, context: dict,
         return True, "OK"
 
     closes = df_m5["close"].astype(float)
-    ema34_m5 = float(closes.ewm(span=34, adjust=False).mean().iloc[-1])
+    ema34_series = closes.ewm(span=34, adjust=False).mean()
+    ema34_m5 = float(ema34_series.iloc[-1])
+    ema34_prev = float(ema34_series.iloc[-2])
     latest = df_m5.iloc[-1]
     latest_open = float(latest["open"])
     latest_close = float(latest["close"])
     latest_volume = float(latest.get("volume", 0.0))
+    prev_close = float(closes.iloc[-2])
     atr = float(context.get("atr_m15") or context.get("atr") or 0.0)
     box_low, box_high = _recent_box_levels(df_m5, window=6, exclude_last=1)
 
     recent = df_m5.tail(4).copy().reset_index(drop=True)
     three_bar_move = float(recent["close"].iloc[-1] - recent["close"].iloc[0])
+    pre_reclaim_move = float(closes.iloc[-2] - closes.iloc[-4])
     prev_vol_mean = float(df_m5.tail(6).iloc[:-1]["volume"].mean())
     vol_expanding = latest_volume > prev_vol_mean * 1.10 if prev_vol_mean > 0 else False
 
     latest_bearish = latest_close < latest_open
     latest_bullish = latest_close > latest_open
+    prior_below_ema = prev_close <= ema34_prev
+    prior_above_ema = prev_close >= ema34_prev
 
     if signal == "BUY":
         if latest_bearish and latest_close < ema34_m5:
             return False, f"M5 bearish impulse: close {latest_close:.4f} below EMA34 {ema34_m5:.4f}"
         if atr > 0 and three_bar_move <= -atr and latest_close <= ema34_m5:
             return False, f"M5 bearish impulse: 3-candle drop {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
+        if (
+            atr > 0
+            and pre_reclaim_move <= -(atr * 0.75)
+            and latest_bullish
+            and latest_close > ema34_m5
+            and prior_below_ema
+            and setup_code != "C"
+        ):
+            return False, (
+                f"M5 flush recovery not confirmed: fresh reclaim above EMA34 {ema34_m5:.4f} "
+                f"after {abs(pre_reclaim_move):.4f} drop; wait for hold"
+            )
         if latest_close < box_low:
             return False, f"M5 lost micro support {box_low:.4f}"
         if vol_expanding and latest_bearish and latest_close <= ema34_m5:
@@ -621,6 +790,18 @@ def _m5_entry_timing_ok(signal: str, context: dict,
         return False, f"M5 bullish impulse: close {latest_close:.4f} above EMA34 {ema34_m5:.4f}"
     if atr > 0 and three_bar_move >= atr and latest_close >= ema34_m5:
         return False, f"M5 bullish impulse: 3-candle rally {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
+    if (
+        atr > 0
+        and pre_reclaim_move >= atr * 0.75
+        and latest_bearish
+        and latest_close < ema34_m5
+        and prior_above_ema
+        and setup_code != "C"
+    ):
+        return False, (
+            f"M5 squeeze-down not confirmed: fresh reclaim below EMA34 {ema34_m5:.4f} "
+            f"after {abs(pre_reclaim_move):.4f} rally; wait for hold"
+        )
     if latest_close > box_high:
         return False, f"M5 broke above micro resistance {box_high:.4f}"
     if vol_expanding and latest_bullish and latest_close >= ema34_m5:
