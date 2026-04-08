@@ -376,9 +376,11 @@ MATH CHECK (enforce):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 YOUR TASK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Look at the M5 chart image carefully.
-2. Match each condition in the Pattern Library against what you see.
-3. Return ONLY valid JSON — no markdown, no explanation outside JSON.
+1. Look at BOTH M5 chart panes carefully.
+2. Use the wide M5 context pane to judge structure, box quality, nearby resistance/support, and whether a breakout is clean or fragile.
+3. Use the close M5 execution pane to judge the signal candle, wick/body quality, and immediate confirmation.
+4. Match each condition in the Pattern Library against what you see.
+5. Return ONLY valid JSON - no markdown, no explanation outside JSON.
 
 OUTPUT FORMAT:
 {{
@@ -399,11 +401,11 @@ OUTPUT FORMAT:
 """
 
     user_text = (
-        f"Here is the {symbol} M5 chart (last 80 candles) generated from live Binance data. "
-        f"Chart includes: candlesticks, EMA34 (green), EMA89 (orange), "
-        f"Volume bars with Volume MA (blue), Bollinger Bands (white dashed), "
-        f"H1 S/R levels (coloured dashed horizontal lines). "
-        f"Analyse according to the system prompt instructions."
+        f"Here is the {symbol} dual-view M5 chart generated from live Binance data. "
+        f"The TOP pane is a wider 5-minute context view showing more history for structure and breakout quality. "
+        f"The LOWER panes are the close-up 5-minute execution view with price, RSI, and volume for signal confirmation. "
+        f"Chart includes candlesticks, EMA34 (green), EMA89 (orange), Volume MA (blue), Bollinger Bands, and H1 S/R levels. "
+        f"Analyse according to the system prompt instructions and use both panes together."
     )
 
     return system_prompt, user_text
