@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent.parent.parent / ".env")
 DATABASE_URL = os.getenv("DATABASE_URL")
 FEATURE_TRAIN_TIMEFRAME = os.getenv("FEATURE_TRAIN_TIMEFRAME", "1D").strip().upper()
+ML_FEATURE_SET = os.getenv("ML_FEATURE_SET", "full").strip().lower()
 
 
 def _to_utc_naive_datetime(values) -> pd.Series:
@@ -410,6 +411,7 @@ def build_features(symbol: str, lookahead: int = 1, lookahead_hours: int | None 
     """
     print(f"Loading data for {symbol}...")
     print(f"  Timeframe mode: {FEATURE_TRAIN_TIMEFRAME}")
+    print(f"  Feature set: {ML_FEATURE_SET}")
     target_threshold_pct = float(os.getenv("TARGET_RETURN_THRESHOLD_PCT", "0"))
     target_threshold = target_threshold_pct / 100.0
     dropped_neutral = 0
@@ -655,39 +657,40 @@ def build_features(symbol: str, lookahead: int = 1, lookahead_hours: int | None 
 
 
 def get_feature_columns() -> list:
-    # Kept to ~18 features that are mutually low-correlation.
-    # Dropping redundant price-derived indicators (7 MAs + 3 EMAs + 2 RSIs +
-    # MACD line/signal + stoch_d + volatility_3d/14d + etc.) was the main fix
-    # for the flat-importance / near-random-accuracy problem: XGBoost spreads
-    # splits evenly across correlated features and learns nothing robust.
-    # Each feature here contributes a genuinely independent source of information.
-    return [
-        # Price momentum â€” 3 timeframes; ret_1d dropped (too noisy solo)
+    """
+    Returns the feature column set used by training/inference.
+
+    Env:
+      ML_FEATURE_SET=full       (default, includes macro/sentiment/funding)
+      ML_FEATURE_SET=technical  (price/volume-derived technicals only)
+    """
+    full_cols = [
         "ret_3d", "ret_7d", "ret_14d",
-        # Volatility regime â€” single mid-term window
         "volatility_7d",
-        # Price position within recent range (summarises all the MA/EMA signals
-        # without needing 10 separate collinear MA columns)
-        "price_position",
-        # High-low range as a fraction of close (intraday uncertainty)
-        "hl_range",
-        # Volume confirmation
+        "price_position", "hl_range",
         "vol_trend",
-        # Momentum â€” one normalised oscillator + one trend-cross indicator
         "rsi_14", "macd_hist",
-        # Regime â€” above/below 200-day MA; single most powerful regime filter
         "bull_regime",
-        # Market structure â€” BTC/ETH relative strength
         "btc_eth_ratio_7d_change",
-        # Sentiment â€” unique external signal (not derived from price)
         "fear_greed",
-        # Derivatives positioning â€” unique external signal
         "funding_rate_avg", "funding_extreme_long",
-        # Macro â€” unique external signals (as-of joined, no lookahead)
         "macro_fed_rate", "macro_cpi_surprise", "macro_nfp_surprise",
-        # Calendar â€” day-of-week effect is real in crypto
         "day_of_week",
     ]
+
+    technical_cols = [
+        "ret_3d", "ret_7d", "ret_14d",
+        "volatility_7d",
+        "price_position", "hl_range",
+        "vol_trend",
+        "rsi_14", "macd_hist",
+        "bull_regime",
+        "btc_eth_ratio_7d_change",
+    ]
+
+    if ML_FEATURE_SET in {"technical", "tech", "technical_only", "ta"}:
+        return technical_cols
+    return full_cols
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ import sys
 import os
 import json
 import asyncio
+import time
 import logging
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor
@@ -56,6 +57,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(messa
 log = logging.getLogger(__name__)
 
 PREDICTION_TTL = 90_000   # 25h â€” survives even if the daily job is late
+PRECOMPUTE_TICK_SECONDS = int(os.getenv("PRECOMPUTE_TICK_SECONDS", "60"))
 _redis: Optional[redis_lib.Redis] = None
 
 def _get_redis() -> Optional[redis_lib.Redis]:
@@ -118,6 +120,30 @@ def _pred_cache_key(symbol: str, horizon_token: str) -> str:
     return f"prediction:{symbol.upper()}:{_normalize_horizon_token(horizon_token)}"
 
 
+def _horizon_interval_seconds(horizon_token: str) -> int:
+    """
+    Refresh cadence for cached predictions.
+
+    Priority:
+      1) PRECOMPUTE_INTERVAL_<TOKEN> (hours), e.g. PRECOMPUTE_INTERVAL_4H=4
+      2) Default: min(horizon length, 24h)
+         - 4h  -> 4h
+         - 1d  -> 24h
+         - 7d  -> 24h (capped)
+    """
+    token = _normalize_horizon_token(horizon_token)
+    env_key = f"PRECOMPUTE_INTERVAL_{token.upper()}"
+    raw = os.getenv(env_key, "").strip()
+    if raw:
+        try:
+            hours = float(raw)
+            if hours > 0:
+                return max(60, int(hours * 3600))
+        except ValueError:
+            log.warning(f"Invalid {env_key}={raw!r}; falling back to default cadence")
+    return max(60, min(_token_hours(token), 24) * 3600)
+
+
 HORIZON_TOKENS: list[str] = []
 for _h in HORIZONS:
     try:
@@ -136,32 +162,38 @@ DEFAULT_HORIZON_TOKEN = _normalize_horizon_token(
 if DEFAULT_HORIZON_TOKEN not in HORIZON_TOKENS:
     HORIZON_TOKENS = [DEFAULT_HORIZON_TOKEN] + HORIZON_TOKENS
 
+ML_FEATURE_SET = os.getenv("ML_FEATURE_SET", "full").strip().lower()
+
 # Must exactly match get_feature_columns() in feature_engineering.py.
 # Defined inline so this file has no dependency on feature_engineering at prediction time.
-FEATURE_COLS: list[str] = [
-    # Price momentum
+FULL_FEATURE_COLS: list[str] = [
     "ret_3d", "ret_7d", "ret_14d",
-    # Volatility regime
     "volatility_7d",
-    # Price position / range
     "price_position", "hl_range",
-    # Volume
     "vol_trend",
-    # Momentum indicators
     "rsi_14", "macd_hist",
-    # Regime
     "bull_regime",
-    # Market structure
     "btc_eth_ratio_7d_change",
-    # Sentiment
     "fear_greed",
-    # Derivatives positioning
     "funding_rate_avg", "funding_extreme_long",
-    # Macro (as-of joined in training; neutral defaults at inference)
     "macro_fed_rate", "macro_cpi_surprise", "macro_nfp_surprise",
-    # Calendar
     "day_of_week",
 ]
+
+TECHNICAL_FEATURE_COLS: list[str] = [
+    "ret_3d", "ret_7d", "ret_14d",
+    "volatility_7d",
+    "price_position", "hl_range",
+    "vol_trend",
+    "rsi_14", "macd_hist",
+    "bull_regime",
+    "btc_eth_ratio_7d_change",
+]
+
+if ML_FEATURE_SET in {"technical", "tech", "technical_only", "ta"}:
+    FEATURE_COLS = TECHNICAL_FEATURE_COLS
+else:
+    FEATURE_COLS = FULL_FEATURE_COLS
 
 # BTC shows a persistent UP bias in validation (recall UP ~0.76, DOWN ~0.33) from
 # the predominantly bullish 2021-2025 training window. A higher threshold reduces
@@ -178,13 +210,16 @@ model_trained_at: dict[str, str] = {}   # key â†’ ISO UTC timestamp from tr
 _executor = ThreadPoolExecutor(max_workers=2)
 
 
-def _feature_horizon_for_symbol(symbol: str) -> str:
+def _feature_horizon_for_symbol(symbol: str, allowed_horizons: Optional[set[str]] = None) -> str:
     tokens: list[str] = []
     for key in models.keys():
         if not key.startswith(symbol + "_"):
             continue
         try:
-            tokens.append(_model_horizon_token(key))
+            token = _model_horizon_token(key)
+            if allowed_horizons and token not in allowed_horizons:
+                continue
+            tokens.append(token)
         except Exception:
             continue
     if not tokens:
@@ -197,20 +232,35 @@ def _build_latest_features(symbol: str, horizon_token: str):
     return build_features(symbol, **_token_to_build_kwargs(horizon_token))
 
 
-def precompute_predictions() -> dict:
+def precompute_predictions(target_horizons: Optional[list[str]] = None) -> dict:
     """
     Builds features once per symbol, runs all horizon models, stores results
-    in Redis with a 25h TTL. Called at startup and every 24h by the scheduler.
+    in Redis with a 25h TTL.
     Returns the computed predictions dict for convenience.
     """
+    target_set: Optional[set[str]] = None
+    if target_horizons:
+        target_set = {_normalize_horizon_token(t) for t in target_horizons}
+
     results = {}
     for symbol in SYMBOLS:
-        symbol_models = {k: m for k, m in models.items() if k.startswith(symbol + "_")}
+        symbol_models = {}
+        for k, m in models.items():
+            if not k.startswith(symbol + "_"):
+                continue
+            try:
+                token = _model_horizon_token(k)
+            except Exception:
+                continue
+            if target_set and token not in target_set:
+                continue
+            symbol_models[k] = m
         if not symbol_models:
-            log.warning(f"[precompute] No models loaded for {symbol} â€” skipping")
+            if not target_set:
+                log.warning(f"[precompute] No models loaded for {symbol} â€” skipping")
             continue
 
-        feature_horizon = _feature_horizon_for_symbol(symbol)
+        feature_horizon = _feature_horizon_for_symbol(symbol, allowed_horizons=target_set)
         try:
             df = _build_latest_features(symbol, feature_horizon)
         except Exception as e:
@@ -259,16 +309,49 @@ def precompute_predictions() -> dict:
                 r.setex(cache_key, PREDICTION_TTL, json.dumps(payload))
                 log.info(f"[precompute] Cached {cache_key} â†’ {direction} ({confidence:.1%})")
 
-    log.info(f"[precompute] Done â€” {len(results)} predictions cached")
+    if target_set:
+        log.info(f"[precompute] Done ({sorted(target_set)}) â€” {len(results)} predictions cached")
+    else:
+        log.info(f"[precompute] Done â€” {len(results)} predictions cached")
     return results
 
 
 async def _precompute_scheduler():
-    """Runs precompute at startup (after a short delay) then every 24h.
+    """Runs precompute at startup, then on horizon-aware cadence.
     Uses a Redis lock so only one worker runs precompute when multiple workers are active."""
     await asyncio.sleep(5)   # let startup finish first
     loop = asyncio.get_event_loop()
+
+    # Initial warm cache: all horizons once at startup.
+    r = _get_redis()
+    acquired = False
+    if r:
+        acquired = r.set("precompute:lock", "1", nx=True, ex=3600)
+    else:
+        acquired = True
+    if acquired:
+        log.info(f"[scheduler] Initial precompute for horizons={HORIZON_TOKENS}")
+        await loop.run_in_executor(_executor, precompute_predictions)
+        if r:
+            r.delete("precompute:lock")
+    else:
+        log.info("[scheduler] Initial precompute skipped â€” another worker is running it")
+
+    cadence = {t: _horizon_interval_seconds(t) for t in HORIZON_TOKENS}
+    for t, secs in cadence.items():
+        log.info(f"[scheduler] cadence {t}={secs // 3600}h")
+
+    next_run = {
+        token: (time.time() + cadence[token]) for token in HORIZON_TOKENS
+    }
+
     while True:
+        await asyncio.sleep(max(10, PRECOMPUTE_TICK_SECONDS))
+        now_ts = time.time()
+        due_tokens = [t for t in HORIZON_TOKENS if now_ts >= next_run[t]]
+        if not due_tokens:
+            continue
+
         r = _get_redis()
         acquired = False
         if r:
@@ -278,14 +361,16 @@ async def _precompute_scheduler():
             acquired = True  # no Redis â€” single worker, always run
 
         if acquired:
-            log.info("[scheduler] Running daily prediction precompute...")
-            await loop.run_in_executor(_executor, precompute_predictions)
+            log.info(f"[scheduler] Running precompute for due horizons={due_tokens}")
+            await loop.run_in_executor(_executor, precompute_predictions, due_tokens)
             if r:
                 r.delete("precompute:lock")
         else:
             log.info("[scheduler] Skipping precompute â€” another worker is running it")
 
-        await asyncio.sleep(24 * 3600)
+        now_ts = time.time()
+        for token in due_tokens:
+            next_run[token] = now_ts + cadence[token]
 
 
 @asynccontextmanager
@@ -294,6 +379,7 @@ async def lifespan(app: FastAPI):
     global models, model_trained_at
     log.info("Loading models via model_store...")
     models, model_trained_at = load_all_models()
+    log.info(f"Feature set: {ML_FEATURE_SET} ({len(FEATURE_COLS)} features)")
     if models:
         log.info(f"Ready â€” loaded: {list(models.keys())}")
     else:
@@ -478,6 +564,7 @@ def health():
     return {
         "status":        "ok",
         "models_loaded": list(models.keys()),
+        "feature_set":   ML_FEATURE_SET,
         "feature_count": len(FEATURE_COLS),
         "timestamp":     datetime.utcnow().isoformat(),
     }
@@ -1485,4 +1572,3 @@ def cache_bust(
         "busted":    symbol.upper() if symbol else "ALL",
         "timestamp": datetime.utcnow().isoformat(),
     }
-
