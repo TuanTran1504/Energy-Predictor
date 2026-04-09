@@ -991,7 +991,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             return
 
     log.info("  All gates passed → generating chart...")
-    chart_b64 = generate_chart(df_m5, ctx)
+    chart_b64 = generate_chart(df_m5, ctx, df_h1=df_h1)
 
     if not chart_b64:
         log_error(f"[{symbol}] Chart generation failed")

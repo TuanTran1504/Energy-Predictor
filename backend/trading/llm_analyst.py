@@ -387,6 +387,10 @@ Vol MA  = BLUE line on volume panel
 Red dashed horizontal = H1 Resistance
 Green dashed horizontal = H1 Support
 White dashed bands = Bollinger Bands
+Cyan shaded area = Decision Box (H1 support-to-resistance range)
+Inside Decision Box:
+  - Near top edge: look for rejection SELL, or breakout+hold BUY
+  - Near bottom edge: look for rejection BUY, or breakdown+hold SELL
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SL / TP MATH RULES
@@ -411,11 +415,13 @@ MATH CHECK (enforce):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 YOUR TASK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Look at BOTH M5 chart panes carefully.
-2. Use the wide M5 context pane to judge structure, box quality, nearby resistance/support, and whether a breakout is clean or fragile.
-3. Use the close M5 execution pane to judge the signal candle, wick/body quality, and immediate confirmation.
+1. Review the M5 execution pane for signal candle quality, wick/body structure, and immediate confirmation.
+2. Review the H1 context pane for box structure and edge behavior:
+   top edge rejection vs breakout+hold, bottom edge rejection vs breakdown+hold.
+3. Use RSI + volume panels to confirm timing quality and momentum/range context.
 4. Match each condition in the Pattern Library against what you see.
-5. Return ONLY valid JSON - no markdown, no explanation outside JSON.
+5. If setup is not ready yet, return WAIT but still provide a seek_entry zone near the relevant box edge with the exact trigger condition.
+6. Return ONLY valid JSON - no markdown, no explanation outside JSON.
 
 OUTPUT FORMAT:
 {{
@@ -439,11 +445,12 @@ OUTPUT FORMAT:
 """
 
     user_text = (
-        f"Here is the {symbol} dual-view M5 chart generated from live Binance data. "
-        f"The TOP pane is a wider 5-minute context view showing more history for structure and breakout quality. "
-        f"The LOWER panes are the close-up 5-minute execution view with price, RSI, and volume for signal confirmation. "
-        f"Chart includes candlesticks, EMA34 (green), EMA89 (orange), Volume MA (blue), Bollinger Bands, and H1 S/R levels. "
-        f"Analyse according to the system prompt instructions and use both panes together."
+        f"Here is the {symbol} chart generated from live Binance data. "
+        f"The TOP pane is M5 execution view for entry timing. "
+        f"The SECOND pane is H1 context view with a cyan Decision Box between support and resistance. "
+        f"The lower panels are M5 RSI and M5 volume. "
+        f"Chart includes candlesticks, EMA34 (green), EMA89 (orange), Volume MA (blue), and Bollinger Bands on M5. "
+        f"Analyse according to the system prompt and use both timeframes together."
     )
 
     return system_prompt, user_text
