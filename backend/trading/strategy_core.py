@@ -759,6 +759,8 @@ def _setup_c_reversal_ok(signal: str, context: dict,
     soft_body_ratio = _env_float("SETUP_C_SOFT_BODY_RATIO", 0.45)
     volume_mult = _env_float("SETUP_C_VOLUME_MULT", 1.00 if relaxed_setup_c else 1.10)
     fake_move_atr_mult = _env_float("SETUP_C_FAKE_MOVE_ATR_MULT", 0.20 if relaxed_setup_c else 0.35)
+    ema34_now = float(ema34_series.iloc[-1])
+    setup_c_ema_tol = (atr * 0.08) if (relaxed_setup_c and atr > 0) else 0.0
 
     if signal == "BUY":
         strong_engulf = pattern["pattern"] == "bullish_engulfing"
@@ -774,7 +776,7 @@ def _setup_c_reversal_ok(signal: str, context: dict,
         )
         if not (strong_engulf or strong_pin or soft_body):
             return False, "Setup C BUY needs bullish engulfing or strong rejection pinbar"
-        if latest_close <= float(ema34_series.iloc[-1]):
+        if latest_close <= (ema34_now - setup_c_ema_tol):
             return False, "Setup C BUY needs close back above M5 EMA34"
         if latest_volume <= prev_vol_mean * volume_mult:
             return False, "Setup C BUY needs reversal volume above recent candles"
@@ -797,7 +799,7 @@ def _setup_c_reversal_ok(signal: str, context: dict,
     )
     if not (strong_engulf or strong_pin or soft_body):
         return False, "Setup C SELL needs bearish engulfing or strong rejection pinbar"
-    if latest_close >= float(ema34_series.iloc[-1]):
+    if latest_close >= (ema34_now + setup_c_ema_tol):
         return False, "Setup C SELL needs close back below M5 EMA34"
     if latest_volume <= prev_vol_mean * volume_mult:
         return False, "Setup C SELL needs reversal volume above recent candles"
@@ -829,6 +831,11 @@ def _m5_entry_timing_ok(signal: str, context: dict,
     prev_close = float(closes.iloc[-2])
     atr = float(context.get("atr_m15") or context.get("atr") or 0.0)
     box_low, box_high = _recent_box_levels(df_m5, window=6, exclude_last=1)
+    is_setup_e = str(setup_code or "").upper() == "E"
+    market_mode = str(context.get("market_mode", "") or "").upper()
+    sideway_setup_e = is_setup_e and market_mode == "SIDEWAY"
+    setup_e_ema_tol = (atr * 0.10) if (sideway_setup_e and atr > 0) else 0.0
+    setup_e_impulse_atr = (atr * 1.35) if (sideway_setup_e and atr > 0) else atr
 
     recent = df_m5.tail(4).copy().reset_index(drop=True)
     three_bar_move = float(recent["close"].iloc[-1] - recent["close"].iloc[0])
@@ -842,9 +849,9 @@ def _m5_entry_timing_ok(signal: str, context: dict,
     prior_above_ema = prev_close >= ema34_prev
 
     if signal == "BUY":
-        if latest_bearish and latest_close < ema34_m5:
+        if latest_bearish and latest_close < (ema34_m5 - setup_e_ema_tol):
             return False, f"M5 bearish impulse: close {latest_close:.4f} below EMA34 {ema34_m5:.4f}"
-        if atr > 0 and three_bar_move <= -atr and latest_close <= ema34_m5:
+        if atr > 0 and three_bar_move <= -setup_e_impulse_atr and latest_close <= (ema34_m5 - setup_e_ema_tol):
             return False, f"M5 bearish impulse: 3-candle drop {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
         if (
             atr > 0
@@ -860,13 +867,13 @@ def _m5_entry_timing_ok(signal: str, context: dict,
             )
         if latest_close < box_low:
             return False, f"M5 lost micro support {box_low:.4f}"
-        if vol_expanding and latest_bearish and latest_close <= ema34_m5:
+        if vol_expanding and latest_bearish and latest_close <= (ema34_m5 - setup_e_ema_tol):
             return False, "M5 sell pressure expanding on the latest candle"
         return True, "OK"
 
-    if latest_bullish and latest_close > ema34_m5:
+    if latest_bullish and latest_close > (ema34_m5 + setup_e_ema_tol):
         return False, f"M5 bullish impulse: close {latest_close:.4f} above EMA34 {ema34_m5:.4f}"
-    if atr > 0 and three_bar_move >= atr and latest_close >= ema34_m5:
+    if atr > 0 and three_bar_move >= setup_e_impulse_atr and latest_close >= (ema34_m5 + setup_e_ema_tol):
         return False, f"M5 bullish impulse: 3-candle rally {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
     if (
         atr > 0
@@ -882,7 +889,7 @@ def _m5_entry_timing_ok(signal: str, context: dict,
         )
     if latest_close > box_high:
         return False, f"M5 broke above micro resistance {box_high:.4f}"
-    if vol_expanding and latest_bullish and latest_close >= ema34_m5:
+    if vol_expanding and latest_bullish and latest_close >= (ema34_m5 + setup_e_ema_tol):
         return False, "M5 buy pressure expanding on the latest candle"
     return True, "OK"
 
