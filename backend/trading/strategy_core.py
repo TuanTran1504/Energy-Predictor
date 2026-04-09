@@ -16,6 +16,8 @@ Public API:
   detect_bb_mean_reversion(df_m5, idx, context) -> dict | None
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 
@@ -35,6 +37,33 @@ ADX_TREND_THRESHOLD = 45
 BREAKOUT_CONFIRM_ATR_MULT = 0.20
 BREAKOUT_CONFIRM_PCT = 0.0008
 ROLLOVER_ATR_MULT = 0.75
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return float(default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return int(default)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return int(default)
 
 
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
@@ -391,22 +420,31 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     Runs all technical gates in order.
     """
     primary = context.get("primary_trend") or context["m15_trend"]
-    h1 = context["h1_trend"]
     score = context["score"]
     is_range = context["is_range"]
+    allow_sideway = _env_bool("TECH_ALLOW_SIDEWAY", False)
 
-    if primary == "SIDEWAY":
+    if primary == "SIDEWAY" and not allow_sideway:
         return False, "GATE1: M15 SIDEWAY"
 
     if not is_range:
         if primary == "VOLATILE_RANGE":
             return False, "GATE2: M15 VOLATILE_RANGE"
 
-    threshold = SCORE_THRESHOLD
-    if not str(context.get("symbol", "BTC")).startswith("BTC") and context.get("adx", 0) > 45:
-        threshold = 2
+    base_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD", SCORE_THRESHOLD))
+    range_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD_RANGE", base_threshold))
+    non_btc_high_adx_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD_NON_BTC_HIGH_ADX", 2))
+    adx_relax_level = _env_float("TECH_ADX_RELAX_LEVEL", 45.0)
+    rollover_threshold = max(1, _env_int("TECH_ROLLOVER_SCORE_THRESHOLD", 1))
+
+    threshold = range_threshold if is_range else base_threshold
+    if (
+        not str(context.get("symbol", "BTC")).startswith("BTC")
+        and context.get("adx", 0) > adx_relax_level
+    ):
+        threshold = min(threshold, non_btc_high_adx_threshold)
     if context.get("trend_rollover"):
-        threshold = min(threshold, 1)
+        threshold = min(threshold, rollover_threshold)
     if score < threshold:
         return False, f"GATE3: score {score}/{threshold} insufficient"
 
@@ -717,6 +755,10 @@ def _setup_c_reversal_ok(signal: str, context: dict,
     lower_wick = min(latest_open, latest_close) - float(latest["low"])
     upper_wick = float(latest["high"]) - max(latest_open, latest_close)
     body_ratio = body / candle_range if candle_range > 0 else 0.0
+    relaxed_setup_c = _env_bool("SETUP_C_RELAXED", False)
+    soft_body_ratio = _env_float("SETUP_C_SOFT_BODY_RATIO", 0.45)
+    volume_mult = _env_float("SETUP_C_VOLUME_MULT", 1.00 if relaxed_setup_c else 1.10)
+    fake_move_atr_mult = _env_float("SETUP_C_FAKE_MOVE_ATR_MULT", 0.20 if relaxed_setup_c else 0.35)
 
     if signal == "BUY":
         strong_engulf = pattern["pattern"] == "bullish_engulfing"
@@ -725,13 +767,18 @@ def _setup_c_reversal_ok(signal: str, context: dict,
             and lower_wick >= body * 2.5
             and latest_close > latest_open
         )
-        if not (strong_engulf or strong_pin):
+        soft_body = (
+            relaxed_setup_c
+            and latest_close > latest_open
+            and body_ratio >= soft_body_ratio
+        )
+        if not (strong_engulf or strong_pin or soft_body):
             return False, "Setup C BUY needs bullish engulfing or strong rejection pinbar"
         if latest_close <= float(ema34_series.iloc[-1]):
             return False, "Setup C BUY needs close back above M5 EMA34"
-        if latest_volume <= prev_vol_mean * 1.10:
+        if latest_volume <= prev_vol_mean * volume_mult:
             return False, "Setup C BUY needs reversal volume above recent candles"
-        if atr > 0 and recent_move > -(atr * 0.35):
+        if atr > 0 and recent_move > -(atr * fake_move_atr_mult):
             return False, "Setup C BUY needs a real fake-drop before reversal"
         if latest_close <= recent_low:
             return False, "Setup C BUY reversal has not reclaimed local structure"
@@ -743,13 +790,18 @@ def _setup_c_reversal_ok(signal: str, context: dict,
         and upper_wick >= body * 2.5
         and latest_close < latest_open
     )
-    if not (strong_engulf or strong_pin):
+    soft_body = (
+        relaxed_setup_c
+        and latest_close < latest_open
+        and body_ratio >= soft_body_ratio
+    )
+    if not (strong_engulf or strong_pin or soft_body):
         return False, "Setup C SELL needs bearish engulfing or strong rejection pinbar"
     if latest_close >= float(ema34_series.iloc[-1]):
         return False, "Setup C SELL needs close back below M5 EMA34"
-    if latest_volume <= prev_vol_mean * 1.10:
+    if latest_volume <= prev_vol_mean * volume_mult:
         return False, "Setup C SELL needs reversal volume above recent candles"
-    if atr > 0 and recent_move < atr * 0.35:
+    if atr > 0 and recent_move < atr * fake_move_atr_mult:
         return False, "Setup C SELL needs a real fake-pump before reversal"
     if latest_close >= recent_high:
         return False, "Setup C SELL reversal has not lost local structure"
@@ -907,17 +959,20 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
     ema89 = float(df_m5["close"].astype(float).ewm(span=89, adjust=False).mean().iloc[-1])
     bb = _bb_snapshot(df_m5)
 
+    min_rr_default = max(0.5, _env_float("TRADE_MIN_RR", MIN_RR))
+    min_rr_range = max(0.5, _env_float("TRADE_MIN_RR_RANGE", min_rr_default))
+    min_rr_setup_e = max(0.5, _env_float("SETUP_E_MIN_RR", 1.0))
     fee_cost = entry * 0.0018
     if is_setup_e:
-        min_rr = 1.0
+        min_rr = min_rr_setup_e
         base_buffer = max(entry * 0.0010, atr * 0.10)
         min_risk = max(entry * 0.0010, atr * 0.25)
     elif is_range:
-        min_rr = MIN_RR
+        min_rr = min_rr_range
         base_buffer = max(entry * 0.0015, atr * 0.20)
         min_risk = max(entry * SL_MIN_PCT, atr * 0.35)
     else:
-        min_rr = MIN_RR
+        min_rr = min_rr_default
         base_buffer = max(entry * 0.0015, atr * 0.25)
         min_risk = max(entry * SL_MIN_PCT, atr * 0.55)
 

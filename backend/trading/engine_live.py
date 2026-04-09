@@ -87,8 +87,14 @@ try:
     SL_SR_BUFFER_ATR_MULT = max(0.0, float(os.getenv("SL_SR_BUFFER_ATR_MULT", "0.25")))
 except (TypeError, ValueError):
     SL_SR_BUFFER_ATR_MULT = 0.25
-TAKE_PROFIT_MIN_RR    = 1.5
-SETUP_E_MIN_RR        = 1.0
+try:
+    TAKE_PROFIT_MIN_RR = max(0.5, float(os.getenv("TRADE_MIN_RR", "1.5")))
+except (TypeError, ValueError):
+    TAKE_PROFIT_MIN_RR = 1.5
+try:
+    SETUP_E_MIN_RR = max(0.5, float(os.getenv("SETUP_E_MIN_RR", "1.0")))
+except (TypeError, ValueError):
+    SETUP_E_MIN_RR = 1.0
 POSITION_RISK_PCT     = 0.01
 MAX_POSITION_FRACTION = 0.10  # default cap: 10% of balance * leverage
 MAX_POSITION_FRACTION_BY_SYMBOL = {
@@ -1059,6 +1065,15 @@ def run_once(dry_run: bool = False):
     log.info(
         f"ML mode: entry={ML_PRIMARY_HORIZON} trend={ML_TREND_HORIZON} "
         f"require_alignment={ML_REQUIRE_TREND_ALIGNMENT}"
+    )
+    log.info(
+        "Filter mode: "
+        f"TECH_ALLOW_SIDEWAY={os.getenv('TECH_ALLOW_SIDEWAY', '0')} "
+        f"TECH_SCORE_THRESHOLD={os.getenv('TECH_SCORE_THRESHOLD', '3')} "
+        f"TECH_SCORE_THRESHOLD_RANGE={os.getenv('TECH_SCORE_THRESHOLD_RANGE', os.getenv('TECH_SCORE_THRESHOLD', '3'))} "
+        f"SETUP_C_RELAXED={os.getenv('SETUP_C_RELAXED', '0')} "
+        f"TRADE_MIN_RR={TAKE_PROFIT_MIN_RR:.2f} "
+        f"SETUP_E_MIN_RR={SETUP_E_MIN_RR:.2f}"
     )
     funding_str = "  ".join(
         f"{s} funding={market_signals.get(f'{s.lower()}_funding', 0):+.4f}%"

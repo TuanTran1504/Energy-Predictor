@@ -281,6 +281,7 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     range_bias  = context.get("range_bias", "MIDDLE")
     candle_text = context.get("candle_summary", "")
     symbol      = context.get("symbol", "BTC/USDT")
+    symbol_base = str(symbol).split("/", 1)[0].upper()
     ml_dir      = context.get("ml_direction", "—")
     ml_conf     = context.get("ml_confidence", 0)
 
@@ -339,7 +340,11 @@ def _build_prompt(context: dict) -> tuple[str, str]:
         patterns = [PATTERN_LIBRARY["wait"]]
         bias_note = "Trend unclear → WAIT."
 
-    min_rr = 1.0 if symbol in ("SOL", "XRP") else 1.5
+    try:
+        trend_min_rr = max(0.5, float(os.getenv("TRADE_MIN_RR", "1.5")))
+    except (TypeError, ValueError):
+        trend_min_rr = 1.5
+    min_rr = 1.0 if symbol_base in ("SOL", "XRP") else trend_min_rr
     rr_str = str(min_rr)
     patterns = [p.replace("R:R ≥ 1.5", f"R:R ≥ {rr_str}")
                  .replace("R:R < 1.5", f"R:R < {rr_str}") for p in patterns]
@@ -387,17 +392,17 @@ White dashed bands = Bollinger Bands
 SL / TP MATH RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TREND setups (A/B/C/D):
-  SL buffer for this symbol = {"0.50%" if symbol in ("SOL", "XRP") else "0.25%"} (volatile coins need wider SL to survive wicks).
-  BUY : SL = signal candle low − (entry × {"0.005" if symbol in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
+  SL buffer for this symbol = {"0.50%" if symbol_base in ("SOL", "XRP") else "0.25%"} (volatile coins need wider SL to survive wicks).
+  BUY : SL = signal candle low − (entry × {"0.005" if symbol_base in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
         TP must be BELOW resistance = {sr.get('resistance','?')}.
-  SELL: SL = signal candle high + (entry × {"0.005" if symbol in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
+  SELL: SL = signal candle high + (entry × {"0.005" if symbol_base in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
         TP must be ABOVE support = {sr.get('support','?')}.
 
 SIDEWAY Setup E (mean reversion):
   BUY : SL below lower Bollinger Band minus 0.2% buffer. TP = upper Bollinger Band.
   SELL: SL above upper Bollinger Band plus 0.2% buffer. TP = lower Bollinger Band.
 
-Minimum R:R = {1.0 if symbol in ("SOL", "XRP") else 1.5} for this symbol. If R:R below minimum → WAIT.
+Minimum R:R = {1.0 if symbol_base in ("SOL", "XRP") else trend_min_rr} for this symbol. If R:R below minimum → WAIT.
 
 MATH CHECK (enforce):
   BUY:  TP > entry > SL
