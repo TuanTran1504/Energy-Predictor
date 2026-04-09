@@ -27,6 +27,7 @@ from pathlib import Path
 
 import psycopg2
 from psycopg2 import errors
+from psycopg2 import OperationalError, InterfaceError
 import redis
 from binance.um_futures import UMFutures
 from dotenv import load_dotenv
@@ -179,7 +180,27 @@ def _algo_order(symbol: str, side: str, order_type: str, trigger_price: float) -
 
 
 def _get_conn():
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    return psycopg2.connect(
+        DATABASE_URL,
+        sslmode="require",
+        connect_timeout=8,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=3,
+    )
+
+
+def _is_transient_db_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    transient_markers = (
+        "ssl connection has been closed unexpectedly",
+        "server closed the connection unexpectedly",
+        "connection not open",
+        "terminating connection due to administrator command",
+        "could not receive data from server",
+    )
+    return any(marker in msg for marker in transient_markers)
 
 
 def db_ensure_trades_table():
@@ -309,21 +330,40 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
 
 
 def db_get_open_trades() -> list[dict]:
-    conn = _get_conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(f"""
-                SELECT id, symbol, side, entry_price, quantity,
-                       stop_loss, take_profit, binance_order_id, opened_at
-                FROM {TRADES_TABLE} WHERE status='OPEN' AND account_type=%s
-            """, (ACCOUNT_TYPE,))
-            cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, r)) for r in cur.fetchall()]
-    except Exception as e:
-        log.warning(f"[DB] get_open_trades failed: {e}")
-        return []
-    finally:
-        conn.close()
+    retries = 2
+    for attempt in range(retries + 1):
+        conn = None
+        try:
+            conn = _get_conn()
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    SELECT id, symbol, side, entry_price, quantity,
+                           stop_loss, take_profit, binance_order_id, opened_at
+                    FROM {TRADES_TABLE} WHERE status='OPEN' AND account_type=%s
+                """, (ACCOUNT_TYPE,))
+                cols = [d[0] for d in cur.description]
+                return [dict(zip(cols, r)) for r in cur.fetchall()]
+        except (OperationalError, InterfaceError) as e:
+            if attempt < retries and _is_transient_db_error(e):
+                wait_s = 0.25 * (attempt + 1)
+                log.warning(
+                    f"[DB] get_open_trades transient error ({e}); retrying in {wait_s:.2f}s "
+                    f"({attempt + 1}/{retries})"
+                )
+                time.sleep(wait_s)
+                continue
+            log.warning(f"[DB] get_open_trades failed: {e}")
+            return []
+        except Exception as e:
+            log.warning(f"[DB] get_open_trades failed: {e}")
+            return []
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+    return []
 
 
 def db_cleanup_stale_pending(max_age_seconds: int = 120):
@@ -993,7 +1033,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             return
 
     log.info("  All gates passed → generating chart...")
-    chart_b64 = generate_chart(df_m5, ctx)
+    chart_b64 = generate_chart(df_m5, ctx, df_h1=df_h1)
     if not chart_b64:
         log_error(f"[{symbol}] Chart generation failed")
         return
