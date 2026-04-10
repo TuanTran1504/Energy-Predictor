@@ -292,17 +292,13 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
 
 IMPORTANT OVERRIDE:
 - Market mode is the primary directional filter.
-- Do not call BUY during an active 5m bearish impulse, even if M15 is still uptrend.
-- Do not call SELL during an active 5m bullish impulse, even if M15 is still downtrend.
-- If the latest 5m candle closes against the trade and through EMA34 / micro structure, prefer WAIT.
-- After a sharp 5m flush, do not call BUY on the first reclaim candle alone; prefer WAIT until price reclaims EMA34 / micro structure and holds.
-- After a sharp 5m squeeze-up, do not call SELL on the first breakdown candle alone; prefer WAIT until price loses EMA34 / micro structure and holds below it.
+- Do not call BUY during an active 5m bearish impulse
+- Do not call SELL during an active 5m bullish impulse
 - Do not reject a valid setup because of stop loss, take profit, or R:R math.
 - Python will calculate entry, stop loss, take profit, and final R:R after your decision.
 - You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
 - Recommend a seek-entry zone only as an advisory area to monitor, not as a hard executable order.
 - If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on M5.
-- If no clear area exists yet, choose WAIT and set seek-entry fields to null.
 - If you mention rr_check, say that Python will calculate levels after the decision.
 """
 
