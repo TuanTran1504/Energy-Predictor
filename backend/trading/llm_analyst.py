@@ -37,6 +37,7 @@ REQUIRED on M5 chart — ALL must be true:
     "Near" = candle body or lower wick within 0.5% of the EMA line.
 [2] SIGNAL CANDLE — one of:
     Option A (Bullish Pinbar): lower wick ≥ 1.5× body, body closes in upper 50% of full candle range, short upper wick.
+        Candle color (red/green) does NOT matter — a red candle with a long lower wick and close in the upper half IS a valid bullish pinbar.
     Option B (Bullish Engulfing): current green candle body fully engulfs previous red candle body.
 [3] VOLUME: signal candle volume > average of previous 5 candles (visually taller bar).
 [4] ENTRY: at signal candle close. SL below signal candle low minus 0.25%.
@@ -58,6 +59,7 @@ REQUIRED on M5 chart — ALL must be true:
     "Near" = candle body or upper wick within 0.5% of the EMA line.
 [2] SIGNAL CANDLE — one of:
     Option A (Bearish Pinbar): upper wick ≥ 1.5× body, body closes in lower 50%, short lower wick.
+        Candle color (red/green) does NOT matter — a green candle with a long upper wick and close in the lower half IS a valid bearish pinbar.
     Option B (Bearish Engulfing): current red candle body fully engulfs previous green candle body.
 [3] VOLUME: signal candle volume > average of previous 5 candles.
 [4] ENTRY: at signal candle close. SL above signal candle high plus 0.25%.
@@ -82,7 +84,7 @@ REQUIRED:
     Option C: Second touch of support (double bottom) — price bouncing off same level twice.
 [3] VOLUME: Higher than the average of the 5 previous candles.
 [4] ENTRY: at signal candle close (must be ABOVE the support line).
-    SL below support minus 0.25%. TP toward H1 resistance. R:R ≥ 1.5.
+    SL below support minus 0.25%. TP toward H1 resistance. (Python will verify R:R post-decision.)
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through support (more than 3 candles held below)
@@ -103,7 +105,7 @@ REQUIRED:
     Option C: Second touch of resistance (double top).
 [3] VOLUME: Higher than the average of the 5 previous candles.
 [4] ENTRY: at signal candle close (must be BELOW resistance).
-    SL above resistance plus 0.25%. TP toward H1 support. R:R ≥ 1.5.
+    SL above resistance plus 0.25%. TP toward H1 support. (Python will verify R:R post-decision.)
 """,
 
     "wait": """
