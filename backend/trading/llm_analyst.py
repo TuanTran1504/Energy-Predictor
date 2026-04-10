@@ -90,7 +90,6 @@ FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through support (more than 3 candles held below)
   - Signal candle has virtually no lower wick and body is bearish
   - Volume is notably below surrounding candles
-  - Price is in the middle of the range (far from both S and R)
 """,
 
     "setup_D_sell": """
@@ -106,6 +105,11 @@ REQUIRED:
 [3] VOLUME: Higher than the average of the 5 previous candles.
 [4] ENTRY: at signal candle close (must be BELOW resistance).
     SL above resistance plus 0.25%. TP toward H1 support. (Python will verify R:R post-decision.)
+
+FALSE SIGNALS — output WAIT if:
+  - Price has broken clearly through resistance (more than 3 candles held above)
+  - Signal candle has virtually no upper wick and body is bullish
+  - Volume is notably below surrounding candles
 """,
 
     "wait": """
@@ -232,9 +236,9 @@ TREND setups (A/D):
   SELL: SL = signal candle high + (entry × {"0.005" if symbol_base in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
         TP must be ABOVE support = {sr.get('support','?')}.
 
-Minimum R:R = {1.0 if symbol_base in ("SOL", "XRP") else trend_min_rr} for this symbol. If R:R below minimum → WAIT.
+NOTE: Python will calculate and enforce R:R after your signal decision. Do NOT use R:R as a reason to WAIT.
 
-MATH CHECK (enforce):
+DIRECTION CHECK only (enforce):
   BUY:  TP > entry > SL
   SELL: SL > entry > TP
 
@@ -256,7 +260,7 @@ OUTPUT FORMAT:
     "ema_check":    "EMA34 [above/below/intertwined] EMA89. Gap [widening/narrowing/stable].",
     "price_action": "Describe signal candle: type, colour, wick vs body ratio.",
     "volume_check": "Signal candle volume [above/below] Vol MA. Pass/Fail.",
-    "rr_check":     "Entry=X, SL=X, TP=X, risk=X, reward=X, R:R=X. Pass/Fail.",
+    "rr_check":     "Python handles R:R. Just note estimated entry, SL, TP levels from the chart.",
     "pattern_match": "Which conditions passed. Which failed."
   }},
   "signal":       "BUY" | "SELL" | "WAIT",
