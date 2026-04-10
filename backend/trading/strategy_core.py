@@ -24,6 +24,8 @@ H1_TREND_GAP = 0.8
 M15_TREND_GAP = 0.4
 BTC_TREND_GAP = 1.0
 ATR_VOLATILE_PCT = 0.8
+TREND_HYSTERESIS_PCT = 0.10
+TREND_CONFIRM_BARS = 2
 FUNDING_THRESHOLD = 0.05
 SCORE_THRESHOLD = 3
 ML_CONFIDENCE_MIN = 0.55
@@ -63,12 +65,45 @@ def _env_int(name: str, default: int) -> int:
 
 
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
-                   threshold: float, atr_pct: float = 0.0) -> str:
+                   threshold: float, atr_pct: float = 0.0,
+                   prev_gap_pct: float | None = None,
+                   prev_ema34: float | None = None,
+                   prev_ema89: float | None = None) -> str:
     """
     UPTREND / DOWNTREND / VOLATILE_RANGE / SIDEWAY
     """
-    if gap_pct >= threshold:
+    hysteresis = max(0.0, TREND_HYSTERESIS_PCT)
+    enter_threshold = threshold + (hysteresis * 0.5)
+    exit_threshold = max(0.0, threshold - (hysteresis * 0.5))
+
+    if (
+        TREND_CONFIRM_BARS >= 2
+        and prev_gap_pct is not None
+        and prev_ema34 is not None
+        and prev_ema89 is not None
+    ):
+        now_up = ema34 > ema89
+        now_down = ema34 < ema89
+        prev_up = prev_ema34 > prev_ema89
+        prev_down = prev_ema34 < prev_ema89
+
+        prev_was_uptrend = prev_up and prev_gap_pct >= enter_threshold
+        prev_was_downtrend = prev_down and prev_gap_pct >= enter_threshold
+
+        if now_up and gap_pct >= exit_threshold:
+            if prev_was_uptrend or (
+                prev_up and prev_gap_pct >= exit_threshold and gap_pct >= enter_threshold
+            ):
+                return "UPTREND"
+
+        if now_down and gap_pct >= exit_threshold:
+            if prev_was_downtrend or (
+                prev_down and prev_gap_pct >= exit_threshold and gap_pct >= enter_threshold
+            ):
+                return "DOWNTREND"
+    elif gap_pct >= threshold:
         return "UPTREND" if ema34 > ema89 else "DOWNTREND"
+
     if atr_pct >= ATR_VOLATILE_PCT:
         return "VOLATILE_RANGE"
     return "SIDEWAY"
@@ -157,10 +192,13 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
 
     h1_ema34 = df_h1["ema34"].iloc[-1]
     h1_ema89 = df_h1["ema89"].iloc[-1]
+    h1_ema34_prev = df_h1["ema34"].iloc[-2] if len(df_h1) >= 2 else h1_ema34
+    h1_ema89_prev = df_h1["ema89"].iloc[-2] if len(df_h1) >= 2 else h1_ema89
     h1_close = df_h1["close"].iloc[-1]
     h1_atr = df_h1["atr_h1"].iloc[-1]
     h1_atr_pct = h1_atr / h1_close * 100
     h1_gap = abs(h1_ema34 - h1_ema89) / h1_ema89 * 100
+    h1_gap_prev = abs(h1_ema34_prev - h1_ema89_prev) / h1_ema89_prev * 100
 
     df_m15 = df_m15.copy()
     df_m15["ema34"] = df_m15["close"].ewm(span=34, adjust=False).mean()
@@ -174,13 +212,24 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     )
     df_m15["atr"] = df_m15["tr"].ewm(span=14, adjust=False).mean()
 
-    h1_trend = classify_trend(h1_gap, h1_ema34, h1_ema89, H1_TREND_GAP, h1_atr_pct)
-
     m15_ema34 = df_m15["ema34"].iloc[-1]
     m15_ema89 = df_m15["ema89"].iloc[-1]
+    m15_ema34_prev = df_m15["ema34"].iloc[-2] if len(df_m15) >= 2 else m15_ema34
+    m15_ema89_prev = df_m15["ema89"].iloc[-2] if len(df_m15) >= 2 else m15_ema89
     m15_gap = abs(m15_ema34 - m15_ema89) / m15_ema89 * 100
-    raw_m15_trend = classify_trend(m15_gap, m15_ema34, m15_ema89, M15_TREND_GAP, h1_atr_pct)
     atr_m15 = df_m15["atr"].iloc[-1]
+    close_m15 = float(df_m15["close"].iloc[-1])
+    m15_atr_pct = float(atr_m15 / close_m15 * 100) if close_m15 > 0 else 0.0
+    m15_gap_prev_for_trend = abs(m15_ema34_prev - m15_ema89_prev) / m15_ema89_prev * 100
+
+    h1_trend = classify_trend(
+        h1_gap, h1_ema34, h1_ema89, H1_TREND_GAP, h1_atr_pct,
+        prev_gap_pct=h1_gap_prev, prev_ema34=h1_ema34_prev, prev_ema89=h1_ema89_prev,
+    )
+    raw_m15_trend = classify_trend(
+        m15_gap, m15_ema34, m15_ema89, M15_TREND_GAP, m15_atr_pct,
+        prev_gap_pct=m15_gap_prev_for_trend, prev_ema34=m15_ema34_prev, prev_ema89=m15_ema89_prev,
+    )
 
     delta = df_m15["close"].diff()
     gain = delta.clip(lower=0).ewm(span=14, adjust=False).mean()
@@ -196,7 +245,6 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     vol_ma = df_m15["volume"].rolling(20).mean().iloc[-1]
     vol_spike = df_m15["volume"].iloc[-1] > vol_ma * 1.5
 
-    close_m15 = float(df_m15["close"].iloc[-1])
     price_above_both_emas = close_m15 > float(m15_ema34) and close_m15 > float(m15_ema89)
     price_below_both_emas = close_m15 < float(m15_ema34) and close_m15 < float(m15_ema89)
 
@@ -227,6 +275,7 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
         "h1_gap": round(h1_gap, 3),
         "m15_gap": round(m15_gap, 3),
         "h1_atr_pct": round(h1_atr_pct, 4),
+        "m15_atr_pct": round(m15_atr_pct, 4),
         "atr_m15": round(atr_m15, 4),
         "rsi": round(float(rsi), 2),
         "vol_spike": bool(vol_spike),
