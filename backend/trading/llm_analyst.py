@@ -16,6 +16,7 @@ import os
 
 import pandas as pd
 from openai import OpenAI
+from strategy_core import M15_TREND_GAP
 
 def _get_client() -> OpenAI:
     return OpenAI(
@@ -140,6 +141,20 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     candle_text = context.get("candle_summary", "")
     symbol      = context.get("symbol", "BTC/USDT")
     symbol_base = str(symbol).split("/", 1)[0].upper()
+    m15_gap     = float(context.get("m15_gap", 0))
+
+    # How far is the current gap from the classification threshold?
+    gap_margin = abs(m15_gap - M15_TREND_GAP) / M15_TREND_GAP if M15_TREND_GAP > 0 else 1.0
+    is_borderline = (
+        gap_margin < 0.25
+        and primary in ("UPTREND", "DOWNTREND")
+    )
+    if m15_gap > M15_TREND_GAP * 1.5:
+        gap_strength = "STRONG"
+    elif is_borderline:
+        gap_strength = "BORDERLINE"
+    else:
+        gap_strength = "MODERATE"
 
     def _fmt_level(v):
         return f"{float(v):.4f}" if v is not None else "N/A"
@@ -167,11 +182,29 @@ def _build_prompt(context: dict) -> tuple[str, str]:
                 f"Do NOT use 'price in middle of range' as a standalone reason to WAIT."
             )
     elif primary == "UPTREND":
-        patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["wait"]]
-        bias_note = f"M15 uptrend — look for Setup A pullback BUY. H1: {h1}."
+        if is_borderline:
+            patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["setup_D_buy"], PATTERN_LIBRARY["wait"]]
+            bias_note = (
+                f"M15 uptrend (BORDERLINE — EMA gap {m15_gap:.3f}% is near threshold {M15_TREND_GAP:.1f}%). "
+                f"Primary: Setup A BUY (EMA pullback). "
+                f"If EMAs look intertwined on the chart rather than clearly separated, evaluate Setup D BUY instead. "
+                f"H1: {h1}."
+            )
+        else:
+            patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["wait"]]
+            bias_note = f"M15 uptrend ({gap_strength} — EMA gap {m15_gap:.3f}%) — look for Setup A pullback BUY. H1: {h1}."
     elif primary == "DOWNTREND":
-        patterns = [PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["wait"]]
-        bias_note = f"M15 downtrend — look for Setup A rally SELL. H1: {h1}."
+        if is_borderline:
+            patterns = [PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["setup_D_sell"], PATTERN_LIBRARY["wait"]]
+            bias_note = (
+                f"M15 downtrend (BORDERLINE — EMA gap {m15_gap:.3f}% is near threshold {M15_TREND_GAP:.1f}%). "
+                f"Primary: Setup A SELL (EMA rally rejection). "
+                f"If EMAs look intertwined on the chart rather than clearly separated, evaluate Setup D SELL instead. "
+                f"H1: {h1}."
+            )
+        else:
+            patterns = [PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["wait"]]
+            bias_note = f"M15 downtrend ({gap_strength} — EMA gap {m15_gap:.3f}%) — look for Setup A rally SELL. H1: {h1}."
     else:
         patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["wait"]]
         bias_note = f"Trend unclear — check chart for strongest directional signal. H1: {h1}."
@@ -197,6 +230,7 @@ Primary Trend : {primary} (M15)
 H1 Trend      : {h1}
 RSI (M15)     : {rsi:.1f}
 ATR (M15)     : {atr:.4f}
+M15 EMA Gap   : {m15_gap:.3f}% (threshold {M15_TREND_GAP:.1f}%, strength: {gap_strength})
 H1 Resistance : {sr.get('resistance', 'N/A')}
 H1 Support    : {sr.get('support', 'N/A')}
 Nearest SSL   : {_fmt_level(nearest_ssl)}
