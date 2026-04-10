@@ -249,9 +249,10 @@ YOUR TASK
 2. Review the H1 context pane for box structure and edge behavior:
    top and bottom edge rejection behavior.
 3. Use RSI + volume panels to confirm timing quality and momentum/range context.
-4. Match each condition in the Pattern Library against what you see.
-5. If setup is not ready yet, return WAIT but still provide a seek_entry zone near the relevant box edge with the exact trigger condition.
-6. Return ONLY valid JSON - no markdown, no explanation outside JSON.
+4. You must identify potential entries based on the patterns above. If no clear pattern is visible, you can still call BUY or SELL if the chart structure and signal quality are good — you do not need to match every single condition perfectly to call a valid signal. Use your judgement to evaluate the overall quality of the setup.
+5. Match each condition in the Pattern Library against what you see.
+6. If setup is not ready yet, return WAIT but still provide a seek_entry zone near the relevant box edge with the exact trigger condition.
+7. Return ONLY valid JSON - no markdown, no explanation outside JSON.
 
 OUTPUT FORMAT:
 {{
