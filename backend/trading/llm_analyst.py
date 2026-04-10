@@ -133,8 +133,6 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     candle_text = context.get("candle_summary", "")
     symbol      = context.get("symbol", "BTC/USDT")
     symbol_base = str(symbol).split("/", 1)[0].upper()
-    ml_dir      = context.get("ml_direction", "—")
-    ml_conf     = context.get("ml_confidence", 0)
 
     if market_mode in ("VOLATILE_RANGE", "SIDEWAY") or primary in ("VOLATILE_RANGE", "SIDEWAY"):
         if range_bias == "NEAR_SUPPORT":
@@ -179,7 +177,6 @@ RSI (M15)     : {rsi:.1f}
 ATR (M15)     : {atr:.4f}
 H1 Resistance : {sr.get('resistance', 'N/A')}
 H1 Support    : {sr.get('support', 'N/A')}
-ML Model      : {ml_dir} confidence={ml_conf:.0%}
 Bias directive: {bias_note}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -258,7 +255,7 @@ OUTPUT FORMAT:
         f"The TOP pane is M5 execution view for entry timing. "
         f"The SECOND pane is H1 context view with a cyan Decision Box between support and resistance. "
         f"The lower panels are M5 RSI and M5 volume. "
-        f"Chart includes candlesticks, EMA34 (green), EMA89 (orange), Volume MA (blue), and Bollinger Bands on M5. "
+        f"Chart includes candlesticks, EMA34 (green), EMA89 (orange), and Volume MA (blue). "
         f"Analyse according to the system prompt and use both timeframes together."
     )
 
@@ -294,7 +291,7 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
     system_prompt += """
 
 IMPORTANT OVERRIDE:
-- Market mode is the primary directional filter. Treat ML as side information only.
+- Market mode is the primary directional filter.
 - Do not call BUY during an active 5m bearish impulse, even if M15 is still uptrend.
 - Do not call SELL during an active 5m bullish impulse, even if M15 is still downtrend.
 - If the latest 5m candle closes against the trade and through EMA34 / micro structure, prefer WAIT.

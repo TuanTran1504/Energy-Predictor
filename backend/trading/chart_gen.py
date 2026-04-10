@@ -6,13 +6,11 @@ Produces a dark-themed M5+H1 chart with:
   - H1 context pane with decision box
   - Candlestick bodies + wicks
   - EMA 34 (green) + EMA 89 (orange)
-  - SMA 20 (white dashed, BB midline)
-  - Bollinger Bands (semi-transparent fill)
   - H1 Support (green dashed) + Resistance (red dashed)
   - Current price line (yellow dotted)
   - RSI panel with 30/70 zones
   - Volume panel + Volume MA 20 (blue)
-  - Title bar: symbol, mode, score, ADX, RSI, ATR, funding
+  - Title bar: symbol, mode, score, RSI, ATR, funding
 
 Returns base64-encoded PNG string ready for Gemini vision API.
 """
@@ -38,11 +36,9 @@ BULL_WICK = "#4DB6AC"
 BEAR_WICK = "#E57373"
 EMA34_C = "#00E676"
 EMA89_C = "#FF9800"
-SMA20_C = "#FFFFFF"
 VOLMA_C = "#2196F3"
 RESIST_C = "#FF5252"
 SUPPORT_C = "#69F0AE"
-BB_C = "#90CAF9"
 RSI_C = "#CE93D8"
 RSI_OB_C = "#EF5350"
 RSI_OS_C = "#26A69A"
@@ -78,12 +74,7 @@ def _prepare_chart_df(df_m5: pd.DataFrame, window: int) -> pd.DataFrame:
     df = df_m5.tail(window).copy().reset_index(drop=True)
     df["ema34"] = df["close"].ewm(span=34, adjust=False).mean()
     df["ema89"] = df["close"].ewm(span=89, adjust=False).mean()
-    df["sma20"] = df["close"].rolling(20).mean()
     df["vol_ma"] = df["volume"].rolling(20).mean()
-
-    std20 = df["close"].rolling(20).std()
-    df["bb_up"] = df["sma20"] + 2 * std20
-    df["bb_dn"] = df["sma20"] - 2 * std20
 
     delta = df["close"].diff()
     gain = delta.clip(lower=0).ewm(span=14, adjust=False).mean()
@@ -114,7 +105,7 @@ def _format_time_axis(ax, df: pd.DataFrame, max_labels: int = 10):
 def _draw_price_panel(ax_price, df: pd.DataFrame, sr: dict, current_price: float, *,
                       title: str = "", show_legend: bool = True,
                       annotate_levels: bool = True, last_marker: bool = True,
-                      show_bb: bool = True, show_current_price: bool = True,
+                      show_current_price: bool = True,
                       box_mode: str = "soft", draw_diagonals: bool = False,
                       box_bounds: tuple[float, float] | None = None):
     import matplotlib.patches as mpatches
@@ -182,23 +173,6 @@ def _draw_price_panel(ax_price, df: pd.DataFrame, sr: dict, current_price: float
 
     ax_price.plot(x, df["ema34"], color=EMA34_C, linewidth=1.6, label="EMA 34", zorder=4)
     ax_price.plot(x, df["ema89"], color=EMA89_C, linewidth=1.6, label="EMA 89", zorder=4)
-
-    valid_sma = df["sma20"].notna()
-    ax_price.plot(
-        x_arr[valid_sma], df["sma20"][valid_sma],
-        color=SMA20_C, linewidth=0.8, alpha=0.5,
-        linestyle="--", label="SMA 20", zorder=3,
-    )
-
-    if show_bb:
-        valid_bb = df["bb_up"].notna()
-        ax_price.plot(x_arr[valid_bb], df["bb_up"][valid_bb], color=BB_C, linewidth=1.0, alpha=0.6, zorder=3)
-        ax_price.plot(x_arr[valid_bb], df["bb_dn"][valid_bb], color=BB_C, linewidth=1.0, alpha=0.6, zorder=3)
-        ax_price.fill_between(
-            x_arr[valid_bb],
-            df["bb_up"][valid_bb], df["bb_dn"][valid_bb],
-            color=BB_C, alpha=0.05, zorder=2,
-        )
 
     if resistance:
         ax_price.axhline(resistance, color=RESIST_C, linewidth=1.1, linestyle="--", alpha=0.8, zorder=5)
@@ -284,13 +258,10 @@ def generate_chart(df_m5: pd.DataFrame, context: dict, df_h1: pd.DataFrame | Non
         score = context.get("score", 0)
         h1_trend = context.get("h1_trend", "?")
         market_mode = context.get("market_mode", h1_trend)
-        adx = context.get("adx", 0)
         rsi_val = context.get("rsi", 0)
         atr = context.get("atr_m15", 0)
         funding = context.get("funding_rate", 0)
         symbol = context.get("symbol", "BTC/USDT")
-        ml_dir = context.get("ml_direction", "-")
-        ml_conf = context.get("ml_confidence", 0)
         current_price = float(df_m5_view["close"].iloc[-1])
 
         fig = plt.figure(figsize=(14, 11), facecolor=BG)
@@ -312,7 +283,7 @@ def generate_chart(df_m5: pd.DataFrame, context: dict, df_h1: pd.DataFrame | Non
             ax_m5, df_m5_view, sr, current_price,
             title=f"M5 Execution View ({M5_WINDOW} candles) - use for signal candle and setup confirmation",
             show_legend=True, annotate_levels=True, last_marker=True,
-            show_bb=True, show_current_price=True, box_mode="soft",
+            show_current_price=True, box_mode="soft",
         )
         h1_low = float(df_h1_view["low"].min())
         h1_high = float(df_h1_view["high"].max())
@@ -322,7 +293,7 @@ def generate_chart(df_m5: pd.DataFrame, context: dict, df_h1: pd.DataFrame | Non
             ax_h1, df_h1_view, sr_h1, current_price,
             title=f"H1 Context + Decision Box ({H1_WINDOW} candles) - use for range structure and edge behavior",
             show_legend=False, annotate_levels=True, last_marker=False,
-            show_bb=False, show_current_price=True, box_mode="tv", draw_diagonals=True,
+            show_current_price=True, box_mode="tv", draw_diagonals=True,
             box_bounds=(h1_low, h1_high),
         )
         _format_time_axis(ax_h1, df_h1_view, max_labels=12)
@@ -382,8 +353,8 @@ def generate_chart(df_m5: pd.DataFrame, context: dict, df_h1: pd.DataFrame | Non
         title = (
             f"{symbol} - M5 + H1 view ({M5_WINDOW}/{H1_WINDOW} candles) | "
             f"Mode: {market_mode} | H1: {h1_trend} | Score: {score}/5 | "
-            f"ADX: {adx:.1f} RSI: {rsi_val:.1f} ATR: {atr:.2f} "
-            f"Funding: {funding:+.4f}% | ML: {ml_dir} ({ml_conf:.0%})"
+            f"RSI: {rsi_val:.1f} ATR: {atr:.2f} "
+            f"Funding: {funding:+.4f}%"
         )
         fig.suptitle(title, color=mode_color, fontsize=10, fontweight="bold", y=0.975)
 
