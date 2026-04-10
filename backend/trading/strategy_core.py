@@ -109,6 +109,58 @@ def classify_trend(gap_pct: float, ema34: float, ema89: float,
     return "SIDEWAY"
 
 
+def _nearest_liquidity_levels(df_m5: pd.DataFrame, current_price: float,
+                              lookback: int = 90, swing_window: int = 2,
+                              tol_pct: float = 0.12, min_touches: int = 2) -> tuple[float | None, float | None]:
+    """
+    Lightweight liquidity hint from repeated swing highs/lows.
+    Returns (nearest_ssl_below_price, nearest_bsl_above_price).
+    """
+    if len(df_m5) < max(12, swing_window * 2 + 3) or current_price <= 0:
+        return None, None
+
+    src = df_m5.tail(max(lookback, swing_window * 2 + 3)).reset_index(drop=True)
+    highs = src["high"].astype(float).to_numpy()
+    lows = src["low"].astype(float).to_numpy()
+
+    swing_highs: list[float] = []
+    swing_lows: list[float] = []
+    n = len(src)
+    for i in range(swing_window, n - swing_window):
+        left_h = highs[i - swing_window:i]
+        right_h = highs[i + 1:i + swing_window + 1]
+        left_l = lows[i - swing_window:i]
+        right_l = lows[i + 1:i + swing_window + 1]
+        if highs[i] >= left_h.max() and highs[i] >= right_h.max():
+            swing_highs.append(float(highs[i]))
+        if lows[i] <= left_l.min() and lows[i] <= right_l.min():
+            swing_lows.append(float(lows[i]))
+
+    def _cluster(values: list[float]) -> list[dict]:
+        if not values:
+            return []
+        sorted_vals = sorted(values)
+        clusters: list[list[float]] = [[sorted_vals[0]]]
+        for v in sorted_vals[1:]:
+            prev = clusters[-1][-1]
+            rel = abs(v - prev) / max(abs(prev), 1e-9) * 100
+            if rel <= tol_pct:
+                clusters[-1].append(v)
+            else:
+                clusters.append([v])
+        return [{"price": float(np.mean(c)), "touches": len(c)} for c in clusters]
+
+    high_clusters = _cluster(swing_highs)
+    low_clusters = _cluster(swing_lows)
+
+    bsl_candidates = [c["price"] for c in high_clusters if c["touches"] >= min_touches and c["price"] > current_price]
+    ssl_candidates = [c["price"] for c in low_clusters if c["touches"] >= min_touches and c["price"] < current_price]
+
+    nearest_bsl = min(bsl_candidates, key=lambda p: p - current_price) if bsl_candidates else None
+    nearest_ssl = max(ssl_candidates, key=lambda p: p) if ssl_candidates else None
+    return nearest_ssl, nearest_bsl
+
+
 
 def detect_m15_rollover(raw_trend: str, df_m15: pd.DataFrame,
                         atr: float, rsi: float) -> tuple[bool, str]:
@@ -256,6 +308,7 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     ema_gap_widening = m15_gap > m15_gap_prev
 
     current_price = float(df_m5["close"].iloc[-1])
+    nearest_ssl, nearest_bsl = _nearest_liquidity_levels(df_m5, current_price)
 
     is_range = (h1_trend == "VOLATILE_RANGE" or m15_trend == "VOLATILE_RANGE")
     is_aligned = (h1_trend == m15_trend and h1_trend not in ("SIDEWAY", "VOLATILE_RANGE"))
@@ -284,6 +337,8 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
         "price_below_both_emas": bool(price_below_both_emas),
         "ema_gap_widening": bool(ema_gap_widening),
         "current_price": current_price,
+        "nearest_ssl": round(float(nearest_ssl), 4) if nearest_ssl is not None else None,
+        "nearest_bsl": round(float(nearest_bsl), 4) if nearest_bsl is not None else None,
         "_df_h1_ema34": round(float(h1_ema34), 4),
         "_df_h1_ema89": round(float(h1_ema89), 4),
     }
@@ -446,16 +501,6 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     if score < threshold:
         return False, f"GATE3: score {score}/{threshold} insufficient"
 
-    if is_range:
-        price = context["current_price"]
-        sr = context.get("sr", {})
-        if sr:
-            dist_r = abs(sr["resistance"] - price) / price * 100
-            dist_s = abs(price - sr["support"]) / price * 100
-            edge = context.get("h1_atr_pct", 1.0)
-            if dist_r > edge and dist_s > edge:
-                return False, f"GATE4: price in middle of range (R:{dist_r:.2f}% S:{dist_s:.2f}%)"
-
     return True, "OK"
 
 
@@ -610,6 +655,7 @@ def _m5_entry_timing_ok(signal: str, context: dict,
     if df_m5 is None or len(df_m5) < 6:
         return True, "OK"
 
+    is_range = bool(context.get("is_range", False))
     closes = df_m5["close"].astype(float)
     ema34_series = closes.ewm(span=34, adjust=False).mean()
     ema34_m5 = float(ema34_series.iloc[-1])
@@ -634,42 +680,45 @@ def _m5_entry_timing_ok(signal: str, context: dict,
     prior_above_ema = prev_close >= ema34_prev
 
     if signal == "BUY":
-        if latest_bearish and latest_close < ema34_m5:
-            return False, f"M5 bearish impulse: close {latest_close:.4f} below EMA34 {ema34_m5:.4f}"
-        if atr > 0 and three_bar_move <= -atr and latest_close <= ema34_m5:
-            return False, f"M5 bearish impulse: 3-candle drop {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
-        if (
-            atr > 0
-            and pre_reclaim_move <= -(atr * 0.75)
-            and latest_bullish
-            and latest_close > ema34_m5
-            and prior_below_ema
-        ):
-            return False, (
-                f"M5 flush recovery not confirmed: fresh reclaim above EMA34 {ema34_m5:.4f} "
-                f"after {abs(pre_reclaim_move):.4f} drop; wait for hold"
-            )
+        if not is_range:
+            if latest_bearish and latest_close < ema34_m5:
+                return False, f"M5 bearish impulse: close {latest_close:.4f} below EMA34 {ema34_m5:.4f}"
+            if atr > 0 and three_bar_move <= -atr and latest_close <= ema34_m5:
+                return False, f"M5 bearish impulse: 3-candle drop {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
+            if (
+                atr > 0
+                and pre_reclaim_move <= -(atr * 0.75)
+                and latest_bullish
+                and latest_close > ema34_m5
+                and prior_below_ema
+            ):
+                return False, (
+                    f"M5 flush recovery not confirmed: fresh reclaim above EMA34 {ema34_m5:.4f} "
+                    f"after {abs(pre_reclaim_move):.4f} drop; wait for hold"
+                )
         if latest_close < box_low:
             return False, f"M5 lost micro support {box_low:.4f}"
         if vol_expanding and latest_bearish and latest_close <= ema34_m5:
             return False, "M5 sell pressure expanding on the latest candle"
         return True, "OK"
 
-    if latest_bullish and latest_close > ema34_m5:
-        return False, f"M5 bullish impulse: close {latest_close:.4f} above EMA34 {ema34_m5:.4f}"
-    if atr > 0 and three_bar_move >= atr and latest_close >= ema34_m5:
-        return False, f"M5 bullish impulse: 3-candle rally {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
-    if (
-        atr > 0
-        and pre_reclaim_move >= atr * 0.75
-        and latest_bearish
-        and latest_close < ema34_m5
-        and prior_above_ema
-    ):
-        return False, (
-            f"M5 squeeze-down not confirmed: fresh reclaim below EMA34 {ema34_m5:.4f} "
-            f"after {abs(pre_reclaim_move):.4f} rally; wait for hold"
-        )
+    # SELL
+    if not is_range:
+        if latest_bullish and latest_close > ema34_m5:
+            return False, f"M5 bullish impulse: close {latest_close:.4f} above EMA34 {ema34_m5:.4f}"
+        if atr > 0 and three_bar_move >= atr and latest_close >= ema34_m5:
+            return False, f"M5 bullish impulse: 3-candle rally {abs(three_bar_move):.4f} >= ATR {atr:.4f}"
+        if (
+            atr > 0
+            and pre_reclaim_move >= atr * 0.75
+            and latest_bearish
+            and latest_close < ema34_m5
+            and prior_above_ema
+        ):
+            return False, (
+                f"M5 squeeze-down not confirmed: fresh reclaim below EMA34 {ema34_m5:.4f} "
+                f"after {abs(pre_reclaim_move):.4f} rally; wait for hold"
+            )
     if latest_close > box_high:
         return False, f"M5 broke above micro resistance {box_high:.4f}"
     if vol_expanding and latest_bullish and latest_close >= ema34_m5:
