@@ -5,7 +5,7 @@ Strategy layers:
   1. Macro bias  — ML model direction + Fear&Greed + funding rate
   2. Technical gates — H1/M15 trend, score ≥ 3/5, range position
   3. BTC correlation filter — don't trade against BTC trend
-  4. Gemini Flash vision — chart pattern confirmation (Setup A/B/C/D)
+  4. Gemini Flash vision — chart pattern confirmation (Setup A/D)
   5. Execution — Binance Futures market order + native SL/TP
 
 Run modes:
@@ -918,7 +918,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     log.info(f"  H1={ctx['h1_trend']} M15={ctx['m15_trend']} BTC={ctx.get('btc_trend','?')}")
     log.info(f"  S/R  R={ctx['sr']['resistance']} S={ctx['sr']['support']}")
     log.info(f"  Score {score}/5: {', '.join(score_details) or 'none'}")
-    log.info(f"  ADX={ctx['adx']:.1f} RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f}")
+    log.info(f"  RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f}")
     if ctx.get("trend_rollover"):
         log.info(f"  Rollover: {ctx.get('trend_rollover_reason', 'detected')}")
 
