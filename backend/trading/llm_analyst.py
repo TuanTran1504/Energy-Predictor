@@ -34,7 +34,7 @@ Context: EMA34 (green) is ABOVE EMA89 (orange). Gap is wide or stable.
 
 REQUIRED on M5 chart — ALL must be true:
 [1] PULLBACK: Price has retraced from higher levels and is touching or near EMA34 or EMA89.
-    "Near" = candle body or lower wick within 0.5% of the EMA line.
+    "Near" = candle body or lower wick within 1.5% of the EMA line.
 [2] SIGNAL CANDLE — one of:
     Option A (Bullish Pinbar): lower wick ≥ 1.5× body, body closes in upper 50% of full candle range, short upper wick.
         Candle color (red/green) does NOT matter — a red candle with a long lower wick and close in the upper half IS a valid bullish pinbar.
@@ -56,7 +56,7 @@ Context: EMA34 (green) is BELOW EMA89 (orange). Gap is wide or stable.
 
 REQUIRED on M5 chart — ALL must be true:
 [1] RALLY PULLBACK: Price has rallied from lower levels and is touching or near EMA34 or EMA89.
-    "Near" = candle body or upper wick within 0.5% of the EMA line.
+    "Near" = candle body or upper wick within 1.5% of the EMA line.
 [2] SIGNAL CANDLE — one of:
     Option A (Bearish Pinbar): upper wick ≥ 1.5× body, body closes in lower 50%, short lower wick.
         Candle color (red/green) does NOT matter — a green candle with a long upper wick and close in the lower half IS a valid bearish pinbar.
@@ -77,7 +77,7 @@ FALSE SIGNALS — output WAIT if:
 Context: EMA34 ≈ EMA89 (intertwined). Price oscillating between H1 S/R levels.
 
 REQUIRED:
-[1] Price is near H1 SUPPORT (green dashed line) — within 0.5% of it.
+[1] Price is near H1 SUPPORT (green dashed line) — within 1.5% of it.
 [2] SIGNAL CANDLE at or near support:
     Option A: Bullish Pinbar with lower wick piercing or touching the support level.
     Option B: Bullish Engulfing at the support zone.
@@ -98,7 +98,7 @@ FALSE SIGNALS — output WAIT if:
 Context: EMA34 ≈ EMA89 (intertwined). Price oscillating between H1 S/R levels.
 
 REQUIRED:
-[1] Price is near H1 RESISTANCE (red dashed line) — within 0.5%.
+[1] Price is near H1 RESISTANCE (red dashed line) — within 1.5%.
 [2] SIGNAL CANDLE at or near resistance:
     Option A: Bearish Pinbar with upper wick piercing or touching the resistance level.
     Option B: Bearish Engulfing at the resistance zone.
