@@ -141,13 +141,25 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     if market_mode in ("VOLATILE_RANGE", "SIDEWAY") or primary in ("VOLATILE_RANGE", "SIDEWAY"):
         if range_bias == "NEAR_SUPPORT":
             patterns = [PATTERN_LIBRARY["setup_D_buy"], PATTERN_LIBRARY["wait"]]
-            bias_note = f"Range/Sideway near support ({sr.get('support')}) → look for Setup D BUY bounce only."
+            bias_note = (
+                f"RANGE market — price near support ({sr.get('support')}). "
+                f"SIDEWAY/RANGE mode is VALID for trading — evaluate Setup D BUY. "
+                f"Do NOT use 'market is sideways' as a reason to WAIT."
+            )
         elif range_bias == "NEAR_RESISTANCE":
             patterns = [PATTERN_LIBRARY["setup_D_sell"], PATTERN_LIBRARY["wait"]]
-            bias_note = f"Range/Sideway near resistance ({sr.get('resistance')}) → look for Setup D SELL bounce only."
+            bias_note = (
+                f"RANGE market — price near resistance ({sr.get('resistance')}). "
+                f"SIDEWAY/RANGE mode is VALID for trading — evaluate Setup D SELL. "
+                f"Do NOT use 'market is sideways' as a reason to WAIT."
+            )
         else:
-            patterns = [PATTERN_LIBRARY["wait"]]
-            bias_note = "Range/Sideway — price in middle of range. WAIT."
+            patterns = [PATTERN_LIBRARY["setup_D_buy"], PATTERN_LIBRARY["setup_D_sell"], PATTERN_LIBRARY["wait"]]
+            bias_note = (
+                f"RANGE market — price between support ({sr.get('support')}) and resistance ({sr.get('resistance')}). "
+                f"Check chart: if closer to support look for Setup D BUY, if closer to resistance look for Setup D SELL. "
+                f"Do NOT use 'price in middle of range' as a standalone reason to WAIT."
+            )
     elif primary == "UPTREND":
         patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["wait"]]
         bias_note = f"M15 uptrend — look for Setup A pullback BUY. H1: {h1}."
@@ -155,8 +167,8 @@ def _build_prompt(context: dict) -> tuple[str, str]:
         patterns = [PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["wait"]]
         bias_note = f"M15 downtrend — look for Setup A rally SELL. H1: {h1}."
     else:
-        patterns = [PATTERN_LIBRARY["wait"]]
-        bias_note = "Trend unclear → WAIT."
+        patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["wait"]]
+        bias_note = f"Trend unclear — check chart for strongest directional signal. H1: {h1}."
 
     try:
         trend_min_rr = max(0.5, float(os.getenv("TRADE_MIN_RR", "1.5")))
@@ -297,7 +309,6 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
     system_prompt += """
 
 IMPORTANT OVERRIDE:
-- Market mode is the primary directional filter.
 - Do not call BUY during an active 5m bearish impulse
 - Do not call SELL during an active 5m bullish impulse
 - Use liquidity hints as secondary timing filter: prefer BUY after sweep/reclaim near SSL, prefer SELL after sweep/reject near BSL.
@@ -307,6 +318,8 @@ IMPORTANT OVERRIDE:
 - Recommend a seek-entry zone only as an advisory area to monitor, not as a hard executable order.
 - If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on M5.
 - If you mention rr_check, say that Python will calculate levels after the decision.
+- CRITICAL: Do NOT output WAIT solely because "market is sideways", "market mode is range", or "price is in the middle of the box". These are descriptive labels, not rejection criteria. Setup D exists specifically for sideways/range markets — if a D setup is visible, take it.
+- CRITICAL: Do NOT output WAIT solely because the market label says SIDEWAY or VOLATILE_RANGE. Evaluate the actual chart for signal candle quality, volume, and S/R proximity.
 """
 
     content_payload = [
