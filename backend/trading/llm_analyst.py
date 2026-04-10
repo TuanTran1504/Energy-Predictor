@@ -34,18 +34,18 @@ Context: EMA34 (green) is ABOVE EMA89 (orange). Gap is wide or stable.
 
 REQUIRED on M5 chart — ALL must be true:
 [1] PULLBACK: Price has retraced from higher levels and is touching or near EMA34 or EMA89.
-    "Near" = candle body or lower wick within 0.3% of the EMA line.
+    "Near" = candle body or lower wick within 0.5% of the EMA line.
 [2] SIGNAL CANDLE — one of:
-    Option A (Bullish Pinbar): lower wick ≥ 2× body, body closes in upper 50% of full candle range, short upper wick.
+    Option A (Bullish Pinbar): lower wick ≥ 1.5× body, body closes in upper 50% of full candle range, short upper wick.
     Option B (Bullish Engulfing): current green candle body fully engulfs previous red candle body.
-[3] VOLUME: signal candle volume > average of previous 3 candles (visually taller bar).
+[3] VOLUME: signal candle volume > average of previous 5 candles (visually taller bar).
 [4] ENTRY: at signal candle close. SL below signal candle low minus 0.25%.
     TP toward nearest H1 resistance (red dashed line).
 
 FALSE SIGNALS — output WAIT if:
   - Signal candle has small body, no clear shape (Doji / Spinning Top)
-  - EMAs are converging (gap closing)
-  - Volume is lower than surrounding candles
+  - EMAs are rapidly converging (gap closing more than 30% in the last 5 candles)
+  - Volume is notably lower than surrounding candles
   - Price has broken below EMA89 for more than 3 consecutive candles
 """,
 
@@ -55,17 +55,18 @@ Context: EMA34 (green) is BELOW EMA89 (orange). Gap is wide or stable.
 
 REQUIRED on M5 chart — ALL must be true:
 [1] RALLY PULLBACK: Price has rallied from lower levels and is touching or near EMA34 or EMA89.
+    "Near" = candle body or upper wick within 0.5% of the EMA line.
 [2] SIGNAL CANDLE — one of:
-    Option A (Bearish Pinbar): upper wick ≥ 2× body, body closes in lower 50%, short lower wick.
+    Option A (Bearish Pinbar): upper wick ≥ 1.5× body, body closes in lower 50%, short lower wick.
     Option B (Bearish Engulfing): current red candle body fully engulfs previous green candle body.
-[3] VOLUME: signal candle volume > average of previous 3 candles.
+[3] VOLUME: signal candle volume > average of previous 5 candles.
 [4] ENTRY: at signal candle close. SL above signal candle high plus 0.25%.
     TP toward nearest H1 support (green dashed line).
 
 FALSE SIGNALS — output WAIT if:
-  - No clear upper wick, body dominates candle (> 70%)
-  - EMAs converging
-  - Low volume on signal candle
+  - No clear upper wick, body dominates candle (> 85%)
+  - EMAs are rapidly converging (gap closing more than 30% in the last 5 candles)
+  - Volume is notably lower than surrounding candles
   - Price broken above EMA89 for more than 3 consecutive candles
 """,
 
@@ -74,19 +75,19 @@ FALSE SIGNALS — output WAIT if:
 Context: EMA34 ≈ EMA89 (intertwined). Price oscillating between H1 S/R levels.
 
 REQUIRED:
-[1] Price is near H1 SUPPORT (green dashed line) — within 0.3% of it.
+[1] Price is near H1 SUPPORT (green dashed line) — within 0.5% of it.
 [2] SIGNAL CANDLE at or near support:
-    Option A: Bullish Pinbar with lower wick piercing the support level.
+    Option A: Bullish Pinbar with lower wick piercing or touching the support level.
     Option B: Bullish Engulfing at the support zone.
     Option C: Second touch of support (double bottom) — price bouncing off same level twice.
-[3] VOLUME: Higher than the 3 previous candles.
+[3] VOLUME: Higher than the average of the 5 previous candles.
 [4] ENTRY: at signal candle close (must be ABOVE the support line).
     SL below support minus 0.25%. TP toward H1 resistance. R:R ≥ 1.5.
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through support (more than 3 candles held below)
-  - Signal candle has no clear lower wick
-  - Low volume at the support level
+  - Signal candle has virtually no lower wick and body is bearish
+  - Volume is notably below surrounding candles
   - Price is in the middle of the range (far from both S and R)
 """,
 
@@ -95,27 +96,25 @@ FALSE SIGNALS — output WAIT if:
 Context: EMA34 ≈ EMA89 (intertwined). Price oscillating between H1 S/R levels.
 
 REQUIRED:
-[1] Price is near H1 RESISTANCE (red dashed line) — within 0.3%.
+[1] Price is near H1 RESISTANCE (red dashed line) — within 0.5%.
 [2] SIGNAL CANDLE at or near resistance:
-    Option A: Bearish Pinbar with upper wick piercing the resistance level.
+    Option A: Bearish Pinbar with upper wick piercing or touching the resistance level.
     Option B: Bearish Engulfing at the resistance zone.
     Option C: Second touch of resistance (double top).
-[3] VOLUME: Higher than the 3 previous candles.
+[3] VOLUME: Higher than the average of the 5 previous candles.
 [4] ENTRY: at signal candle close (must be BELOW resistance).
     SL above resistance plus 0.25%. TP toward H1 support. R:R ≥ 1.5.
 """,
 
     "wait": """
-=== MANDATORY WAIT CONDITIONS ===
+=== WAIT CONDITIONS ===
 Choose WAIT if ANY of the following:
-- Signal candle shape is ambiguous (Doji, Spinning Top, small body)
-- Volume on signal candle is LOWER than surrounding candles
-- Both required conditions present but R:R < 1.5 after applying H1 S/R cap
-- EMAs are choppy (crossing back and forth in last 10 candles)
+- Signal candle shape is clearly ambiguous (Doji, Spinning Top with tiny body)
+- Volume on signal candle is notably below surrounding candles
+- EMAs are choppy (crossing back and forth in last 5 candles)
 - Price is in the middle of a range with no clear S/R nearby
-- You can see only PART of the required setup (e.g. nice candle but wrong volume)
 
-RULE: When in doubt → WAIT. A missed trade doesn't lose money. A bad trade does.
+RULE: When clearly ambiguous → WAIT. Borderline setups with good structure are acceptable.
 """,
 }
 
@@ -129,10 +128,15 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     rsi         = context.get("rsi", 0)
     atr         = context.get("atr_m15", 0)
     sr          = context.get("sr", {})
+    nearest_ssl = context.get("nearest_ssl")
+    nearest_bsl = context.get("nearest_bsl")
     range_bias  = context.get("range_bias", "MIDDLE")
     candle_text = context.get("candle_summary", "")
     symbol      = context.get("symbol", "BTC/USDT")
     symbol_base = str(symbol).split("/", 1)[0].upper()
+
+    def _fmt_level(v):
+        return f"{float(v):.4f}" if v is not None else "N/A"
 
     if market_mode in ("VOLATILE_RANGE", "SIDEWAY") or primary in ("VOLATILE_RANGE", "SIDEWAY"):
         if range_bias == "NEAR_SUPPORT":
@@ -177,6 +181,8 @@ RSI (M15)     : {rsi:.1f}
 ATR (M15)     : {atr:.4f}
 H1 Resistance : {sr.get('resistance', 'N/A')}
 H1 Support    : {sr.get('support', 'N/A')}
+Nearest SSL   : {_fmt_level(nearest_ssl)}
+Nearest BSL   : {_fmt_level(nearest_bsl)}
 Bias directive: {bias_note}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -294,6 +300,7 @@ IMPORTANT OVERRIDE:
 - Market mode is the primary directional filter.
 - Do not call BUY during an active 5m bearish impulse
 - Do not call SELL during an active 5m bullish impulse
+- Use liquidity hints as secondary timing filter: prefer BUY after sweep/reclaim near SSL, prefer SELL after sweep/reject near BSL.
 - Do not reject a valid setup because of stop loss, take profit, or R:R math.
 - Python will calculate entry, stop loss, take profit, and final R:R after your decision.
 - You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
