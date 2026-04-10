@@ -423,21 +423,33 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     score = context["score"]
     is_range = context["is_range"]
     allow_sideway = _env_bool("TECH_ALLOW_SIDEWAY", False)
+    price = float(context.get("current_price") or 0.0)
+    sr = context.get("sr", {}) or {}
+    rsi = float(context.get("rsi") or 50.0)
+    edge = max(0.35, float(context.get("h1_atr_pct") or 0.8))
+    near_edge = False
+    if price > 0 and sr:
+        dist_r = abs(float(sr["resistance"]) - price) / price * 100
+        dist_s = abs(price - float(sr["support"])) / price * 100
+        near_edge = dist_r <= edge or dist_s <= edge
+    rsi_extreme = rsi <= 42 or rsi >= 58
 
-    if primary == "SIDEWAY" and not allow_sideway:
+    if primary == "SIDEWAY" and not allow_sideway and not (near_edge or rsi_extreme):
         return False, "GATE1: M15 SIDEWAY"
 
     if not is_range:
         if primary == "VOLATILE_RANGE":
             return False, "GATE2: M15 VOLATILE_RANGE"
 
-    base_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD", SCORE_THRESHOLD))
-    range_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD_RANGE", base_threshold))
-    non_btc_high_adx_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD_NON_BTC_HIGH_ADX", 2))
+    base_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD", 2))
+    range_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD_RANGE", 1))
+    non_btc_high_adx_threshold = max(1, _env_int("TECH_SCORE_THRESHOLD_NON_BTC_HIGH_ADX", 1))
     adx_relax_level = _env_float("TECH_ADX_RELAX_LEVEL", 45.0)
     rollover_threshold = max(1, _env_int("TECH_ROLLOVER_SCORE_THRESHOLD", 1))
 
     threshold = range_threshold if is_range else base_threshold
+    if primary == "SIDEWAY" and (near_edge or rsi_extreme):
+        threshold = min(threshold, 1)
     if (
         not str(context.get("symbol", "BTC")).startswith("BTC")
         and context.get("adx", 0) > adx_relax_level
@@ -727,6 +739,11 @@ def _pullback_cluster_levels(df_m5: pd.DataFrame, signal: str, lookback: int = 1
     return float(cluster["low"].min()), float(highs.max())
 
 
+def _deep_structure_levels(df_m5: pd.DataFrame, lookback: int = 20) -> tuple[float, float]:
+    cluster = df_m5.tail(lookback).copy()
+    return float(cluster["low"].min()), float(cluster["high"].max())
+
+
 def _setup_c_reversal_ok(signal: str, context: dict,
                          df_m5: pd.DataFrame | None) -> tuple[bool, str]:
     """
@@ -755,18 +772,18 @@ def _setup_c_reversal_ok(signal: str, context: dict,
     lower_wick = min(latest_open, latest_close) - float(latest["low"])
     upper_wick = float(latest["high"]) - max(latest_open, latest_close)
     body_ratio = body / candle_range if candle_range > 0 else 0.0
-    relaxed_setup_c = _env_bool("SETUP_C_RELAXED", False)
-    soft_body_ratio = _env_float("SETUP_C_SOFT_BODY_RATIO", 0.45)
-    volume_mult = _env_float("SETUP_C_VOLUME_MULT", 1.00 if relaxed_setup_c else 1.10)
-    fake_move_atr_mult = _env_float("SETUP_C_FAKE_MOVE_ATR_MULT", 0.20 if relaxed_setup_c else 0.35)
+    relaxed_setup_c = _env_bool("SETUP_C_RELAXED", True)
+    soft_body_ratio = _env_float("SETUP_C_SOFT_BODY_RATIO", 0.40 if relaxed_setup_c else 0.45)
+    volume_mult = _env_float("SETUP_C_VOLUME_MULT", 0.98 if relaxed_setup_c else 1.10)
+    fake_move_atr_mult = _env_float("SETUP_C_FAKE_MOVE_ATR_MULT", 0.15 if relaxed_setup_c else 0.35)
     ema34_now = float(ema34_series.iloc[-1])
-    setup_c_ema_tol = (atr * 0.08) if (relaxed_setup_c and atr > 0) else 0.0
+    setup_c_ema_tol = (atr * 0.12) if (relaxed_setup_c and atr > 0) else 0.0
 
     if signal == "BUY":
         strong_engulf = pattern["pattern"] == "bullish_engulfing"
         strong_pin = (
             pattern["pattern"] == "bullish_pinbar"
-            and lower_wick >= body * 2.5
+            and lower_wick >= body * (2.0 if relaxed_setup_c else 2.5)
             and latest_close > latest_open
         )
         soft_body = (
@@ -789,7 +806,7 @@ def _setup_c_reversal_ok(signal: str, context: dict,
     strong_engulf = pattern["pattern"] == "bearish_engulfing"
     strong_pin = (
         pattern["pattern"] == "bearish_pinbar"
-        and upper_wick >= body * 2.5
+        and upper_wick >= body * (2.0 if relaxed_setup_c else 2.5)
         and latest_close < latest_open
     )
     soft_body = (
@@ -962,6 +979,7 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
     recent_low = float(m5_window["low"].min())
     recent_high = float(m5_window["high"].max())
     pullback_low, pullback_high = _pullback_cluster_levels(df_m5, signal)
+    deep_low, deep_high = _deep_structure_levels(df_m5, lookback=20)
     box_low, box_high = _recent_box_levels(df_m5, exclude_last=1)
     ema89 = float(df_m5["close"].astype(float).ewm(span=89, adjust=False).mean().iloc[-1])
     bb = _bb_snapshot(df_m5)
@@ -976,8 +994,8 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         min_risk = max(entry * 0.0010, atr * 0.25)
     elif is_range:
         min_rr = min_rr_range
-        base_buffer = max(entry * 0.0015, atr * 0.20)
-        min_risk = max(entry * SL_MIN_PCT, atr * 0.35)
+        base_buffer = max(entry * 0.0018, atr * 0.30)
+        min_risk = max(entry * SL_MIN_PCT, atr * 0.45)
     else:
         min_rr = min_rr_default
         base_buffer = max(entry * 0.0015, atr * 0.25)
@@ -992,17 +1010,17 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
 
     if signal == "BUY":
         if setup_code == "A":
-            stop_refs = [pullback_low, support, ema89]
+            stop_refs = [pullback_low, recent_low, support, ema89]
         elif setup_code == "B":
             stop_refs = [box_low, support, ema89]
         elif setup_code == "C":
-            stop_refs = [pullback_low, recent_low, support, ema89]
+            stop_refs = [deep_low, pullback_low, recent_low, support, ema89]
         elif setup_code == "D":
-            stop_refs = [support, recent_low]
+            stop_refs = [deep_low, support, recent_low]
         elif is_setup_e:
             stop_refs = [bb["lower_bb"], recent_low]
         else:
-            stop_refs = [pullback_low, recent_low, support, ema89, bb["lower_bb"]]
+            stop_refs = [deep_low, pullback_low, recent_low, support, ema89, bb["lower_bb"]]
         stop_candidates = _dedupe_levels([x for x in stop_refs if x is not None and x < entry], reverse=True)
         if not stop_candidates:
             return None, "no valid bullish invalidation below entry"
@@ -1076,17 +1094,17 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
 
     else:
         if setup_code == "A":
-            stop_refs = [pullback_high, resistance, ema89]
+            stop_refs = [pullback_high, recent_high, resistance, ema89]
         elif setup_code == "B":
             stop_refs = [box_high, resistance, ema89]
         elif setup_code == "C":
-            stop_refs = [pullback_high, recent_high, resistance, ema89]
+            stop_refs = [deep_high, pullback_high, recent_high, resistance, ema89]
         elif setup_code == "D":
-            stop_refs = [resistance, recent_high]
+            stop_refs = [deep_high, resistance, recent_high]
         elif is_setup_e:
             stop_refs = [bb["upper_bb"], recent_high]
         else:
-            stop_refs = [pullback_high, recent_high, resistance, ema89, bb["upper_bb"]]
+            stop_refs = [deep_high, pullback_high, recent_high, resistance, ema89, bb["upper_bb"]]
         stop_candidates = _dedupe_levels([x for x in stop_refs if x is not None and x > entry])
         if not stop_candidates:
             return None, "no valid bearish invalidation above entry"

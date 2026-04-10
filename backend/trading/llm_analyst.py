@@ -277,6 +277,8 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     rsi         = context.get("rsi", 0)
     atr         = context.get("atr_m15", 0)
     sr          = context.get("sr", {})
+    price       = float(context.get("current_price", 0) or 0)
+    h1_atr_pct  = float(context.get("h1_atr_pct", 0.8) or 0.8)
     allowed_dir = context.get("allowed_direction", "BOTH")
     range_bias  = context.get("range_bias", "MIDDLE")
     candle_text = context.get("candle_summary", "")
@@ -296,16 +298,41 @@ def _build_prompt(context: dict) -> tuple[str, str]:
             patterns = [PATTERN_LIBRARY["wait"]]
             bias_note = "Price is in the middle of the range → WAIT."
     elif market_mode == "SIDEWAY" or primary == "SIDEWAY":
-        # Setup E: direction driven by RSI extreme at BB
-        if rsi < 40:
+        support = sr.get("support")
+        resistance = sr.get("resistance")
+        edge = max(price * 0.002, price * (h1_atr_pct / 100.0) * 0.35) if price > 0 else 0.0
+        near_support = support is not None and price > 0 and abs(price - float(support)) <= edge
+        near_resistance = resistance is not None and price > 0 and abs(float(resistance) - price) <= edge
+
+        if near_support:
+            patterns = [
+                PATTERN_LIBRARY["setup_D_buy"],
+                PATTERN_LIBRARY["setup_E_buy"],
+                PATTERN_LIBRARY["wait"],
+            ]
+            bias_note = (
+                f"SIDEWAY near support ({support}) with RSI={rsi:.1f} -> "
+                "look for Setup D bounce first, Setup E mean reversion second."
+            )
+        elif near_resistance:
+            patterns = [
+                PATTERN_LIBRARY["setup_D_sell"],
+                PATTERN_LIBRARY["setup_E_sell"],
+                PATTERN_LIBRARY["wait"],
+            ]
+            bias_note = (
+                f"SIDEWAY near resistance ({resistance}) with RSI={rsi:.1f} -> "
+                "look for Setup D fade first, Setup E mean reversion second."
+            )
+        elif rsi < 40:
             patterns = [PATTERN_LIBRARY["setup_E_buy"], PATTERN_LIBRARY["wait"]]
-            bias_note = f"SIDEWAY + RSI={rsi:.1f} oversold → look for BUY mean reversion to SMA20."
+            bias_note = f"SIDEWAY + RSI={rsi:.1f} oversold -> look for BUY mean reversion to SMA20."
         elif rsi > 60:
             patterns = [PATTERN_LIBRARY["setup_E_sell"], PATTERN_LIBRARY["wait"]]
-            bias_note = f"SIDEWAY + RSI={rsi:.1f} overbought → look for SELL mean reversion to SMA20."
+            bias_note = f"SIDEWAY + RSI={rsi:.1f} overbought -> look for SELL mean reversion to SMA20."
         else:
             patterns = [PATTERN_LIBRARY["wait"]]
-            bias_note = f"SIDEWAY + RSI={rsi:.1f} neutral — no edge. WAIT."
+            bias_note = f"SIDEWAY + RSI={rsi:.1f} neutral and not at an edge - no edge. WAIT."
     elif primary == "UPTREND":
         if trend_rollover:
             patterns = [PATTERN_LIBRARY["setup_C_buy"], PATTERN_LIBRARY["wait"]]
