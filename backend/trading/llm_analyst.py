@@ -23,7 +23,7 @@ def _get_client() -> OpenAI:
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
     )
 
-MODEL = "gemini-2.5-flash-lite"
+MODEL = "gemini-2.5-flash"
 
 
 PATTERN_LIBRARY = {
