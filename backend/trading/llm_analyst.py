@@ -137,6 +137,11 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     sr          = context.get("sr", {})
     nearest_ssl = context.get("nearest_ssl")
     nearest_bsl = context.get("nearest_bsl")
+    chart_box_support = context.get("chart_box_support", sr.get("support"))
+    chart_box_resistance = context.get("chart_box_resistance", sr.get("resistance"))
+    chart_box_state = str(context.get("chart_box_state", "UNKNOWN"))
+    chart_box_window = int(context.get("chart_box_window", 0) or 0)
+    chart_box_skip = int(context.get("chart_box_skip", 0) or 0)
     range_bias  = context.get("range_bias", "MIDDLE")
     candle_text = context.get("candle_summary", "")
     symbol      = context.get("symbol", "BTC/USDT")
@@ -160,6 +165,22 @@ def _build_prompt(context: dict) -> tuple[str, str]:
 
     def _fmt_level(v):
         return f"{float(v):.4f}" if v is not None else "N/A"
+
+    chart_box_state_label = chart_box_state.replace("_", " ")
+    if chart_box_state == "ABOVE_BOX":
+        box_note = (
+            "Price is already above the historical H1 box. Prefer continuation or retest-hold BUY ideas, "
+            "not blind box-top fades."
+        )
+    elif chart_box_state == "BELOW_BOX":
+        box_note = (
+            "Price is already below the historical H1 box. Prefer continuation or retest-fail SELL ideas, "
+            "not blind box-bottom bounces."
+        )
+    else:
+        box_note = (
+            "Price is still inside the historical H1 box, so edge rejection logic is still valid."
+        )
 
     if market_mode in ("VOLATILE_RANGE", "SIDEWAY") or primary in ("VOLATILE_RANGE", "SIDEWAY"):
         if range_bias == "NEAR_SUPPORT":
@@ -233,11 +254,14 @@ H1 Trend      : {h1}
 RSI (M15)     : {rsi:.1f}
 ATR (M15)     : {atr:.4f}
 M15 EMA Gap   : {m15_gap:.3f}% (threshold {M15_TREND_GAP:.1f}%, strength: {gap_strength})
-H1 Resistance : {sr.get('resistance', 'N/A')}
-H1 Support    : {sr.get('support', 'N/A')}
+H1 Box High   : {_fmt_level(chart_box_resistance)}
+H1 Box Low    : {_fmt_level(chart_box_support)}
+H1 Box State  : {chart_box_state_label}
+Box Source    : built from prior {chart_box_window} H1 candles after skipping latest {chart_box_skip}
 Nearest SSL   : {_fmt_level(nearest_ssl)}
 Nearest BSL   : {_fmt_level(nearest_bsl)}
 Bias directive: {bias_note}
+Box note      : {box_note}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 LAST 5 {exec_tf_label} CANDLES (newest last)
@@ -255,12 +279,17 @@ CHART LEGEND
 EMA 34  = bright GREEN line
 EMA 89  = ORANGE line
 Vol MA  = BLUE line on volume panel
-Red dashed horizontal = H1 Resistance
-Green dashed horizontal = H1 Support
-Cyan shaded area = Decision Box (H1 support-to-resistance range)
-Inside Decision Box:
+Red dashed horizontal = H1 historical box high
+Green dashed horizontal = H1 historical box low
+The TOP pane has NO decision box. Use it only for execution timing.
+Cyan shaded area on H1 = historical decision box built from older H1 candles
+Inside H1 Decision Box:
   - Near top edge: look for rejection SELL
   - Near bottom edge: look for rejection BUY
+Historical Box logic:
+  - ABOVE BOX = breakout already happened. Prefer continuation or retest-hold, not blind fade.
+  - BELOW BOX = breakdown already happened. Prefer continuation or retest-fail, not blind fade.
+  - INSIDE BOX = range rejection logic is still valid.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SL / TP MATH RULES
@@ -282,8 +311,8 @@ DIRECTION CHECK only (enforce):
 YOUR TASK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. Review the {exec_tf_label} execution pane for signal candle quality, wick/body structure, and immediate confirmation.
-2. Review the H1 context pane for box structure and edge behavior:
-   top and bottom edge rejection behavior.
+2. Review the H1 context pane for the historical decision box:
+   decide whether price is still ranging inside it or has already accepted above/below it.
 3. Use RSI + volume panels to confirm timing quality and momentum/range context.
 4. You must identify potential entries based on the patterns above. If no clear pattern is visible, you can still call BUY or SELL if the chart structure and signal quality are good — you do not need to match every single condition perfectly to call a valid signal. Use your judgement to evaluate the overall quality of the setup.
 5. Match each condition in the Pattern Library against what you see.
@@ -314,7 +343,8 @@ OUTPUT FORMAT:
     user_text = (
         f"Here is the {symbol} chart generated from live Binance data. "
         f"The TOP pane is {exec_tf_label} execution view for entry timing. "
-        f"The SECOND pane is H1 context view with a cyan Decision Box between support and resistance. "
+        f"The TOP pane does not include a decision box. "
+        f"The SECOND pane is H1 context view with a cyan historical Decision Box. "
         f"The lower panels are {exec_tf_label} RSI and {exec_tf_label} volume. "
         f"Chart includes candlesticks, EMA34 (green), EMA89 (orange), and Volume MA (blue). "
         f"Analyse according to the system prompt and use both timeframes together."
@@ -361,8 +391,10 @@ IMPORTANT OVERRIDE:
 - Recommend a seek-entry zone only as an advisory area to monitor, not as a hard executable order.
 - If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on the execution timeframe.
 - If you mention rr_check, say that Python will calculate levels after the decision.
-- CRITICAL: Do NOT output WAIT solely because "market is sideways", "market mode is range", or "price is in the middle of the box". These are descriptive labels, not rejection criteria. Setup D exists specifically for sideways/range markets — if a D setup is visible, take it.
+- CRITICAL: Do NOT output WAIT solely because "market is sideways", "market mode is range", or "price is in the middle of the box". These are descriptive labels, not rejection criteria. Setup D exists specifically for sideways/range markets - if a D setup is visible, take it.
 - CRITICAL: Do NOT output WAIT solely because the market label says SIDEWAY or VOLATILE_RANGE. Evaluate the actual chart for signal candle quality, volume, and S/R proximity.
+- CRITICAL: If price is already ABOVE the historical H1 box, do not short just because price is near the box top. Only fade a clear failed breakout.
+- CRITICAL: If price is already BELOW the historical H1 box, do not buy just because price is near the box bottom. Only fade a clear failed breakdown.
 """
 
     content_payload = [

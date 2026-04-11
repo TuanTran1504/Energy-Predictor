@@ -3,7 +3,7 @@ chart_gen.py - Candlestick chart generator for the LLM analyst.
 
 Produces a dark-themed execution+H1 chart with:
   - configurable execution pane
-  - H1 context pane with decision box
+  - H1 context pane with a historical decision box
   - Candlestick bodies + wicks
   - EMA 34 (green) + EMA 89 (orange)
   - H1 Support (green dashed) + Resistance (red dashed)
@@ -39,6 +39,7 @@ EMA89_C = "#FF9800"
 VOLMA_C = "#2196F3"
 RESIST_C = "#FF5252"
 SUPPORT_C = "#69F0AE"
+PREV_SUPPORT_C = "#9AD6AE"
 RSI_C = "#CE93D8"
 RSI_OB_C = "#EF5350"
 RSI_OS_C = "#26A69A"
@@ -47,6 +48,7 @@ BOX_C = "#00BCD4"
 BOX_EDGE_RATIO = 0.18
 BSL_C = "#FF8A80"
 SSL_C = "#80CBC4"
+PREV_RESIST_C = "#FFAB91"
 
 def _env_int(name: str, default: int, min_value: int, max_value: int) -> int:
     raw = os.getenv(name)
@@ -80,6 +82,8 @@ def _env_bool(name: str, default: bool = False) -> bool:
 M5_WINDOW = _env_int("CHART_M5_WINDOW", _env_int("CHART_CLOSE_WINDOW", 100, 60, 400), 60, 500)
 M15_WINDOW = _env_int("CHART_M15_WINDOW", 220, 120, 500)
 H1_WINDOW = _env_int("CHART_H1_WINDOW", 300, 120, 800)
+H1_BOX_SKIP = _env_int("CHART_H1_BOX_SKIP", 50, 10, 200)
+H1_BOX_WINDOW = _env_int("CHART_H1_BOX_WINDOW", 250, 50, 600)
 SHOW_LIQUIDITY = _env_bool("CHART_SHOW_LIQUIDITY", True)
 LIQ_LOOKBACK_M5 = _env_int("CHART_LIQUIDITY_LOOKBACK_M5", 90, 30, 300)
 LIQ_LOOKBACK_H1 = _env_int("CHART_LIQUIDITY_LOOKBACK_H1", 120, 40, 400)
@@ -92,6 +96,42 @@ def _exec_window_for_tf(exec_tf: str) -> int:
     if tf == "15m":
         return M15_WINDOW
     return M5_WINDOW
+
+
+def _compute_h1_decision_box(df_h1: pd.DataFrame, current_price: float) -> dict:
+    source = df_h1.copy().reset_index(drop=True)
+    usable = max(len(source) - H1_BOX_SKIP, 0)
+    hist = source.iloc[:usable].tail(H1_BOX_WINDOW).copy() if usable > 0 else source.iloc[0:0].copy()
+
+    if hist.empty:
+        hist = source.tail(min(len(source), H1_BOX_WINDOW)).copy()
+
+    if hist.empty:
+        return {
+            "support": None,
+            "resistance": None,
+            "state": "UNKNOWN",
+            "window": 0,
+            "skip": H1_BOX_SKIP,
+        }
+
+    support = float(hist["low"].min())
+    resistance = float(hist["high"].max())
+    tol = max(current_price * 0.001, 1e-9)
+    if current_price > resistance + tol:
+        state = "ABOVE_BOX"
+    elif current_price < support - tol:
+        state = "BELOW_BOX"
+    else:
+        state = "INSIDE_BOX"
+
+    return {
+        "support": support,
+        "resistance": resistance,
+        "state": state,
+        "window": len(hist),
+        "skip": min(H1_BOX_SKIP, max(len(source) - len(hist), 0)),
+    }
 
 
 def _apply_dark_style(ax):
@@ -228,7 +268,8 @@ def _draw_price_panel(ax_price, df: pd.DataFrame, sr: dict, current_price: float
                       show_current_price: bool = True,
                       box_mode: str = "soft", draw_diagonals: bool = False,
                       box_bounds: tuple[float, float] | None = None,
-                      liquidity_areas: list[dict] | None = None):
+                      liquidity_areas: list[dict] | None = None,
+                      show_prev_box: bool = False):
     import matplotlib.patches as mpatches
 
     x = range(len(df))
@@ -239,6 +280,7 @@ def _draw_price_panel(ax_price, df: pd.DataFrame, sr: dict, current_price: float
 
     support = sr.get("support")
     resistance = sr.get("resistance")
+    breakout_state = str(sr.get("breakout_state", "INSIDE_BOX"))
     box_bottom = None
     box_top = None
     if box_bounds is not None:
@@ -317,6 +359,20 @@ def _draw_price_panel(ax_price, df: pd.DataFrame, sr: dict, current_price: float
                     va="center",
                     ha="right",
                 )
+
+    if show_prev_box:
+        breakout_label = breakout_state.replace("_", " ")
+        ax_price.text(
+            0.012, 0.98,
+            f"Box state: {breakout_label}",
+            transform=ax_price.transAxes,
+            color=TEXT,
+            fontsize=8,
+            va="top",
+            ha="left",
+            bbox={"facecolor": "#161B22", "edgecolor": SPINE, "alpha": 0.82, "pad": 4},
+            zorder=7,
+        )
 
     if show_current_price:
         ax_price.axhline(current_price, color=CUR_PRICE_C, linewidth=1.0, linestyle=":", alpha=0.9, zorder=6)
@@ -408,25 +464,40 @@ def generate_chart(df_exec: pd.DataFrame, context: dict, df_h1: pd.DataFrame | N
             title=f"{exec_tf} Execution View ({exec_window} candles) - use for signal candle and setup confirmation",
             show_legend=True, annotate_levels=True, last_marker=True,
             show_current_price=True, box_mode="soft",
+            box_bounds=(0.0, 0.0),
             liquidity_areas=(
                 _detect_liquidity_areas(df_exec_view, current_price, LIQ_LOOKBACK_M5)
                 if SHOW_LIQUIDITY else []
             ),
         )
-        h1_low = float(df_h1_view["low"].min())
-        h1_high = float(df_h1_view["high"].max())
-        sr_h1 = {"support": h1_low, "resistance": h1_high}
+        h1_box = _compute_h1_decision_box(df_h1_view, current_price)
+        h1_low = float(h1_box.get("support") or df_h1_view["low"].min())
+        h1_high = float(h1_box.get("resistance") or df_h1_view["high"].max())
+        if h1_high <= h1_low:
+            h1_low = float(df_h1_view["low"].min())
+            h1_high = float(df_h1_view["high"].max())
+        context["chart_box_support"] = round(h1_low, 2)
+        context["chart_box_resistance"] = round(h1_high, 2)
+        context["chart_box_state"] = h1_box.get("state", "UNKNOWN")
+        context["chart_box_window"] = int(h1_box.get("window", 0) or 0)
+        context["chart_box_skip"] = int(h1_box.get("skip", H1_BOX_SKIP) or H1_BOX_SKIP)
+        sr_h1 = {
+            "support": h1_low,
+            "resistance": h1_high,
+            "breakout_state": h1_box.get("state", "UNKNOWN"),
+        }
 
         _draw_price_panel(
             ax_h1, df_h1_view, sr_h1, current_price,
-            title=f"H1 Context + Decision Box ({H1_WINDOW} candles) - use for range structure and edge behavior",
+            title=(
+                f"H1 Context + Historical Decision Box ({H1_WINDOW} candles total, "
+                f"box from prior {context['chart_box_window']} after skipping latest {context['chart_box_skip']})"
+            ),
             show_legend=False, annotate_levels=True, last_marker=False,
             show_current_price=True, box_mode="tv", draw_diagonals=True,
             box_bounds=(h1_low, h1_high),
-            liquidity_areas=(
-                _detect_liquidity_areas(df_h1_view, current_price, LIQ_LOOKBACK_H1)
-                if SHOW_LIQUIDITY else []
-            ),
+            liquidity_areas=[],
+            show_prev_box=True,
         )
         _format_time_axis(ax_h1, df_h1_view, max_labels=12)
 
@@ -485,6 +556,7 @@ def generate_chart(df_exec: pd.DataFrame, context: dict, df_h1: pd.DataFrame | N
         title = (
             f"{symbol} - {exec_tf} + H1 view ({exec_window}/{H1_WINDOW} candles) | "
             f"Mode: {market_mode} | H1: {h1_trend} | Score: {score}/5 | "
+            f"Box: {context.get('chart_box_state', 'UNKNOWN')} | "
             f"RSI: {rsi_val:.1f} ATR: {atr:.2f} "
             f"Funding: {funding:+.4f}%"
         )
