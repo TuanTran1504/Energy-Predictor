@@ -1223,7 +1223,7 @@ async def trade_chat(request: Request):
                 try:
                     import sys as _sys
                     _sys.path.insert(0, str(Path(__file__).parent.parent / "trading"))
-                    from engine import get_client, _get_binance_positions
+                    from engine_llm import get_client, _get_binance_positions
                     _bn_client = get_client()
                     _bn_pos    = _get_binance_positions(_bn_client)
                 except Exception:
@@ -1409,7 +1409,7 @@ async def trade_execute(request: Request):
         raise HTTPException(status_code=400, detail="order is required")
 
     try:
-        from engine import (
+        from engine_llm import (
             get_client, get_conn, save_trade, calc_quantity,
             LEVERAGE,
         )
@@ -1464,7 +1464,7 @@ async def trade_execute(request: Request):
         })
 
         # Place native SL/TP on Binance â€” fires even if engine is offline
-        from engine import _place_native_sl_tp
+        from engine_llm import _place_native_sl_tp
         _place_native_sl_tp(client, symbol, side, stop_loss, take_profit)
 
         return {
@@ -1554,7 +1554,7 @@ def positions_sync():
     sys.path.insert(0, str(Path(__file__).parent.parent / "trading"))
 
     try:
-        from engine import get_client, SYMBOLS
+        from engine_llm import get_client, SYMBOLS
         client = get_client()
 
         positions = {}

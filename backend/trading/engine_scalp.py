@@ -65,6 +65,15 @@ try:
 except (TypeError, ValueError):
     DEFAULT_MIN_NOTIONAL = 100.0
 
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return float(default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return float(default)
+
 MONITOR_INTERVAL  = 5    # seconds
 COOLDOWN_SECONDS  = 300  # 5 min cooldown per symbol after a close
 
@@ -81,6 +90,10 @@ VOL_MA_LEN    = 20
 SL_BUFFER_ATR_MULT = 0.3   # SL = signal candle extreme ± ATR * 0.3
 MIN_RR             = 1.5
 MIN_ATR_PCT        = 0.05  # skip if ATR < 0.05% of price (dead market)
+M5_MIN_GAP_PCT     = max(0.0, _env_float("SCALP_M5_MIN_GAP_PCT", 0.05))
+VOLUME_MIN_RATIO   = max(0.0, _env_float("SCALP_VOLUME_MIN_RATIO", 0.80))
+PARTIAL_AT_R       = max(0.5, _env_float("SCALP_PARTIAL_AT_R", 1.0))
+PARTIAL_CLOSE_FRAC = min(0.9, max(0.1, _env_float("SCALP_PARTIAL_CLOSE_FRAC", 0.5)))
 
 # ── In-memory state ───────────────────────────────────────────────────────────
 _SYMBOL_MIN_NOTIONAL_CACHE: dict[str, float] = {}
@@ -136,17 +149,20 @@ def db_ensure_trades_table():
                     entry_price       FLOAT,
                     exit_price        FLOAT,
                     quantity          FLOAT,
+                    initial_quantity  FLOAT,
                     leverage          INTEGER     DEFAULT 5,
                     stop_loss         FLOAT,
                     take_profit       FLOAT,
                     pnl_usdt          FLOAT,
                     pnl_pct           FLOAT,
+                    realized_pnl_usdt FLOAT       DEFAULT 0,
                     confidence        FLOAT,
                     horizon           INTEGER     DEFAULT 1,
                     binance_order_id  TEXT,
                     close_reason      TEXT,
                     setup             TEXT,
                     notes             TEXT,
+                    partial_taken     BOOLEAN     DEFAULT FALSE,
                     account_type      TEXT        DEFAULT 'scalp',
                     opened_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     closed_at         TIMESTAMPTZ
@@ -158,6 +174,9 @@ def db_ensure_trades_table():
                 ("confidence",       "FLOAT"),
                 ("binance_order_id", "TEXT"),
                 ("close_reason",     "TEXT"),
+                ("initial_quantity", "FLOAT"),
+                ("realized_pnl_usdt","FLOAT DEFAULT 0"),
+                ("partial_taken",    "BOOLEAN DEFAULT FALSE"),
                 ("account_type",     "TEXT DEFAULT 'scalp'"),
             ]:
                 cur.execute(f"""
@@ -198,11 +217,11 @@ def db_confirm_open(trade_id: int, entry: float, qty: float,
         with conn.cursor() as cur:
             cur.execute(f"""
                 UPDATE {TRADES_TABLE} SET
-                  status='OPEN', entry_price=%s, quantity=%s,
+                  status='OPEN', entry_price=%s, quantity=%s, initial_quantity=%s,
                   stop_loss=%s, take_profit=%s,
                   binance_order_id=%s, notes=%s
                 WHERE id=%s
-            """, (entry, qty, sl, tp, order_id, notes[:200], trade_id))
+            """, (entry, qty, qty, sl, tp, order_id, notes[:200], trade_id))
         conn.commit()
     finally:
         conn.close()
@@ -226,28 +245,68 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
     try:
         with conn.cursor() as cur:
             cur.execute(
-                f"SELECT entry_price, quantity, side, symbol FROM {TRADES_TABLE} WHERE id=%s",
+                f"""
+                SELECT entry_price, quantity, side, symbol, initial_quantity, realized_pnl_usdt
+                FROM {TRADES_TABLE} WHERE id=%s
+                """,
                 (trade_id,),
             )
             row = cur.fetchone()
             if not row:
                 return
-            entry, qty, side, symbol = row
-            pnl_pct = (
+            entry, qty, side, symbol, initial_qty, realized_pnl_usdt = row
+            move_ratio = (
                 (exit_price - entry) / entry if side == "BUY"
                 else (entry - exit_price) / entry
-            ) * LEVERAGE
-            margin   = qty * entry / LEVERAGE
-            pnl_usdt = pnl_pct * margin
+            )
+            remaining_margin = qty * entry / LEVERAGE
+            remaining_pnl_usdt = move_ratio * LEVERAGE * remaining_margin
+            total_pnl_usdt = float(realized_pnl_usdt or 0.0) + float(remaining_pnl_usdt)
+            initial_margin = (float(initial_qty or qty) * entry) / LEVERAGE if entry else 0.0
+            pnl_pct = (total_pnl_usdt / initial_margin) if initial_margin > 0 else 0.0
             cur.execute(f"""
                 UPDATE {TRADES_TABLE} SET
                   status='CLOSED', exit_price=%s, pnl_usdt=%s,
                   pnl_pct=%s, close_reason=%s, closed_at=NOW()
                 WHERE id=%s
-            """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason, trade_id))
+            """, (exit_price, round(total_pnl_usdt, 4), round(pnl_pct * 100, 4), reason, trade_id))
         conn.commit()
         _last_trade_close[symbol] = time.time()
         log.info(f"[DB] Trade {trade_id} closed — {reason} @ {exit_price}  pnl={pnl_pct*100:.2f}%")
+    finally:
+        conn.close()
+
+
+def db_mark_partial(trade_id: int, exit_price: float, closed_qty: float,
+                    remaining_qty: float, new_stop_loss: float, note: str):
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"SELECT entry_price, side, realized_pnl_usdt FROM {TRADES_TABLE} WHERE id=%s",
+                (trade_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return
+            entry, side, realized_pnl_usdt = row
+            move_ratio = (
+                (exit_price - entry) / entry if side == "BUY"
+                else (entry - exit_price) / entry
+            )
+            partial_margin = closed_qty * entry / LEVERAGE
+            partial_pnl_usdt = move_ratio * LEVERAGE * partial_margin
+            updated_realized = float(realized_pnl_usdt or 0.0) + float(partial_pnl_usdt)
+            cur.execute(f"""
+                UPDATE {TRADES_TABLE} SET
+                  quantity=%s,
+                  stop_loss=%s,
+                  partial_taken=TRUE,
+                  realized_pnl_usdt=%s,
+                  notes=%s
+                WHERE id=%s
+            """, (remaining_qty, new_stop_loss, round(updated_realized, 4), note[:200], trade_id))
+        conn.commit()
     finally:
         conn.close()
 
@@ -261,7 +320,8 @@ def db_get_open_trades() -> list[dict]:
             with conn.cursor() as cur:
                 cur.execute(f"""
                     SELECT id, symbol, side, entry_price, quantity,
-                           stop_loss, take_profit, binance_order_id, opened_at
+                           initial_quantity, stop_loss, take_profit,
+                           realized_pnl_usdt, partial_taken, binance_order_id, opened_at
                     FROM {TRADES_TABLE} WHERE status='OPEN' AND account_type=%s
                 """, (ACCOUNT_TYPE,))
                 cols = [d[0] for d in cur.description]
@@ -402,6 +462,11 @@ def calc_quantity(balance: float, entry: float, sl: float,
     return qty
 
 
+def _floor_qty(qty: float, symbol: str) -> float:
+    factor = 10 ** QTY_PRECISION.get(symbol, 2)
+    return math.floor(float(qty) * factor) / factor
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Scalp indicators
 # ─────────────────────────────────────────────────────────────────────────────
@@ -449,6 +514,12 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
     m5_close   = df_m5["close"].astype(float)
     m5_ema_fast = float(_ema(m5_close, M5_FAST_EMA).iloc[-1])
     m5_ema_slow = float(_ema(m5_close, M5_SLOW_EMA).iloc[-1])
+    m5_gap_pct = abs(m5_ema_fast - m5_ema_slow) / max(abs(m5_ema_slow), 1e-9) * 100
+    if m5_gap_pct < M5_MIN_GAP_PCT:
+        return {
+            "signal": "WAIT",
+            "reason": f"M5 chop gap={m5_gap_pct:.3f}% < {M5_MIN_GAP_PCT:.3f}%",
+        }
     m5_trend   = "UP" if m5_ema_fast > m5_ema_slow else "DOWN"
 
     # ── M1 indicators ────────────────────────────────────────────────────────
@@ -483,7 +554,8 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
         return {"signal": "WAIT", "reason": f"dead market ATR%={atr_pct:.3f}"}
 
     # ── Volume confirmation ──────────────────────────────────────────────────
-    vol_ok = vol_now > vol_ma_now if vol_ma_now > 0 else False
+    vol_ratio = (vol_now / vol_ma_now) if vol_ma_now > 0 else 0.0
+    vol_ok = vol_ratio >= VOLUME_MIN_RATIO if vol_ma_now > 0 else False
 
     # ── Cross detection ──────────────────────────────────────────────────────
     bull_cross = fast_prev <= slow_prev and fast_now > slow_now
@@ -550,7 +622,10 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
             f"M5={m5_trend} RSI={rsi_now:.1f}"
         )
     elif not vol_ok:
-        reason = f"low volume {vol_now:.0f} < MA {vol_ma_now:.0f}"
+        reason = (
+            f"low volume ratio={vol_ratio:.2f} < {VOLUME_MIN_RATIO:.2f} "
+            f"(vol={vol_now:.0f} ma={vol_ma_now:.0f})"
+        )
     elif bull_cross and m5_trend != "UP":
         reason = f"bull cross but M5 trend={m5_trend}"
     elif bear_cross and m5_trend != "DOWN":
@@ -640,8 +715,10 @@ def _monitor_loop(client: UMFutures):
 
             # Phase 1: enforce SL/TP by mark price
             for trade in list(open_trades):
-                sl = trade.get("stop_loss") or 0
-                tp = trade.get("take_profit") or 0
+                entry = float(trade.get("entry_price") or 0.0)
+                qty = float(trade.get("quantity") or 0.0)
+                sl = float(trade.get("stop_loss") or 0.0)
+                tp = float(trade.get("take_profit") or 0.0)
                 if not sl and not tp:
                     continue
                 sym = trade["symbol"]
@@ -649,6 +726,51 @@ def _monitor_loop(client: UMFutures):
                     mark = float(client.ticker_price(symbol=f"{sym}USDT")["price"])
                 except Exception:
                     continue
+
+                partial_taken = bool(trade.get("partial_taken"))
+                if not partial_taken and entry > 0 and qty > 0 and sl > 0:
+                    risk = (entry - sl) if trade["side"] == "BUY" else (sl - entry)
+                    if risk > 0:
+                        partial_trigger = (
+                            entry + risk * PARTIAL_AT_R
+                            if trade["side"] == "BUY"
+                            else entry - risk * PARTIAL_AT_R
+                        )
+                        hit_partial = (
+                            mark >= partial_trigger
+                            if trade["side"] == "BUY"
+                            else mark <= partial_trigger
+                        )
+                        if hit_partial:
+                            close_qty = _floor_qty(qty * PARTIAL_CLOSE_FRAC, sym)
+                            remaining_qty = _floor_qty(qty - close_qty, sym)
+                            if close_qty > 0 and remaining_qty > 0:
+                                close_side = "SELL" if trade["side"] == "BUY" else "BUY"
+                                try:
+                                    client.new_order(
+                                        symbol=f"{sym}USDT",
+                                        side=close_side,
+                                        type="MARKET",
+                                        quantity=close_qty,
+                                    )
+                                    db_mark_partial(
+                                        trade["id"],
+                                        mark,
+                                        close_qty,
+                                        remaining_qty,
+                                        entry,
+                                        f"partial @{PARTIAL_AT_R:.1f}R; stop moved to breakeven",
+                                    )
+                                    trade["quantity"] = remaining_qty
+                                    trade["stop_loss"] = entry
+                                    trade["partial_taken"] = True
+                                    log.info(
+                                        f"[MONITOR] {sym} partial fired @ {mark} "
+                                        f"closed={close_qty} remaining={remaining_qty} stop->BE"
+                                    )
+                                    continue
+                                except Exception as e:
+                                    log.warning(f"[MONITOR] Partial close failed for {sym}: {e}")
 
                 hit = None
                 if trade["side"] == "BUY":
@@ -746,6 +868,10 @@ def run_once(dry_run: bool = False):
     log.info("=" * 55)
     log.info(f"SCALP ENGINE  {'DRY' if dry_run else 'LIVE'}  {datetime.now(UTC).isoformat()}")
     log.info("=" * 55)
+    try:
+        db_ensure_trades_table()
+    except Exception as e:
+        log.warning(f"DB table init failed (will retry): {e}")
     client  = get_client()
     balance = get_account_balance(client)
     log.info(f"Balance: {balance:.2f} USDT")
