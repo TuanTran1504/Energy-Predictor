@@ -74,6 +74,15 @@ def _env_float(name: str, default: float) -> float:
     except (TypeError, ValueError):
         return float(default)
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return int(default)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return int(default)
+
 MONITOR_INTERVAL  = 5    # seconds
 COOLDOWN_SECONDS  = 300  # 5 min cooldown per symbol after a close
 
@@ -94,6 +103,14 @@ M5_MIN_GAP_PCT     = max(0.0, _env_float("SCALP_M5_MIN_GAP_PCT", 0.05))
 VOLUME_MIN_RATIO   = max(0.0, _env_float("SCALP_VOLUME_MIN_RATIO", 0.80))
 PARTIAL_AT_R       = max(0.5, _env_float("SCALP_PARTIAL_AT_R", 1.0))
 PARTIAL_CLOSE_FRAC = min(0.9, max(0.1, _env_float("SCALP_PARTIAL_CLOSE_FRAC", 0.5)))
+OFFENSIVE_MODE     = os.getenv("SCALP_OFFENSIVE_MODE", "1") == "1"
+ENTRY_CROSS_LOOKBACK = max(1, _env_int("SCALP_CROSS_LOOKBACK", 2))
+STRONG_TREND_GAP_PCT = max(M5_MIN_GAP_PCT, _env_float("SCALP_STRONG_TREND_GAP_PCT", 0.10))
+STRONG_TREND_ATR_PCT = min(MIN_ATR_PCT, _env_float("SCALP_STRONG_TREND_ATR_PCT", 0.04))
+STRONG_TREND_VOL_RATIO = min(VOLUME_MIN_RATIO, _env_float("SCALP_STRONG_TREND_VOL_RATIO", 0.65))
+CONT_LOOKBACK_BARS = max(2, _env_int("SCALP_CONT_LOOKBACK", 4))
+CONT_PULLBACK_ATR  = max(0.1, _env_float("SCALP_CONT_PULLBACK_ATR", 0.45))
+BREAKOUT_LOOKBACK_BARS = max(2, _env_int("SCALP_BREAKOUT_LOOKBACK", 5))
 
 # ── In-memory state ───────────────────────────────────────────────────────────
 _SYMBOL_MIN_NOTIONAL_CACHE: dict[str, float] = {}
@@ -492,6 +509,38 @@ def _atr(df: pd.DataFrame, period: int) -> pd.Series:
     return tr.ewm(span=period, adjust=False).mean()
 
 
+def _cross_happened_recently(fast: pd.Series, slow: pd.Series,
+                             direction: str, lookback: int) -> bool:
+    for bars_ago in range(1, lookback + 1):
+        prev_idx = -bars_ago - 1
+        now_idx = -bars_ago
+        if direction == "bull":
+            if fast.iloc[prev_idx] <= slow.iloc[prev_idx] and fast.iloc[now_idx] > slow.iloc[now_idx]:
+                return True
+        else:
+            if fast.iloc[prev_idx] >= slow.iloc[prev_idx] and fast.iloc[now_idx] < slow.iloc[now_idx]:
+                return True
+    return False
+
+
+def _build_signal(signal: str, setup: str, entry: float, sl: float, tp: float,
+                  atr: float, reason: str) -> dict:
+    risk = (entry - sl) if signal == "BUY" else (sl - entry)
+    if risk <= 0:
+        return {"signal": "WAIT", "reason": f"{signal} invalid risk geometry"}
+    rr = ((tp - entry) / risk) if signal == "BUY" else ((entry - tp) / risk)
+    return {
+        "signal": signal,
+        "setup": setup,
+        "entry": entry,
+        "sl": round(sl, 6),
+        "tp": round(tp, 6),
+        "rr": round(rr, 2),
+        "atr": atr,
+        "reason": reason,
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Signal logic
 # ─────────────────────────────────────────────────────────────────────────────
@@ -512,8 +561,12 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
 
     # ── M5 trend ─────────────────────────────────────────────────────────────
     m5_close   = df_m5["close"].astype(float)
-    m5_ema_fast = float(_ema(m5_close, M5_FAST_EMA).iloc[-1])
-    m5_ema_slow = float(_ema(m5_close, M5_SLOW_EMA).iloc[-1])
+    m5_fast_s = _ema(m5_close, M5_FAST_EMA)
+    m5_slow_s = _ema(m5_close, M5_SLOW_EMA)
+    m5_ema_fast = float(m5_fast_s.iloc[-1])
+    m5_ema_slow = float(m5_slow_s.iloc[-1])
+    m5_fast_prev = float(m5_fast_s.iloc[-2])
+    m5_slow_prev = float(m5_slow_s.iloc[-2])
     m5_gap_pct = abs(m5_ema_fast - m5_ema_slow) / max(abs(m5_ema_slow), 1e-9) * 100
     if m5_gap_pct < M5_MIN_GAP_PCT:
         return {
@@ -521,6 +574,11 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
             "reason": f"M5 chop gap={m5_gap_pct:.3f}% < {M5_MIN_GAP_PCT:.3f}%",
         }
     m5_trend   = "UP" if m5_ema_fast > m5_ema_slow else "DOWN"
+    strong_trend = (
+        m5_gap_pct >= STRONG_TREND_GAP_PCT
+        and ((m5_ema_fast > m5_fast_prev and m5_ema_slow > m5_slow_prev)
+             or (m5_ema_fast < m5_fast_prev and m5_ema_slow < m5_slow_prev))
+    )
 
     # ── M1 indicators ────────────────────────────────────────────────────────
     closes   = df_m1["close"].astype(float)
@@ -540,6 +598,7 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
     slow_now  = float(slow_ema.iloc[-1])
     slow_prev = float(slow_ema.iloc[-2])
     trend_now = float(trend_ema.iloc[-1])
+    trend_prev = float(trend_ema.iloc[-2])
     rsi_now   = float(rsi_s.iloc[-1])
     atr_now   = float(atr_s.iloc[-1])
     vol_now   = float(volumes.iloc[-1])
@@ -547,93 +606,160 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
     current   = float(closes.iloc[-1])
     sig_low   = float(lows.iloc[-1])
     sig_high  = float(highs.iloc[-1])
+    recent_high = float(highs.iloc[-BREAKOUT_LOOKBACK_BARS:-1].max())
+    recent_low = float(lows.iloc[-BREAKOUT_LOOKBACK_BARS:-1].min())
+    cont_low = float(lows.iloc[-CONT_LOOKBACK_BARS:].min())
+    cont_high = float(highs.iloc[-CONT_LOOKBACK_BARS:].max())
+    trend_slope_up = trend_now >= trend_prev
+    trend_slope_down = trend_now <= trend_prev
 
     # ── Dead market filter ───────────────────────────────────────────────────
     atr_pct = atr_now / current * 100 if current > 0 else 0.0
-    if atr_pct < MIN_ATR_PCT:
-        return {"signal": "WAIT", "reason": f"dead market ATR%={atr_pct:.3f}"}
+    effective_min_atr_pct = STRONG_TREND_ATR_PCT if strong_trend else MIN_ATR_PCT
+    if atr_pct < effective_min_atr_pct:
+        return {
+            "signal": "WAIT",
+            "reason": f"dead market ATR%={atr_pct:.3f} < {effective_min_atr_pct:.3f}",
+        }
 
     # ── Volume confirmation ──────────────────────────────────────────────────
     vol_ratio = (vol_now / vol_ma_now) if vol_ma_now > 0 else 0.0
-    vol_ok = vol_ratio >= VOLUME_MIN_RATIO if vol_ma_now > 0 else False
+    effective_vol_ratio = STRONG_TREND_VOL_RATIO if strong_trend else VOLUME_MIN_RATIO
+    vol_ok = vol_ratio >= effective_vol_ratio if vol_ma_now > 0 else False
 
     # ── Cross detection ──────────────────────────────────────────────────────
     bull_cross = fast_prev <= slow_prev and fast_now > slow_now
     bear_cross = fast_prev >= slow_prev and fast_now < slow_now
+    bull_recent_cross = _cross_happened_recently(fast_ema, slow_ema, "bull", ENTRY_CROSS_LOOKBACK)
+    bear_recent_cross = _cross_happened_recently(fast_ema, slow_ema, "bear", ENTRY_CROSS_LOOKBACK)
 
-    # ── BUY ──────────────────────────────────────────────────────────────────
-    if (
-        bull_cross
-        and m5_trend == "UP"
-        and current > trend_now          # price above M1 trend EMA
-        and 50 < rsi_now < 78            # bullish momentum, not overbought
-        and vol_ok
-    ):
-        sl   = sig_low - atr_now * SL_BUFFER_ATR_MULT
-        risk = current - sl
-        if risk <= 0:
-            return {"signal": "WAIT", "reason": "BUY SL above entry"}
-        tp = current + risk * MIN_RR
-        rr = (tp - current) / risk
-        return {
-            "signal": "BUY",
-            "entry":  current,
-            "sl":     round(sl, 6),
-            "tp":     round(tp, 6),
-            "rr":     round(rr, 2),
-            "atr":    atr_now,
-            "reason": (
-                f"EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bull cross | "
-                f"M5 UP | RSI={rsi_now:.1f} | ATR={atr_now:.4f}"
-            ),
-        }
+    buy_rsi_min = 48 if strong_trend else 50
+    buy_rsi_max = 82 if strong_trend else 78
+    sell_rsi_min = 18 if strong_trend else 22
+    sell_rsi_max = 52 if strong_trend else 50
 
-    # ── SELL ─────────────────────────────────────────────────────────────────
-    if (
-        bear_cross
-        and m5_trend == "DOWN"
-        and current < trend_now          # price below M1 trend EMA
-        and 22 < rsi_now < 50            # bearish momentum, not oversold
+    buy_cross_ready = (
+        m5_trend == "UP"
+        and bull_recent_cross
+        and fast_now >= slow_now
+        and current > trend_now
+        and trend_slope_up
+        and buy_rsi_min < rsi_now < buy_rsi_max
         and vol_ok
-    ):
-        sl   = sig_high + atr_now * SL_BUFFER_ATR_MULT
-        risk = sl - current
-        if risk <= 0:
-            return {"signal": "WAIT", "reason": "SELL SL below entry"}
-        tp = current - risk * MIN_RR
-        rr = (current - tp) / risk
-        return {
-            "signal": "SELL",
-            "entry":  current,
-            "sl":     round(sl, 6),
-            "tp":     round(tp, 6),
-            "rr":     round(rr, 2),
-            "atr":    atr_now,
-            "reason": (
-                f"EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bear cross | "
-                f"M5 DOWN | RSI={rsi_now:.1f} | ATR={atr_now:.4f}"
+    )
+    if buy_cross_ready:
+        sl = min(sig_low, cont_low) - atr_now * SL_BUFFER_ATR_MULT
+        tp = current + (current - sl) * MIN_RR
+        return _build_signal(
+            "BUY",
+            "scalp_ema_cross" if bull_cross else "scalp_cross_followthrough",
+            current,
+            sl,
+            tp,
+            atr_now,
+            (
+                f"{'fresh' if bull_cross else 'recent'} EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bull cross | "
+                f"M5 {'STRONG ' if strong_trend else ''}UP | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}"
             ),
-        }
+        )
+
+    sell_cross_ready = (
+        m5_trend == "DOWN"
+        and bear_recent_cross
+        and fast_now <= slow_now
+        and current < trend_now
+        and trend_slope_down
+        and sell_rsi_min < rsi_now < sell_rsi_max
+        and vol_ok
+    )
+    if sell_cross_ready:
+        sl = max(sig_high, cont_high) + atr_now * SL_BUFFER_ATR_MULT
+        tp = current - (sl - current) * MIN_RR
+        return _build_signal(
+            "SELL",
+            "scalp_ema_cross" if bear_cross else "scalp_cross_followthrough",
+            current,
+            sl,
+            tp,
+            atr_now,
+            (
+                f"{'fresh' if bear_cross else 'recent'} EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bear cross | "
+                f"M5 {'STRONG ' if strong_trend else ''}DOWN | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}"
+            ),
+        )
+
+    if OFFENSIVE_MODE and strong_trend:
+        buy_pullback = (
+            m5_trend == "UP"
+            and fast_now > slow_now
+            and current > fast_now >= trend_now
+            and cont_low <= fast_now + atr_now * CONT_PULLBACK_ATR
+            and current >= recent_high
+            and 50 < rsi_now < 84
+            and vol_ratio >= max(0.55, effective_vol_ratio * 0.9)
+        )
+        if buy_pullback:
+            sl = cont_low - atr_now * SL_BUFFER_ATR_MULT
+            tp = current + (current - sl) * (MIN_RR + 0.2)
+            return _build_signal(
+                "BUY",
+                "scalp_trend_resume",
+                current,
+                sl,
+                tp,
+                atr_now,
+                f"trend resume breakout | M5 strong UP | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}",
+            )
+
+        sell_pullback = (
+            m5_trend == "DOWN"
+            and fast_now < slow_now
+            and current < fast_now <= trend_now
+            and cont_high >= fast_now - atr_now * CONT_PULLBACK_ATR
+            and current <= recent_low
+            and 16 < rsi_now < 50
+            and vol_ratio >= max(0.55, effective_vol_ratio * 0.9)
+        )
+        if sell_pullback:
+            sl = cont_high + atr_now * SL_BUFFER_ATR_MULT
+            tp = current - (sl - current) * (MIN_RR + 0.2)
+            return _build_signal(
+                "SELL",
+                "scalp_trend_resume",
+                current,
+                sl,
+                tp,
+                atr_now,
+                f"trend resume breakdown | M5 strong DOWN | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}",
+            )
 
     # ── WAIT — explain why ───────────────────────────────────────────────────
-    if not bull_cross and not bear_cross:
+    if strong_trend and not bull_recent_cross and not bear_recent_cross:
+        reason = (
+            f"trend strong but no trigger | fast={fast_now:.4f} slow={slow_now:.4f} | "
+            f"M5={m5_trend} RSI={rsi_now:.1f} vol={vol_ratio:.2f}"
+        )
+    elif not bull_recent_cross and not bear_recent_cross:
         reason = (
             f"no cross | fast={fast_now:.4f} slow={slow_now:.4f} | "
             f"M5={m5_trend} RSI={rsi_now:.1f}"
         )
     elif not vol_ok:
         reason = (
-            f"low volume ratio={vol_ratio:.2f} < {VOLUME_MIN_RATIO:.2f} "
+            f"low volume ratio={vol_ratio:.2f} < {effective_vol_ratio:.2f} "
             f"(vol={vol_now:.0f} ma={vol_ma_now:.0f})"
         )
-    elif bull_cross and m5_trend != "UP":
+    elif bull_recent_cross and m5_trend != "UP":
         reason = f"bull cross but M5 trend={m5_trend}"
-    elif bear_cross and m5_trend != "DOWN":
+    elif bear_recent_cross and m5_trend != "DOWN":
         reason = f"bear cross but M5 trend={m5_trend}"
-    elif rsi_now >= 78 or rsi_now <= 22:
+    elif rsi_now >= buy_rsi_max or rsi_now <= sell_rsi_min:
         reason = f"RSI extreme={rsi_now:.1f}"
     else:
-        reason = f"conditions not met | M5={m5_trend} RSI={rsi_now:.1f}"
+        reason = (
+            f"conditions not met | M5={m5_trend} strong={strong_trend} "
+            f"RSI={rsi_now:.1f} vol={vol_ratio:.2f}"
+        )
 
     return {"signal": "WAIT", "reason": reason}
 
@@ -645,6 +771,7 @@ def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
 def execute_scalp_trade(client: UMFutures, symbol: str, sig: dict,
                         balance: float, dry_run: bool = False) -> bool:
     signal = sig["signal"]
+    setup  = sig.get("setup", "scalp_ema_cross")
     entry  = sig["entry"]
     sl     = sig["sl"]
     tp     = sig["tp"]
@@ -674,7 +801,7 @@ def execute_scalp_trade(client: UMFutures, symbol: str, sig: dict,
 
     log.info(
         f"  [EXEC] {signal} {symbol} | entry≈{entry} SL={sl} TP={tp} "
-        f"R:R={rr:.2f} qty={qty} dry={dry_run}"
+        f"R:R={rr:.2f} qty={qty} setup={setup} dry={dry_run}"
     )
 
     if dry_run:
@@ -684,7 +811,7 @@ def execute_scalp_trade(client: UMFutures, symbol: str, sig: dict,
     sym_pair   = f"{symbol}USDT"
     pending_id = None
     try:
-        pending_id = db_create_pending(symbol, signal, "scalp_ema_cross")
+        pending_id = db_create_pending(symbol, signal, setup)
         client.change_leverage(symbol=sym_pair, leverage=LEVERAGE)
 
         order        = client.new_order(symbol=sym_pair, side=signal, type="MARKET", quantity=qty)

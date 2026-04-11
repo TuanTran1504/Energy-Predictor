@@ -992,6 +992,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx["ml_conflict_min_rr"] = 0.0
     ctx["fear_greed"]    = fear_greed
     ctx["funding_rate"]  = funding
+    ctx["llm_exec_tf"]   = "15m"
 
     macro_ok, macro_reason, allowed_dir = check_macro_bias(
         ml_dir, ml_conf, fear_greed, funding, symbol
@@ -1031,13 +1032,13 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             return
 
     log.info("  All gates passed → generating chart...")
-    chart_b64 = generate_chart(df_m5, ctx, df_h1=df_h1)
+    chart_b64 = generate_chart(df_m15, ctx, df_h1=df_h1)
     if not chart_b64:
         log_error(f"[{symbol}] Chart generation failed")
         return
 
     log_ai_request(symbol, ctx.get("market_mode", "?"))
-    decision = ask_gemini(chart_b64, ctx, df_m5)
+    decision = ask_gemini(chart_b64, ctx, df_m15)
     if decision is None:
         log_error(f"[{symbol}] Gemini returned no response")
         return

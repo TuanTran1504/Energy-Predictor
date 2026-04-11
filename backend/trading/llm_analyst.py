@@ -1,7 +1,7 @@
 """
 llm_analyst.py — Gemini Flash vision + language analyst.
 
-Sends the M5 chart image + quantitative context to Gemini Flash.
+Sends the execution chart image + quantitative context to Gemini Flash.
 Returns a structured trading decision dict.
 
 Requires:
@@ -142,6 +142,8 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     symbol      = context.get("symbol", "BTC/USDT")
     symbol_base = str(symbol).split("/", 1)[0].upper()
     m15_gap     = float(context.get("m15_gap", 0))
+    exec_tf     = str(context.get("llm_exec_tf", "5m")).lower()
+    exec_tf_label = exec_tf.upper()
 
     # How far is the current gap from the classification threshold?
     gap_margin = abs(m15_gap - M15_TREND_GAP) / M15_TREND_GAP if M15_TREND_GAP > 0 else 1.0
@@ -238,7 +240,7 @@ Nearest BSL   : {_fmt_level(nearest_bsl)}
 Bias directive: {bias_note}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-LAST 5 M5 CANDLES (newest last)
+LAST 5 {exec_tf_label} CANDLES (newest last)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {candle_text}
 
@@ -279,7 +281,7 @@ DIRECTION CHECK only (enforce):
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 YOUR TASK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Review the M5 execution pane for signal candle quality, wick/body structure, and immediate confirmation.
+1. Review the {exec_tf_label} execution pane for signal candle quality, wick/body structure, and immediate confirmation.
 2. Review the H1 context pane for box structure and edge behavior:
    top and bottom edge rejection behavior.
 3. Use RSI + volume panels to confirm timing quality and momentum/range context.
@@ -311,9 +313,9 @@ OUTPUT FORMAT:
 
     user_text = (
         f"Here is the {symbol} chart generated from live Binance data. "
-        f"The TOP pane is M5 execution view for entry timing. "
+        f"The TOP pane is {exec_tf_label} execution view for entry timing. "
         f"The SECOND pane is H1 context view with a cyan Decision Box between support and resistance. "
-        f"The lower panels are M5 RSI and M5 volume. "
+        f"The lower panels are {exec_tf_label} RSI and {exec_tf_label} volume. "
         f"Chart includes candlesticks, EMA34 (green), EMA89 (orange), and Volume MA (blue). "
         f"Analyse according to the system prompt and use both timeframes together."
     )
@@ -321,9 +323,9 @@ OUTPUT FORMAT:
     return system_prompt, user_text
 
 
-def _build_candle_summary(df_m5: pd.DataFrame) -> str:
+def _build_candle_summary(df_exec: pd.DataFrame) -> str:
     lines = []
-    for _, row in df_m5.tail(5).iterrows():
+    for _, row in df_exec.tail(5).iterrows():
         o, h, lo, c = float(row["open"]), float(row["high"]), float(row["low"]), float(row["close"])
         color    = "green" if c >= o else "red"
         body     = abs(c - o)
@@ -337,7 +339,7 @@ def _build_candle_summary(df_m5: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
+def ask_gemini(chart_b64: str, context: dict, df_exec) -> dict | None:
     """
     Sends chart image + context to Gemini Flash.
     Returns parsed decision dict or None on failure.
@@ -345,19 +347,19 @@ def ask_gemini(chart_b64: str, context: dict, df_m5) -> dict | None:
     if not chart_b64:
         return None
 
-    context["candle_summary"] = _build_candle_summary(df_m5)
+    context["candle_summary"] = _build_candle_summary(df_exec)
     system_prompt, user_text  = _build_prompt(context)
     system_prompt += """
 
 IMPORTANT OVERRIDE:
-- Do not call BUY during an active 5m bearish impulse
-- Do not call SELL during an active 5m bullish impulse
+- Do not call BUY during an active execution-timeframe bearish impulse
+- Do not call SELL during an active execution-timeframe bullish impulse
 - Use liquidity hints as secondary timing filter: prefer BUY after sweep/reclaim near SSL, prefer SELL after sweep/reject near BSL.
 - Do not reject a valid setup because of stop loss, take profit, or R:R math.
 - Python will calculate entry, stop loss, take profit, and final R:R after your decision.
 - You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
 - Recommend a seek-entry zone only as an advisory area to monitor, not as a hard executable order.
-- If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on M5.
+- If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on the execution timeframe.
 - If you mention rr_check, say that Python will calculate levels after the decision.
 - CRITICAL: Do NOT output WAIT solely because "market is sideways", "market mode is range", or "price is in the middle of the box". These are descriptive labels, not rejection criteria. Setup D exists specifically for sideways/range markets — if a D setup is visible, take it.
 - CRITICAL: Do NOT output WAIT solely because the market label says SIDEWAY or VOLATILE_RANGE. Evaluate the actual chart for signal candle quality, volume, and S/R proximity.
