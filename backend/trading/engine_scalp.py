@@ -99,8 +99,10 @@ BE_TRIGGER_PCT   = _env_float("SCALP_BE_TRIGGER_PCT", 0.004)   # move SL to entr
 VOLUME_MIN_RATIO = max(0.0, _env_float("SCALP_VOLUME_MIN_RATIO", 1.0))
 
 # RSI momentum zones
-BUY_RSI_MIN  = 50;  BUY_RSI_MAX  = 65   # long: building momentum, not overbought
-SELL_RSI_MIN = 35;  SELL_RSI_MAX = 50   # short: building momentum, not oversold
+BUY_RSI_MIN  = 50   # long: building momentum, not overbought
+BUY_RSI_MAX  = 65
+SELL_RSI_MIN = 35   # short: building momentum, not oversold
+SELL_RSI_MAX = 50
 
 # Session + daily-risk limits
 SESSION_START_HOUR_UTC = _env_int("SCALP_SESSION_START_HOUR_UTC", 14)  # London/NY overlap
