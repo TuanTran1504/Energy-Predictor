@@ -47,7 +47,7 @@ TESTNET_BASE = "https://testnet.binancefuture.com"
 TRADES_TABLE = "trades_scalp"
 ACCOUNT_TYPE = "scalp"
 
-SYMBOLS        = ["BTC", "ETH", "SOL", "XRP"]
+SYMBOLS        = ["BTC", "SOL", "XRP"]
 LEVERAGE       = 5
 CYCLE_INTERVAL = 60   # seconds
 
