@@ -110,7 +110,7 @@ export default function TradingTab({ livePrices = {} }) {
           label="OPEN POSITIONS"
           value={status?.open_trades?.length ?? 0}
           color="var(--text)"
-          sub="BTC + ETH max 2"
+          sub="BTC + ETH + SOL + XRP max 4"
         />
       </div>
 
