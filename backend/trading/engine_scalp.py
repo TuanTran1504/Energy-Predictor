@@ -84,33 +84,29 @@ def _env_int(name: str, default: int) -> int:
         return int(default)
 
 MONITOR_INTERVAL  = 5    # seconds
-COOLDOWN_SECONDS  = 300  # 5 min cooldown per symbol after a close
+COOLDOWN_SECONDS  = 600  # 10 min cooldown per symbol after a close
 
-# ── Strategy parameters ───────────────────────────────────────────────────────
-M1_FAST_EMA   = 9
-M1_SLOW_EMA   = 21
-M1_TREND_EMA  = 50
-M5_FAST_EMA   = 20
-M5_SLOW_EMA   = 50
+# ── Strategy parameters  (EMA cross scalp — London/NY overlap 14–17 UTC) ─────
+M1_FAST_EMA   = 9    # EMA 9 on 1m  — fast momentum
+M1_SLOW_EMA   = 21   # EMA 21 on 1m — slow trend
+M5_TREND_EMA  = 21   # EMA 21 on 5m — trend: long if close > EMA21
 RSI_LEN       = 7
-ATR_LEN       = 7
 VOL_MA_LEN    = 20
 
-SL_BUFFER_ATR_MULT = 0.3   # SL = signal candle extreme ± ATR * 0.3
-MIN_RR             = 1.5
-MIN_ATR_PCT        = 0.05  # skip if ATR < 0.05% of price (dead market)
-M5_MIN_GAP_PCT     = max(0.0, _env_float("SCALP_M5_MIN_GAP_PCT", 0.05))
-VOLUME_MIN_RATIO   = max(0.0, _env_float("SCALP_VOLUME_MIN_RATIO", 0.80))
-PARTIAL_AT_R       = max(0.5, _env_float("SCALP_PARTIAL_AT_R", 1.0))
-PARTIAL_CLOSE_FRAC = min(0.9, max(0.1, _env_float("SCALP_PARTIAL_CLOSE_FRAC", 0.5)))
-OFFENSIVE_MODE     = os.getenv("SCALP_OFFENSIVE_MODE", "1") == "1"
-ENTRY_CROSS_LOOKBACK = max(1, _env_int("SCALP_CROSS_LOOKBACK", 2))
-STRONG_TREND_GAP_PCT = max(M5_MIN_GAP_PCT, _env_float("SCALP_STRONG_TREND_GAP_PCT", 0.10))
-STRONG_TREND_ATR_PCT = min(MIN_ATR_PCT, _env_float("SCALP_STRONG_TREND_ATR_PCT", 0.04))
-STRONG_TREND_VOL_RATIO = min(VOLUME_MIN_RATIO, _env_float("SCALP_STRONG_TREND_VOL_RATIO", 0.65))
-CONT_LOOKBACK_BARS = max(2, _env_int("SCALP_CONT_LOOKBACK", 4))
-CONT_PULLBACK_ATR  = max(0.1, _env_float("SCALP_CONT_PULLBACK_ATR", 0.45))
-BREAKOUT_LOOKBACK_BARS = max(2, _env_int("SCALP_BREAKOUT_LOOKBACK", 5))
+SL_PCT           = _env_float("SCALP_SL_PCT", 0.004)           # 0.4% SL from entry
+MIN_RR           = 2.0                                           # TP = SL × 2  (0.8% from entry)
+BE_TRIGGER_PCT   = _env_float("SCALP_BE_TRIGGER_PCT", 0.004)   # move SL to entry at +0.4% profit
+VOLUME_MIN_RATIO = max(0.0, _env_float("SCALP_VOLUME_MIN_RATIO", 1.0))
+
+# RSI momentum zones
+BUY_RSI_MIN  = 50;  BUY_RSI_MAX  = 65   # long: building momentum, not overbought
+SELL_RSI_MIN = 35;  SELL_RSI_MAX = 50   # short: building momentum, not oversold
+
+# Session + daily-risk limits
+SESSION_START_HOUR_UTC = _env_int("SCALP_SESSION_START_HOUR_UTC", 14)  # London/NY overlap
+SESSION_END_HOUR_UTC   = _env_int("SCALP_SESSION_END_HOUR_UTC", 17)
+DAILY_LOSS_LIMIT_PCT   = _env_float("SCALP_DAILY_LOSS_LIMIT_PCT", 0.03)  # halt at -3% on day
+MAX_SESSION_TRADES     = _env_int("SCALP_MAX_SESSION_TRADES", 6)          # max 6 entries/session
 
 # ── In-memory state ───────────────────────────────────────────────────────────
 _SYMBOL_MIN_NOTIONAL_CACHE: dict[str, float] = {}
@@ -523,6 +519,24 @@ def _cross_happened_recently(fast: pd.Series, slow: pd.Series,
     return False
 
 
+def _is_active_session(ts_ms: int) -> bool:
+    hour = datetime.fromtimestamp(ts_ms / 1000, UTC).hour
+    if SESSION_START_HOUR_UTC == SESSION_END_HOUR_UTC:
+        return True
+    if SESSION_START_HOUR_UTC < SESSION_END_HOUR_UTC:
+        return SESSION_START_HOUR_UTC <= hour < SESSION_END_HOUR_UTC
+    return hour >= SESSION_START_HOUR_UTC or hour < SESSION_END_HOUR_UTC
+
+
+def _candle_body_stats(open_price: float, close_price: float, high_price: float,
+                       low_price: float, atr: float) -> tuple[float, float]:
+    body = abs(close_price - open_price)
+    candle_range = max(high_price - low_price, 1e-9)
+    body_frac = body / candle_range
+    body_atr = body / max(atr, 1e-9)
+    return body_frac, body_atr
+
+
 def _build_signal(signal: str, setup: str, entry: float, sl: float, tp: float,
                   atr: float, reason: str) -> dict:
     risk = (entry - sl) if signal == "BUY" else (sl - entry)
@@ -547,219 +561,94 @@ def _build_signal(signal: str, setup: str, entry: float, sl: float, tp: float,
 
 def compute_scalp_signal(df_m1: pd.DataFrame, df_m5: pd.DataFrame) -> dict:
     """
-    EMA cross momentum scalp.
+    EMA cross scalp — London/NY overlap (14–17 UTC).
 
-    Trend filter  : M5 EMA20 vs EMA50
-    Entry trigger : M1 EMA9 crosses EMA21
-    Confirmation  : RSI(7) in momentum zone, volume above MA(20)
-    Dead market   : skip if ATR < MIN_ATR_PCT of price
+    Trend filter  : 5m EMA 21 — long if close > EMA21, short if close < EMA21
+    Entry trigger : fresh 1m EMA9 × EMA21 cross
+    Confirmation  : RSI(7) in zone (long 50–65, short 35–50), volume > 20-bar avg
+    SL/TP         : fixed-% (0.4% SL, 0.8% TP = 2× SL), BE move at +0.4%
 
-    Returns dict with keys: signal, entry, sl, tp, rr, atr, reason
+    Returns dict with keys: signal, entry, sl, tp, rr, reason
     """
-    if len(df_m1) < M1_TREND_EMA + 5 or len(df_m5) < M5_SLOW_EMA + 5:
+    if len(df_m1) < M1_SLOW_EMA + 5 or len(df_m5) < M5_TREND_EMA + 5:
         return {"signal": "WAIT", "reason": "insufficient data"}
-
-    # ── M5 trend ─────────────────────────────────────────────────────────────
-    m5_close   = df_m5["close"].astype(float)
-    m5_fast_s = _ema(m5_close, M5_FAST_EMA)
-    m5_slow_s = _ema(m5_close, M5_SLOW_EMA)
-    m5_ema_fast = float(m5_fast_s.iloc[-1])
-    m5_ema_slow = float(m5_slow_s.iloc[-1])
-    m5_fast_prev = float(m5_fast_s.iloc[-2])
-    m5_slow_prev = float(m5_slow_s.iloc[-2])
-    m5_gap_pct = abs(m5_ema_fast - m5_ema_slow) / max(abs(m5_ema_slow), 1e-9) * 100
-    if m5_gap_pct < M5_MIN_GAP_PCT:
+    ts_ms = int(df_m1["timestamp"].iloc[-1])
+    if not _is_active_session(ts_ms):
         return {
             "signal": "WAIT",
-            "reason": f"M5 chop gap={m5_gap_pct:.3f}% < {M5_MIN_GAP_PCT:.3f}%",
+            "reason": f"outside session UTC {SESSION_START_HOUR_UTC:02d}-{SESSION_END_HOUR_UTC:02d}",
         }
-    m5_trend   = "UP" if m5_ema_fast > m5_ema_slow else "DOWN"
-    strong_trend = (
-        m5_gap_pct >= STRONG_TREND_GAP_PCT
-        and ((m5_ema_fast > m5_fast_prev and m5_ema_slow > m5_slow_prev)
-             or (m5_ema_fast < m5_fast_prev and m5_ema_slow < m5_slow_prev))
-    )
 
-    # ── M1 indicators ────────────────────────────────────────────────────────
+    # ── 5m trend filter: close vs EMA 21 ─────────────────────────────────────
+    m5_close  = df_m5["close"].astype(float)
+    m5_ema21  = _ema(m5_close, M5_TREND_EMA)
+    m5_trend  = "UP" if float(m5_close.iloc[-1]) > float(m5_ema21.iloc[-1]) else "DOWN"
+
+    # ── 1m indicators ────────────────────────────────────────────────────────
     closes   = df_m1["close"].astype(float)
-    highs    = df_m1["high"].astype(float)
-    lows     = df_m1["low"].astype(float)
     volumes  = df_m1["volume"].astype(float)
 
     fast_ema  = _ema(closes, M1_FAST_EMA)
     slow_ema  = _ema(closes, M1_SLOW_EMA)
-    trend_ema = _ema(closes, M1_TREND_EMA)
     rsi_s     = _rsi(closes, RSI_LEN)
-    atr_s     = _atr(df_m1, ATR_LEN)
     vol_ma_s  = volumes.rolling(VOL_MA_LEN).mean()
 
-    fast_now  = float(fast_ema.iloc[-1])
-    fast_prev = float(fast_ema.iloc[-2])
-    slow_now  = float(slow_ema.iloc[-1])
-    slow_prev = float(slow_ema.iloc[-2])
-    trend_now = float(trend_ema.iloc[-1])
-    trend_prev = float(trend_ema.iloc[-2])
-    rsi_now   = float(rsi_s.iloc[-1])
-    atr_now   = float(atr_s.iloc[-1])
-    vol_now   = float(volumes.iloc[-1])
+    fast_now   = float(fast_ema.iloc[-1])
+    fast_prev  = float(fast_ema.iloc[-2])
+    slow_now   = float(slow_ema.iloc[-1])
+    slow_prev  = float(slow_ema.iloc[-2])
+    rsi_now    = float(rsi_s.iloc[-1])
+    vol_now    = float(volumes.iloc[-1])
     vol_ma_now = float(vol_ma_s.iloc[-1]) if not np.isnan(vol_ma_s.iloc[-1]) else 0.0
-    current   = float(closes.iloc[-1])
-    sig_low   = float(lows.iloc[-1])
-    sig_high  = float(highs.iloc[-1])
-    recent_high = float(highs.iloc[-BREAKOUT_LOOKBACK_BARS:-1].max())
-    recent_low = float(lows.iloc[-BREAKOUT_LOOKBACK_BARS:-1].min())
-    cont_low = float(lows.iloc[-CONT_LOOKBACK_BARS:].min())
-    cont_high = float(highs.iloc[-CONT_LOOKBACK_BARS:].max())
-    trend_slope_up = trend_now >= trend_prev
-    trend_slope_down = trend_now <= trend_prev
+    current    = float(closes.iloc[-1])
 
-    # ── Dead market filter ───────────────────────────────────────────────────
-    atr_pct = atr_now / current * 100 if current > 0 else 0.0
-    effective_min_atr_pct = STRONG_TREND_ATR_PCT if strong_trend else MIN_ATR_PCT
-    if atr_pct < effective_min_atr_pct:
-        return {
-            "signal": "WAIT",
-            "reason": f"dead market ATR%={atr_pct:.3f} < {effective_min_atr_pct:.3f}",
-        }
+    vol_ratio = vol_now / vol_ma_now if vol_ma_now > 0 else 0.0
+    vol_ok    = vol_ratio >= VOLUME_MIN_RATIO if vol_ma_now > 0 else False
 
-    # ── Volume confirmation ──────────────────────────────────────────────────
-    vol_ratio = (vol_now / vol_ma_now) if vol_ma_now > 0 else 0.0
-    effective_vol_ratio = STRONG_TREND_VOL_RATIO if strong_trend else VOLUME_MIN_RATIO
-    vol_ok = vol_ratio >= effective_vol_ratio if vol_ma_now > 0 else False
-
-    # ── Cross detection ──────────────────────────────────────────────────────
     bull_cross = fast_prev <= slow_prev and fast_now > slow_now
     bear_cross = fast_prev >= slow_prev and fast_now < slow_now
-    bull_recent_cross = _cross_happened_recently(fast_ema, slow_ema, "bull", ENTRY_CROSS_LOOKBACK)
-    bear_recent_cross = _cross_happened_recently(fast_ema, slow_ema, "bear", ENTRY_CROSS_LOOKBACK)
 
-    buy_rsi_min = 48 if strong_trend else 50
-    buy_rsi_max = 82 if strong_trend else 78
-    sell_rsi_min = 18 if strong_trend else 22
-    sell_rsi_max = 52 if strong_trend else 50
-
-    buy_cross_ready = (
-        m5_trend == "UP"
-        and bull_recent_cross
-        and fast_now >= slow_now
-        and current > trend_now
-        and trend_slope_up
-        and buy_rsi_min < rsi_now < buy_rsi_max
-        and vol_ok
-    )
-    if buy_cross_ready:
-        sl = min(sig_low, cont_low) - atr_now * SL_BUFFER_ATR_MULT
-        tp = current + (current - sl) * MIN_RR
+    # ── Long entry ───────────────────────────────────────────────────────────
+    if (m5_trend == "UP"
+            and bull_cross
+            and BUY_RSI_MIN < rsi_now < BUY_RSI_MAX
+            and vol_ok):
+        sl = round(current * (1 - SL_PCT), 6)
+        tp = round(current + (current - sl) * MIN_RR, 6)
         return _build_signal(
-            "BUY",
-            "scalp_ema_cross" if bull_cross else "scalp_cross_followthrough",
-            current,
-            sl,
-            tp,
-            atr_now,
-            (
-                f"{'fresh' if bull_cross else 'recent'} EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bull cross | "
-                f"M5 {'STRONG ' if strong_trend else ''}UP | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}"
-            ),
+            "BUY", "ema_cross_long", current, sl, tp, 0.0,
+            f"EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bull | M5 UP (close>{m5_ema21.iloc[-1]:.2f}) | "
+            f"RSI={rsi_now:.1f} | vol={vol_ratio:.2f}",
         )
 
-    sell_cross_ready = (
-        m5_trend == "DOWN"
-        and bear_recent_cross
-        and fast_now <= slow_now
-        and current < trend_now
-        and trend_slope_down
-        and sell_rsi_min < rsi_now < sell_rsi_max
-        and vol_ok
-    )
-    if sell_cross_ready:
-        sl = max(sig_high, cont_high) + atr_now * SL_BUFFER_ATR_MULT
-        tp = current - (sl - current) * MIN_RR
+    # ── Short entry ──────────────────────────────────────────────────────────
+    if (m5_trend == "DOWN"
+            and bear_cross
+            and SELL_RSI_MIN < rsi_now < SELL_RSI_MAX
+            and vol_ok):
+        sl = round(current * (1 + SL_PCT), 6)
+        tp = round(current - (sl - current) * MIN_RR, 6)
         return _build_signal(
-            "SELL",
-            "scalp_ema_cross" if bear_cross else "scalp_cross_followthrough",
-            current,
-            sl,
-            tp,
-            atr_now,
-            (
-                f"{'fresh' if bear_cross else 'recent'} EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bear cross | "
-                f"M5 {'STRONG ' if strong_trend else ''}DOWN | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}"
-            ),
+            "SELL", "ema_cross_short", current, sl, tp, 0.0,
+            f"EMA{M1_FAST_EMA}x{M1_SLOW_EMA} bear | M5 DOWN (close<{m5_ema21.iloc[-1]:.2f}) | "
+            f"RSI={rsi_now:.1f} | vol={vol_ratio:.2f}",
         )
-
-    if OFFENSIVE_MODE and strong_trend:
-        buy_pullback = (
-            m5_trend == "UP"
-            and fast_now > slow_now
-            and current > fast_now >= trend_now
-            and cont_low <= fast_now + atr_now * CONT_PULLBACK_ATR
-            and current >= recent_high
-            and 50 < rsi_now < 84
-            and vol_ratio >= max(0.55, effective_vol_ratio * 0.9)
-        )
-        if buy_pullback:
-            sl = cont_low - atr_now * SL_BUFFER_ATR_MULT
-            tp = current + (current - sl) * (MIN_RR + 0.2)
-            return _build_signal(
-                "BUY",
-                "scalp_trend_resume",
-                current,
-                sl,
-                tp,
-                atr_now,
-                f"trend resume breakout | M5 strong UP | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}",
-            )
-
-        sell_pullback = (
-            m5_trend == "DOWN"
-            and fast_now < slow_now
-            and current < fast_now <= trend_now
-            and cont_high >= fast_now - atr_now * CONT_PULLBACK_ATR
-            and current <= recent_low
-            and 16 < rsi_now < 50
-            and vol_ratio >= max(0.55, effective_vol_ratio * 0.9)
-        )
-        if sell_pullback:
-            sl = cont_high + atr_now * SL_BUFFER_ATR_MULT
-            tp = current - (sl - current) * (MIN_RR + 0.2)
-            return _build_signal(
-                "SELL",
-                "scalp_trend_resume",
-                current,
-                sl,
-                tp,
-                atr_now,
-                f"trend resume breakdown | M5 strong DOWN | RSI={rsi_now:.1f} | vol={vol_ratio:.2f}",
-            )
 
     # ── WAIT — explain why ───────────────────────────────────────────────────
-    if strong_trend and not bull_recent_cross and not bear_recent_cross:
-        reason = (
-            f"trend strong but no trigger | fast={fast_now:.4f} slow={slow_now:.4f} | "
-            f"M5={m5_trend} RSI={rsi_now:.1f} vol={vol_ratio:.2f}"
-        )
-    elif not bull_recent_cross and not bear_recent_cross:
-        reason = (
-            f"no cross | fast={fast_now:.4f} slow={slow_now:.4f} | "
-            f"M5={m5_trend} RSI={rsi_now:.1f}"
-        )
+    if not bull_cross and not bear_cross:
+        reason = f"no fresh cross | fast={fast_now:.4f} slow={slow_now:.4f} | M5={m5_trend} RSI={rsi_now:.1f}"
     elif not vol_ok:
-        reason = (
-            f"low volume ratio={vol_ratio:.2f} < {effective_vol_ratio:.2f} "
-            f"(vol={vol_now:.0f} ma={vol_ma_now:.0f})"
-        )
-    elif bull_recent_cross and m5_trend != "UP":
-        reason = f"bull cross but M5 trend={m5_trend}"
-    elif bear_recent_cross and m5_trend != "DOWN":
-        reason = f"bear cross but M5 trend={m5_trend}"
-    elif rsi_now >= buy_rsi_max or rsi_now <= sell_rsi_min:
-        reason = f"RSI extreme={rsi_now:.1f}"
+        reason = f"low volume ratio={vol_ratio:.2f} < {VOLUME_MIN_RATIO:.2f}"
+    elif bull_cross and m5_trend != "UP":
+        reason = f"bull cross but M5={m5_trend}"
+    elif bear_cross and m5_trend != "DOWN":
+        reason = f"bear cross but M5={m5_trend}"
+    elif bull_cross and not (BUY_RSI_MIN < rsi_now < BUY_RSI_MAX):
+        reason = f"bull cross but RSI={rsi_now:.1f} outside [{BUY_RSI_MIN},{BUY_RSI_MAX}]"
+    elif bear_cross and not (SELL_RSI_MIN < rsi_now < SELL_RSI_MAX):
+        reason = f"bear cross but RSI={rsi_now:.1f} outside [{SELL_RSI_MIN},{SELL_RSI_MAX}]"
     else:
-        reason = (
-            f"conditions not met | M5={m5_trend} strong={strong_trend} "
-            f"RSI={rsi_now:.1f} vol={vol_ratio:.2f}"
-        )
+        reason = f"conditions not met | M5={m5_trend} RSI={rsi_now:.1f} vol={vol_ratio:.2f}"
 
     return {"signal": "WAIT", "reason": reason}
 
@@ -854,50 +743,34 @@ def _monitor_loop(client: UMFutures):
                 except Exception:
                     continue
 
-                partial_taken = bool(trade.get("partial_taken"))
-                if not partial_taken and entry > 0 and qty > 0 and sl > 0:
-                    risk = (entry - sl) if trade["side"] == "BUY" else (sl - entry)
-                    if risk > 0:
-                        partial_trigger = (
-                            entry + risk * PARTIAL_AT_R
-                            if trade["side"] == "BUY"
-                            else entry - risk * PARTIAL_AT_R
-                        )
-                        hit_partial = (
-                            mark >= partial_trigger
-                            if trade["side"] == "BUY"
-                            else mark <= partial_trigger
-                        )
-                        if hit_partial:
-                            close_qty = _floor_qty(qty * PARTIAL_CLOSE_FRAC, sym)
-                            remaining_qty = _floor_qty(qty - close_qty, sym)
-                            if close_qty > 0 and remaining_qty > 0:
-                                close_side = "SELL" if trade["side"] == "BUY" else "BUY"
-                                try:
-                                    client.new_order(
-                                        symbol=f"{sym}USDT",
-                                        side=close_side,
-                                        type="MARKET",
-                                        quantity=close_qty,
-                                    )
-                                    db_mark_partial(
-                                        trade["id"],
-                                        mark,
-                                        close_qty,
-                                        remaining_qty,
-                                        entry,
-                                        f"partial @{PARTIAL_AT_R:.1f}R; stop moved to breakeven",
-                                    )
-                                    trade["quantity"] = remaining_qty
-                                    trade["stop_loss"] = entry
-                                    trade["partial_taken"] = True
-                                    log.info(
-                                        f"[MONITOR] {sym} partial fired @ {mark} "
-                                        f"closed={close_qty} remaining={remaining_qty} stop->BE"
-                                    )
-                                    continue
-                                except Exception as e:
-                                    log.warning(f"[MONITOR] Partial close failed for {sym}: {e}")
+                be_moved = bool(trade.get("partial_taken"))  # reuses DB flag
+                if not be_moved and entry > 0:
+                    be_trigger = (
+                        entry * (1 + BE_TRIGGER_PCT)
+                        if trade["side"] == "BUY"
+                        else entry * (1 - BE_TRIGGER_PCT)
+                    )
+                    hit_be = (
+                        mark >= be_trigger
+                        if trade["side"] == "BUY"
+                        else mark <= be_trigger
+                    )
+                    if hit_be:
+                        try:
+                            db_mark_partial(
+                                trade["id"],
+                                mark,
+                                0,
+                                qty,
+                                entry,
+                                f"SL→BE: +{BE_TRIGGER_PCT*100:.1f}% reached @ {mark:.2f}",
+                            )
+                            trade["stop_loss"] = entry
+                            trade["partial_taken"] = True
+                            log.info(f"[MONITOR] {sym} SL moved to BE @ {entry:.2f} (mark={mark:.2f})")
+                        except Exception as e:
+                            log.warning(f"[MONITOR] BE update failed for {sym}: {e}")
+                        continue
 
                 hit = None
                 if trade["side"] == "BUY":

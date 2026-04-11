@@ -678,6 +678,27 @@ def fetch_ohlcv(client: UMFutures, symbol: str, interval: str,
     return df.iloc[:-1].reset_index(drop=True)
 
 
+def _btc_macro_trend(df_4h: pd.DataFrame) -> str:
+    """
+    Returns 'BULL', 'BEAR', or 'NEUTRAL' based on BTC 4h EMA50.
+      BULL:    close > EMA50 and EMA50 rising  → only block SHORTs on ETH/SOL
+      BEAR:    close < EMA50 and EMA50 falling → only block LONGs  on ETH/SOL
+      NEUTRAL: everything else                 → both directions allowed
+    """
+    if len(df_4h) < 55:
+        return "NEUTRAL"
+    close  = df_4h["close"].astype(float)
+    ema50  = close.ewm(span=50, adjust=False).mean()
+    last_close = float(close.iloc[-1])
+    last_ema   = float(ema50.iloc[-1])
+    slope      = float(ema50.iloc[-1]) - float(ema50.iloc[-3])  # 3-bar slope
+    if last_close > last_ema and slope > 0:
+        return "BULL"
+    if last_close < last_ema and slope < 0:
+        return "BEAR"
+    return "NEUTRAL"
+
+
 def get_account_balance(client: UMFutures) -> float:
     try:
         account = client.account()
@@ -937,8 +958,9 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         df_h1  = fetch_ohlcv(client, symbol, "1h",  200)
         df_m15 = fetch_ohlcv(client, symbol, "15m", 100)
         df_m5  = fetch_ohlcv(client, symbol, "5m",  100)
-        df_btc_h1 = fetch_ohlcv(client, "BTC", "1h", 100) if symbol != "BTC" else df_h1
+        df_btc_h1  = fetch_ohlcv(client, "BTC", "1h",  100) if symbol != "BTC" else df_h1
         df_btc_m15 = fetch_ohlcv(client, "BTC", "15m", 100) if symbol != "BTC" else df_m15
+        df_btc_4h  = fetch_ohlcv(client, "BTC", "4h",  100) if symbol != "BTC" else None
     except Exception as e:
         log_error(f"[{symbol}] OHLCV fetch failed", e)
         return
@@ -947,11 +969,14 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx["symbol"] = f"{symbol}/USDT"
 
     if symbol != "BTC":
-        btc_ctx   = compute_indicators(df_btc_h1, df_btc_m15, df_m5)
-        btc_trend = btc_ctx["m15_trend"]
-        ctx["btc_trend"] = btc_trend
+        btc_ctx        = compute_indicators(df_btc_h1, df_btc_m15, df_m5)
+        btc_trend      = btc_ctx["m15_trend"]
+        btc_macro      = _btc_macro_trend(df_btc_4h)
+        ctx["btc_trend"]       = btc_trend
+        ctx["btc_macro_trend"] = btc_macro
     else:
-        ctx["btc_trend"] = ctx["m15_trend"]
+        ctx["btc_trend"]       = ctx["m15_trend"]
+        ctx["btc_macro_trend"] = "NEUTRAL"  # BTC is not filtered against itself
 
     ctx["sr"] = find_sr_levels(df_h1, ctx["current_price"], df_m15)
 
@@ -960,7 +985,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx["score_details"] = score_details
 
     log_cycle_start(symbol, ctx["market_mode"], score)
-    log.info(f"  H1={ctx['h1_trend']} M15={ctx['m15_trend']} BTC={ctx.get('btc_trend','?')}")
+    log.info(f"  H1={ctx['h1_trend']} M15={ctx['m15_trend']} BTC_M15={ctx.get('btc_trend','?')} BTC_4H={ctx.get('btc_macro_trend','?')}")
     log.info(f"  S/R  R={ctx['sr']['resistance']} S={ctx['sr']['support']}")
     log.info(
         "  PrevBox "
@@ -1020,13 +1045,23 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     )
 
     if symbol != "BTC":
-        btc_trend = ctx.get("btc_trend", "")
-        primary = ctx.get("primary_trend") or ctx["m15_trend"]
-        if (primary == "UPTREND" and btc_trend == "DOWNTREND") or \
-           (primary == "DOWNTREND" and btc_trend == "UPTREND"):
-            log_gate_fail("BTC_CORR", f"BTC={btc_trend} conflicts with {symbol}={primary}", symbol, ctx)
+        btc_macro = ctx.get("btc_macro_trend", "NEUTRAL")
+        primary   = ctx.get("primary_trend") or ctx["m15_trend"]
+        if btc_macro == "BEAR" and primary == "UPTREND":
+            log_gate_fail(
+                "BTC_MACRO",
+                f"BTC 4h strongly BEAR (below EMA50, slope down) — blocking LONG on {symbol}",
+                symbol, ctx,
+            )
             return
-        log_gate_pass("BTC_CORR", f"BTC={btc_trend}")
+        if btc_macro == "BULL" and primary == "DOWNTREND":
+            log_gate_fail(
+                "BTC_MACRO",
+                f"BTC 4h strongly BULL (above EMA50, slope up) — blocking SHORT on {symbol}",
+                symbol, ctx,
+            )
+            return
+        log_gate_pass("BTC_MACRO", f"BTC 4h macro={btc_macro} | {symbol} trend={primary} — no conflict")
 
     tech_ok, tech_reason = check_technical_gates(ctx)
     if not tech_ok:
