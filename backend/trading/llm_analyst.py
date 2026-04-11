@@ -41,11 +41,16 @@ REQUIRED on M5 chart — ALL must be true:
         Candle color (red/green) does NOT matter — a red candle with a long lower wick and close in the upper half IS a valid bullish pinbar.
     Option B (Bullish Engulfing): current green candle body fully engulfs previous red candle body.
 [3] VOLUME: signal candle volume > average of previous 5 candles (visually taller bar).
-[4] ENTRY: at signal candle close. SL below signal candle low minus 0.25%.
+[4] ENTRY:
+    If the signal candle is a bullish pinbar, do NOT enter immediately.
+    Wait for the NEXT candle to break and CLOSE above the pinbar high before entry.
+    If the signal candle is a bullish engulfing, entry at signal candle close is acceptable.
+    SL below signal candle low minus 0.25%.
     TP toward nearest H1 resistance (red dashed line).
 
 FALSE SIGNALS — output WAIT if:
   - Signal candle has small body, no clear shape (Doji / Spinning Top)
+  - Bullish pinbar forms inside chop / a tiny sideways cluster / a small consolidation box
   - EMAs are rapidly converging (gap closing more than 30% in the last 5 candles)
   - Volume is notably lower than surrounding candles
   - Price has broken below EMA89 for more than 3 consecutive candles
@@ -63,14 +68,91 @@ REQUIRED on M5 chart — ALL must be true:
         Candle color (red/green) does NOT matter — a green candle with a long upper wick and close in the lower half IS a valid bearish pinbar.
     Option B (Bearish Engulfing): current red candle body fully engulfs previous green candle body.
 [3] VOLUME: signal candle volume > average of previous 5 candles.
-[4] ENTRY: at signal candle close. SL above signal candle high plus 0.25%.
+[4] ENTRY:
+    If the signal candle is a bearish pinbar, do NOT enter immediately.
+    Wait for the NEXT candle to break and CLOSE below the pinbar low before entry.
+    If the signal candle is a bearish engulfing, entry at signal candle close is acceptable.
+    SL above signal candle high plus 0.25%.
     TP toward nearest H1 support (green dashed line).
 
 FALSE SIGNALS — output WAIT if:
   - No clear upper wick, body dominates candle (> 85%)
+  - Bearish pinbar forms inside chop / a tiny sideways cluster / a small consolidation box
   - EMAs are rapidly converging (gap closing more than 30% in the last 5 candles)
   - Volume is notably lower than surrounding candles
   - Price broken above EMA89 for more than 3 consecutive candles
+""",
+
+    "setup_B_buy": """
+=== SETUP B — BREAKOUT ACCEPTANCE BUY (UPTREND) ===
+Context: Market is trending up and price is trying to start a fresh upward expansion.
+
+REQUIRED:
+[1] Price breaks ABOVE a recent local structure high / small consolidation high / minor resistance.
+[2] The breakout candle closes strongly near its highs.
+[3] Breakout candle body is decisive, not just a wick above resistance.
+[4] Breakout candle volume should be at or above recent average.
+[5] ENTRY: enter only if the breakout candle CLOSES above the broken level.
+
+FALSE SIGNALS — output WAIT if:
+  - Price only wicks above resistance and closes back inside the range
+  - Breakout candle body is weak or small
+  - Breakout candle closes far from its high
+  - Breakout happens directly into obvious higher-timeframe resistance with no room
+""",
+
+    "setup_B_sell": """
+=== SETUP B — BREAKOUT ACCEPTANCE SELL (DOWNTREND) ===
+Context: Market is trending down and price is trying to start a fresh downward expansion.
+
+REQUIRED:
+[1] Price breaks BELOW a recent local structure low / small consolidation low / minor support.
+[2] The breakdown candle closes strongly near its lows.
+[3] Breakdown candle body is decisive, not just a wick below support.
+[4] Breakdown candle volume should be at or above recent average.
+[5] ENTRY: enter only if the breakdown candle CLOSES below the broken level.
+
+FALSE SIGNALS — output WAIT if:
+  - Price only wicks below support and closes back inside the range
+  - Breakdown candle body is weak or small
+  - Breakdown candle closes far from its low
+  - Breakdown happens directly into obvious higher-timeframe support with no room
+""",
+
+    "setup_C_buy": """
+=== SETUP C — BREAKOUT RETEST HOLD BUY (UPTREND) ===
+Context: Price already broke higher and is retesting the broken level from above.
+
+REQUIRED:
+[1] A prior breakout above recent structure is visible.
+[2] Price revisits that broken resistance / breakout level.
+[3] The retest holds — price does NOT lose the level on a closing basis.
+[4] The confirmation candle closes bullish and back above the retest area.
+[5] ENTRY: enter only after the retest-hold candle CLOSES back above the broken level.
+
+FALSE SIGNALS — output WAIT if:
+  - There is no clear prior breakout
+  - Price falls back deeply into the old range
+  - The retest candle closes weakly or indecisively
+  - Retest happens inside messy chop with no clear level
+""",
+
+    "setup_C_sell": """
+=== SETUP C — BREAKOUT RETEST FAIL SELL (DOWNTREND) ===
+Context: Price already broke lower and is retesting the broken level from below.
+
+REQUIRED:
+[1] A prior breakdown below recent structure is visible.
+[2] Price revisits that broken support / breakdown level.
+[3] The retest fails — price does NOT reclaim the level on a closing basis.
+[4] The confirmation candle closes bearish and back below the retest area.
+[5] ENTRY: enter only after the retest-fail candle CLOSES back below the broken level.
+
+FALSE SIGNALS — output WAIT if:
+  - There is no clear prior breakdown
+  - Price reclaims deeply back into the old range
+  - The retest candle closes weakly or indecisively
+  - Retest happens inside messy chop with no clear level
 """,
 
     "setup_D_buy": """
@@ -84,11 +166,15 @@ REQUIRED:
     Option B: Bullish Engulfing at the support zone.
     Option C: Second touch of support (double bottom) — price bouncing off same level twice.
 [3] VOLUME: Higher than the average of the 5 previous candles.
-[4] ENTRY: at signal candle close (must be ABOVE the support line).
+[4] ENTRY:
+    If using a bullish pinbar, wait for the NEXT candle to break and CLOSE above the pinbar high before entry.
+    Otherwise entry at signal candle close is acceptable.
+    Entry must still be ABOVE the support line.
     SL below support minus 0.25%. TP toward H1 resistance. (Python will verify R:R post-decision.)
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through support (more than 3 candles held below)
+  - Bullish pinbar appears in the middle of a tiny range instead of at a clear support reaction
   - Signal candle has virtually no lower wick and body is bearish
   - Volume is notably below surrounding candles
 """,
@@ -104,11 +190,15 @@ REQUIRED:
     Option B: Bearish Engulfing at the resistance zone.
     Option C: Second touch of resistance (double top).
 [3] VOLUME: Higher than the average of the 5 previous candles.
-[4] ENTRY: at signal candle close (must be BELOW resistance).
+[4] ENTRY:
+    If using a bearish pinbar, wait for the NEXT candle to break and CLOSE below the pinbar low before entry.
+    Otherwise entry at signal candle close is acceptable.
+    Entry must still be BELOW resistance.
     SL above resistance plus 0.25%. TP toward H1 support. (Python will verify R:R post-decision.)
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through resistance (more than 3 candles held above)
+  - Bearish pinbar appears in the middle of a tiny range instead of at a clear resistance reaction
   - Signal candle has virtually no upper wick and body is bullish
   - Volume is notably below surrounding candles
 """,
@@ -119,6 +209,7 @@ Choose WAIT if ANY of the following:
 - Signal candle shape is clearly ambiguous (Doji, Spinning Top with tiny body)
 - Volume on signal candle is notably below surrounding candles
 - EMAs are choppy (crossing back and forth in last 5 candles)
+- Pinbar appears inside a small consolidation instead of at a meaningful reaction point
 - Price is in the middle of a range with no clear S/R nearby
 
 RULE: When clearly ambiguous → WAIT. Borderline setups with good structure are acceptable.
@@ -206,30 +297,66 @@ def _build_prompt(context: dict) -> tuple[str, str]:
             )
     elif primary == "UPTREND":
         if is_borderline:
-            patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["setup_D_buy"], PATTERN_LIBRARY["wait"]]
+            patterns = [
+                PATTERN_LIBRARY["setup_A_buy"],
+                PATTERN_LIBRARY["setup_B_buy"],
+                PATTERN_LIBRARY["setup_C_buy"],
+                PATTERN_LIBRARY["setup_D_buy"],
+                PATTERN_LIBRARY["wait"],
+            ]
             bias_note = (
                 f"M15 uptrend (BORDERLINE — EMA gap {m15_gap:.3f}% is near threshold {M15_TREND_GAP:.1f}%). "
-                f"Primary: Setup A BUY (EMA pullback). "
+                f"Prefer Setup A pullback BUY, Setup B breakout BUY, or Setup C retest-hold BUY. "
                 f"If EMAs look intertwined on the chart rather than clearly separated, evaluate Setup D BUY instead. "
                 f"H1: {h1}."
             )
         else:
-            patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["wait"]]
-            bias_note = f"M15 uptrend ({gap_strength} — EMA gap {m15_gap:.3f}%) — look for Setup A pullback BUY. H1: {h1}."
+            patterns = [
+                PATTERN_LIBRARY["setup_A_buy"],
+                PATTERN_LIBRARY["setup_B_buy"],
+                PATTERN_LIBRARY["setup_C_buy"],
+                PATTERN_LIBRARY["wait"],
+            ]
+            bias_note = (
+                f"M15 uptrend ({gap_strength} — EMA gap {m15_gap:.3f}%) — "
+                f"look for Setup A pullback BUY, Setup B breakout BUY, or Setup C retest-hold BUY. H1: {h1}."
+            )
     elif primary == "DOWNTREND":
         if is_borderline:
-            patterns = [PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["setup_D_sell"], PATTERN_LIBRARY["wait"]]
+            patterns = [
+                PATTERN_LIBRARY["setup_A_sell"],
+                PATTERN_LIBRARY["setup_B_sell"],
+                PATTERN_LIBRARY["setup_C_sell"],
+                PATTERN_LIBRARY["setup_D_sell"],
+                PATTERN_LIBRARY["wait"],
+            ]
             bias_note = (
                 f"M15 downtrend (BORDERLINE — EMA gap {m15_gap:.3f}% is near threshold {M15_TREND_GAP:.1f}%). "
-                f"Primary: Setup A SELL (EMA rally rejection). "
+                f"Prefer Setup A rally SELL, Setup B breakdown SELL, or Setup C retest-fail SELL. "
                 f"If EMAs look intertwined on the chart rather than clearly separated, evaluate Setup D SELL instead. "
                 f"H1: {h1}."
             )
         else:
-            patterns = [PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["wait"]]
-            bias_note = f"M15 downtrend ({gap_strength} — EMA gap {m15_gap:.3f}%) — look for Setup A rally SELL. H1: {h1}."
+            patterns = [
+                PATTERN_LIBRARY["setup_A_sell"],
+                PATTERN_LIBRARY["setup_B_sell"],
+                PATTERN_LIBRARY["setup_C_sell"],
+                PATTERN_LIBRARY["wait"],
+            ]
+            bias_note = (
+                f"M15 downtrend ({gap_strength} — EMA gap {m15_gap:.3f}%) — "
+                f"look for Setup A rally SELL, Setup B breakdown SELL, or Setup C retest-fail SELL. H1: {h1}."
+            )
     else:
-        patterns = [PATTERN_LIBRARY["setup_A_buy"], PATTERN_LIBRARY["setup_A_sell"], PATTERN_LIBRARY["wait"]]
+        patterns = [
+            PATTERN_LIBRARY["setup_A_buy"],
+            PATTERN_LIBRARY["setup_A_sell"],
+            PATTERN_LIBRARY["setup_B_buy"],
+            PATTERN_LIBRARY["setup_B_sell"],
+            PATTERN_LIBRARY["setup_C_buy"],
+            PATTERN_LIBRARY["setup_C_sell"],
+            PATTERN_LIBRARY["wait"],
+        ]
         bias_note = f"Trend unclear — check chart for strongest directional signal. H1: {h1}."
 
     try:
@@ -294,7 +421,7 @@ Historical Box logic:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SL / TP MATH RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TREND setups (A/D):
+TREND setups (A/B/C/D):
   SL buffer for this symbol = {"0.50%" if symbol_base in ("SOL", "XRP") else "0.25%"} (volatile coins need wider SL to survive wicks).
   BUY : SL = signal candle low − (entry × {"0.005" if symbol_base in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
         TP must be BELOW resistance = {sr.get('resistance','?')}.
@@ -322,7 +449,7 @@ YOUR TASK
 OUTPUT FORMAT:
 {{
   "analysis": {{
-    "setup_identified": "Setup A/D/None",
+    "setup_identified": "Setup A/B/C/D/None",
     "ema_check":    "EMA34 [above/below/intertwined] EMA89. Gap [widening/narrowing/stable].",
     "price_action": "Describe signal candle: type, colour, wick vs body ratio.",
     "volume_check": "Signal candle volume [above/below] Vol MA. Pass/Fail.",
@@ -391,6 +518,8 @@ IMPORTANT OVERRIDE:
 - Recommend a seek-entry zone only as an advisory area to monitor, not as a hard executable order.
 - If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on the execution timeframe.
 - If you mention rr_check, say that Python will calculate levels after the decision.
+- CRITICAL: A pinbar by itself is not enough. Prefer pinbars only when they happen at a meaningful edge and the next candle confirms the move.
+- CRITICAL: Reject pinbars that form inside chop or a tiny consolidation cluster, even if their volume is slightly above average.
 - CRITICAL: Do NOT output WAIT solely because "market is sideways", "market mode is range", or "price is in the middle of the box". These are descriptive labels, not rejection criteria. Setup D exists specifically for sideways/range markets - if a D setup is visible, take it.
 - CRITICAL: Do NOT output WAIT solely because the market label says SIDEWAY or VOLATILE_RANGE. Evaluate the actual chart for signal candle quality, volume, and S/R proximity.
 - CRITICAL: If price is already ABOVE the historical H1 box, do not short just because price is near the box top. Only fade a clear failed breakout.

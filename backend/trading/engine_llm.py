@@ -5,7 +5,7 @@ Strategy layers:
   1. Macro bias  — ML model direction + Fear&Greed + funding rate
   2. Technical gates — H1/M15 trend, score ≥ 3/5, range position
   3. BTC correlation filter — don't trade against BTC trend
-  4. Gemini Flash vision — chart pattern confirmation (Setup A/D)
+  4. Gemini Flash vision — chart pattern confirmation (Setup A/B/C/D)
   5. Execution — Binance Futures market order + native SL/TP
 
 Run modes:
@@ -73,6 +73,7 @@ QTY_PRECISION  = {
     "XRP": 0,   # step 1 (integer lots)
 }
 STOP_LOSS_PCT  = 0.008    # 0.8% hard max SL
+BREAKOUT_STOP_LOSS_PCT = 0.013
 SL_MIN_PCT     = 0.002    # 0.2% hard min SL
 try:
     SL_ATR_MULTIPLIER = max(0.0, float(os.getenv("SL_ATR_MULTIPLIER", "1.8")))
@@ -783,8 +784,10 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     if risk_pct < SL_MIN_PCT * 100:
         log_gate_fail("SL_MIN", f"SL {risk_pct:.3f}% < min {SL_MIN_PCT*100:.2f}%", symbol)
         return False
-    if risk_pct > STOP_LOSS_PCT * 100:
-        log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {STOP_LOSS_PCT*100:.2f}%", symbol)
+    is_breakout_setup = any(tag in setup.lower() for tag in ("setup b", "setup c", "setup_b", "setup_c")) if setup else False
+    max_stop_pct = BREAKOUT_STOP_LOSS_PCT if is_breakout_setup else STOP_LOSS_PCT
+    if risk_pct > max_stop_pct * 100:
+        log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {max_stop_pct*100:.2f}%", symbol)
         return False
 
     risk   = abs(entry - ai_sl)
@@ -917,6 +920,13 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     log_cycle_start(symbol, ctx["market_mode"], score)
     log.info(f"  H1={ctx['h1_trend']} M15={ctx['m15_trend']} BTC={ctx.get('btc_trend','?')}")
     log.info(f"  S/R  R={ctx['sr']['resistance']} S={ctx['sr']['support']}")
+    log.info(
+        "  PrevBox "
+        f"state={ctx['sr'].get('breakout_state', 'INSIDE_PREV_BOX')} "
+        f"R={ctx['sr'].get('prev_resistance')} S={ctx['sr'].get('prev_support')} "
+        f"confirm={ctx['sr'].get('breakout_confirmed', False)} "
+        f"bars_since={ctx['sr'].get('bars_since_breakout')}"
+    )
     log.info(f"  Score {score}/5: {', '.join(score_details) or 'none'}")
     log.info(f"  RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f}")
     if ctx.get("trend_rollover"):
@@ -1014,7 +1024,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
         return
 
-    ai_ok, ai_reason = validate_ai_trade_decision(decision, ctx, df_m5)
+    ai_ok, ai_reason = validate_ai_trade_decision(decision, ctx, df_m15)
     if not ai_ok:
         log_gate_fail("AI_VALIDATION", ai_reason, symbol, ctx)
         log_skip("AI_INVALID", ai_reason, ctx, decision)
