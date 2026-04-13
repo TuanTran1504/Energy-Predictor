@@ -550,19 +550,28 @@ def check_macro_bias(ml_direction: str, ml_confidence: float,
                      fear_greed: int, funding_rate: float,
                      symbol: str) -> tuple[bool, str, str]:
     """
-    Returns advisory-only macro context.
-    Market mode remains the primary directional filter.
+    Returns macro context. Blocks shorts in extreme fear and longs in extreme greed.
+    Thresholds are configurable via FG_EXTREME_FEAR_THRESHOLD / FG_EXTREME_GREED_THRESHOLD.
+    Set FG_EXTREME_BLOCK=false to revert to advisory-only mode.
     """
+    fg_block       = _env_bool("FG_EXTREME_BLOCK", True)
+    fear_threshold = _env_int("FG_EXTREME_FEAR_THRESHOLD", 15)
+    greed_threshold = _env_int("FG_EXTREME_GREED_THRESHOLD", 85)
+
     notes = []
 
     if ml_direction:
         notes.append(f"ML={ml_direction}({ml_confidence:.0%}) advisory")
 
     if fear_greed is not None:
-        if fear_greed <= 15:
+        if fear_greed <= fear_threshold:
             notes.append(f"F&G={fear_greed} extreme fear")
-        elif fear_greed >= 85:
+            if fg_block:
+                return False, f"F&G={fear_greed} extreme fear — blocking SHORT (bounce risk)", "UP"
+        elif fear_greed >= greed_threshold:
             notes.append(f"F&G={fear_greed} extreme greed")
+            if fg_block:
+                return False, f"F&G={fear_greed} extreme greed — blocking LONG (reversal risk)", "DOWN"
         else:
             notes.append(f"F&G={fear_greed}")
 
