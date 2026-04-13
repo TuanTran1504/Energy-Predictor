@@ -373,6 +373,32 @@ def _build_prompt(context: dict) -> tuple[str, str]:
         ]
         bias_note = f"Trend unclear — check chart for strongest directional signal. H1: {h1}."
 
+    allowed_direction = context.get("allowed_direction", "BOTH")
+    fear_greed_val = context.get("fear_greed")
+    fg_constraint = ""
+    if allowed_direction == "UP":
+        patterns = [p for p in patterns if "SELL" not in p and "sell" not in p]
+        if not any("buy" in p.lower() or "BUY" in p for p in patterns):
+            patterns = [PATTERN_LIBRARY["setup_D_buy"], PATTERN_LIBRARY["wait"]]
+        fg_constraint = (
+            f"\n⚠️  DIRECTION CONSTRAINT — HARD RULE ⚠️\n"
+            f"Fear & Greed = {fear_greed_val} (EXTREME FEAR). Market is in capitulation.\n"
+            f"You MUST only look for LONG / BUY opportunities.\n"
+            f"Do NOT suggest SELL or SHORT under any circumstances.\n"
+            f"If no valid BUY setup exists, output WAIT.\n"
+        )
+    elif allowed_direction == "DOWN":
+        patterns = [p for p in patterns if "BUY" not in p and "buy" not in p]
+        if not any("sell" in p.lower() or "SELL" in p for p in patterns):
+            patterns = [PATTERN_LIBRARY["setup_D_sell"], PATTERN_LIBRARY["wait"]]
+        fg_constraint = (
+            f"\n⚠️  DIRECTION CONSTRAINT — HARD RULE ⚠️\n"
+            f"Fear & Greed = {fear_greed_val} (EXTREME GREED). Market is overheated.\n"
+            f"You MUST only look for SHORT / SELL opportunities.\n"
+            f"Do NOT suggest BUY or LONG under any circumstances.\n"
+            f"If no valid SELL setup exists, output WAIT.\n"
+        )
+
     try:
         trend_min_rr = max(0.5, float(os.getenv("TRADE_MIN_RR", "1.5")))
     except (TypeError, ValueError):
@@ -384,6 +410,7 @@ def _build_prompt(context: dict) -> tuple[str, str]:
     combined = "\n\n" + ("=" * 60 + "\n").join(patterns)
 
     system_prompt = f"""You are a quantitative trading analyst combining chart pattern recognition with hard data.
+{fg_constraint}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 QUANTITATIVE DATA (Python-confirmed — trust completely)

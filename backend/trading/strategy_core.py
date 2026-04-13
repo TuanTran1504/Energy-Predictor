@@ -565,13 +565,15 @@ def check_macro_bias(ml_direction: str, ml_confidence: float,
 
     if fear_greed is not None:
         if fear_greed <= fear_threshold:
+            if fg_block:
+                notes.append(f"F&G={fear_greed} extreme fear — LONG only (bounce risk)")
+                return True, " | ".join(notes), "UP"
             notes.append(f"F&G={fear_greed} extreme fear")
-            if fg_block:
-                return False, f"F&G={fear_greed} extreme fear — blocking SHORT (bounce risk)", "UP"
         elif fear_greed >= greed_threshold:
-            notes.append(f"F&G={fear_greed} extreme greed")
             if fg_block:
-                return False, f"F&G={fear_greed} extreme greed — blocking LONG (reversal risk)", "DOWN"
+                notes.append(f"F&G={fear_greed} extreme greed — SHORT only (reversal risk)")
+                return True, " | ".join(notes), "DOWN"
+            notes.append(f"F&G={fear_greed} extreme greed")
         else:
             notes.append(f"F&G={fear_greed}")
 
@@ -707,6 +709,14 @@ def validate_ai_trade_decision(decision: dict, context: dict,
     signal = str(decision.get("signal", "")).upper()
     if signal not in ("BUY", "SELL"):
         return False, f"invalid signal {signal!r}"
+
+    allowed_direction = context.get("allowed_direction", "BOTH")
+    if allowed_direction == "UP" and signal != "BUY":
+        fg = context.get("fear_greed", "?")
+        return False, f"F&G={fg} extreme fear — only LONG allowed, got {signal}"
+    if allowed_direction == "DOWN" and signal != "SELL":
+        fg = context.get("fear_greed", "?")
+        return False, f"F&G={fg} extreme greed — only SHORT allowed, got {signal}"
 
     primary = context.get("primary_trend") or context.get("m15_trend", "")
     if primary == "UPTREND" and signal != "BUY":
