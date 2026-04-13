@@ -94,6 +94,10 @@ try:
 except (TypeError, ValueError):
     TAKE_PROFIT_MIN_RR = 1.5
 try:
+    RANGE_MIN_RR = max(0.5, float(os.getenv("TRADE_MIN_RR_RANGE", str(TAKE_PROFIT_MIN_RR))))
+except (TypeError, ValueError):
+    RANGE_MIN_RR = TAKE_PROFIT_MIN_RR
+try:
     SETUP_E_MIN_RR = max(0.5, float(os.getenv("SETUP_E_MIN_RR", "1.0")))
 except (TypeError, ValueError):
     SETUP_E_MIN_RR = 1.0
@@ -856,7 +860,13 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     reward    = abs(ai_tp - entry)
     rr        = float(decision.get("planned_rr") or (reward / risk if risk > 0 else 0))
     is_setup_e = "setup_e" in setup.lower() if setup else False
-    min_rr    = SETUP_E_MIN_RR if is_setup_e else TAKE_PROFIT_MIN_RR
+    is_range_setup = any(tag in setup.lower() for tag in ("setup d", "setup_d")) if setup else False
+    if is_setup_e:
+        min_rr = SETUP_E_MIN_RR
+    elif is_range_setup or bool(context.get("is_range", False)):
+        min_rr = RANGE_MIN_RR
+    else:
+        min_rr = TAKE_PROFIT_MIN_RR
     if rr < min_rr:
         log_gate_fail("RR", f"R:R={rr:.2f} < {min_rr}", symbol)
         return False
@@ -947,10 +957,13 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     pos = get_open_position(client, symbol)
     if pos:
         upnl_pct = pos["upnl"] / (pos["entry_price"] * pos["amount"]) * 100
-        log.info(
-            f"  [SKIP] {symbol} has open {pos['side']} position | "
-            f"entry={pos['entry_price']} mark={pos['mark_price']} "
-            f"uPnL={upnl_pct:+.2f}%"
+        log_skip(
+            "OPEN_POSITION",
+            (
+                f"{symbol} has open {pos['side']} position | "
+                f"entry={pos['entry_price']} mark={pos['mark_price']} "
+                f"uPnL={upnl_pct:+.2f}%"
+            ),
         )
         return
 
@@ -1156,7 +1169,10 @@ def run_once(dry_run: bool = False):
         f"TECH_SCORE_THRESHOLD={os.getenv('TECH_SCORE_THRESHOLD', '3')} "
         f"TECH_SCORE_THRESHOLD_RANGE={os.getenv('TECH_SCORE_THRESHOLD_RANGE', os.getenv('TECH_SCORE_THRESHOLD', '3'))} "
         f"SETUP_C_RELAXED={os.getenv('SETUP_C_RELAXED', '0')} "
+        f"SL_ATR_MULTIPLIER={SL_ATR_MULTIPLIER:.2f} "
+        f"SL_SR_BUFFER_ATR_MULT={SL_SR_BUFFER_ATR_MULT:.2f} "
         f"TRADE_MIN_RR={TAKE_PROFIT_MIN_RR:.2f} "
+        f"TRADE_MIN_RR_RANGE={RANGE_MIN_RR:.2f} "
         f"SETUP_E_MIN_RR={SETUP_E_MIN_RR:.2f}"
     )
     funding_str = "  ".join(

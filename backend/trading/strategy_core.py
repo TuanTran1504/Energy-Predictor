@@ -65,6 +65,19 @@ def _env_int(name: str, default: int) -> int:
         return int(default)
 
 
+def _sr_buffer_distance(entry: float, atr: float, is_range: bool) -> float:
+    default_mult = 0.30 if is_range else 0.25
+    buffer_mult = max(0.0, _env_float("SL_SR_BUFFER_ATR_MULT", default_mult))
+    return atr * buffer_mult if atr > 0 and entry > 0 else entry * (0.0018 if is_range else 0.0015)
+
+
+def _min_risk_distance(entry: float, atr: float, is_range: bool) -> float:
+    base_floor = max(entry * SL_MIN_PCT, atr * (0.45 if is_range else 0.55))
+    atr_floor_mult = max(0.0, _env_float("SL_ATR_MULTIPLIER", 1.8))
+    atr_floor = atr * atr_floor_mult if atr > 0 else 0.0
+    return max(base_floor, atr_floor)
+
+
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
                    threshold: float, atr_pct: float = 0.0,
                    prev_gap_pct: float | None = None,
@@ -1031,12 +1044,12 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
     fee_cost = entry * 0.0018
     if is_range:
         min_rr = min_rr_range
-        base_buffer = max(entry * 0.0018, atr * 0.30)
-        min_risk = max(entry * SL_MIN_PCT, atr * 0.45)
+        base_buffer = _sr_buffer_distance(entry, atr, is_range=True)
+        min_risk = _min_risk_distance(entry, atr, is_range=True)
     else:
         min_rr = min_rr_default
-        base_buffer = max(entry * 0.0015, atr * 0.25)
-        min_risk = max(entry * SL_MIN_PCT, atr * 0.55)
+        base_buffer = _sr_buffer_distance(entry, atr, is_range=False)
+        min_risk = _min_risk_distance(entry, atr, is_range=False)
 
     if signal == "BUY":
         if setup_code == "A":
@@ -1058,6 +1071,8 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         else:
             stop_anchor = stop_candidates[-1] if len(stop_candidates) > 1 else stop_candidates[0]
         raw_sl = stop_anchor - base_buffer
+        if support is not None:
+            raw_sl = min(raw_sl, float(support) - base_buffer)
         risk = entry - raw_sl
         if risk < min_risk:
             raw_sl = entry - min_risk
@@ -1134,6 +1149,8 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         else:
             stop_anchor = stop_candidates[-1] if len(stop_candidates) > 1 else stop_candidates[0]
         raw_sl = stop_anchor + base_buffer
+        if resistance is not None:
+            raw_sl = max(raw_sl, float(resistance) + base_buffer)
         risk = raw_sl - entry
         if risk < min_risk:
             raw_sl = entry + min_risk

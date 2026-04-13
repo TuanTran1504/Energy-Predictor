@@ -45,8 +45,8 @@ REQUIRED on M5 chart — ALL must be true:
     If the signal candle is a bullish pinbar, do NOT enter immediately.
     Wait for the NEXT candle to break and CLOSE above the pinbar high before entry.
     If the signal candle is a bullish engulfing, entry at signal candle close is acceptable.
-    SL below signal candle low minus 0.25%.
-    TP toward nearest H1 resistance (red dashed line).
+    Exact SL/TP math is owned by Python and may use extra ATR / structure buffer.
+    TP should still have room toward H1 resistance (red dashed line).
 
 FALSE SIGNALS — output WAIT if:
   - Signal candle has small body, no clear shape (Doji / Spinning Top)
@@ -72,8 +72,8 @@ REQUIRED on M5 chart — ALL must be true:
     If the signal candle is a bearish pinbar, do NOT enter immediately.
     Wait for the NEXT candle to break and CLOSE below the pinbar low before entry.
     If the signal candle is a bearish engulfing, entry at signal candle close is acceptable.
-    SL above signal candle high plus 0.25%.
-    TP toward nearest H1 support (green dashed line).
+    Exact SL/TP math is owned by Python and may use extra ATR / structure buffer.
+    TP should still have room toward H1 support (green dashed line).
 
 FALSE SIGNALS — output WAIT if:
   - No clear upper wick, body dominates candle (> 85%)
@@ -170,7 +170,8 @@ REQUIRED:
     If using a bullish pinbar, wait for the NEXT candle to break and CLOSE above the pinbar high before entry.
     Otherwise entry at signal candle close is acceptable.
     Entry must still be ABOVE the support line.
-    SL below support minus 0.25%. TP toward H1 resistance. (Python will verify R:R post-decision.)
+    Exact SL/TP math is owned by Python and may use extra ATR / structure buffer.
+    TP should still point toward H1 resistance. (Python will verify R:R post-decision.)
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through support (more than 3 candles held below)
@@ -194,7 +195,8 @@ REQUIRED:
     If using a bearish pinbar, wait for the NEXT candle to break and CLOSE below the pinbar low before entry.
     Otherwise entry at signal candle close is acceptable.
     Entry must still be BELOW resistance.
-    SL above resistance plus 0.25%. TP toward H1 support. (Python will verify R:R post-decision.)
+    Exact SL/TP math is owned by Python and may use extra ATR / structure buffer.
+    TP should still point toward H1 support. (Python will verify R:R post-decision.)
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through resistance (more than 3 candles held above)
@@ -422,13 +424,11 @@ Historical Box logic:
 SL / TP MATH RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 TREND setups (A/B/C/D):
-  SL buffer for this symbol = {"0.50%" if symbol_base in ("SOL", "XRP") else "0.25%"} (volatile coins need wider SL to survive wicks).
-  BUY : SL = signal candle low − (entry × {"0.005" if symbol_base in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
-        TP must be BELOW resistance = {sr.get('resistance','?')}.
-  SELL: SL = signal candle high + (entry × {"0.005" if symbol_base in ("SOL", "XRP") else "0.0025"}). Need |entry−SL| ≥ {atr:.4f}.
-        TP must be ABOVE support = {sr.get('support','?')}.
+  Python owns the exact SL/TP math using structure, ATR floor, and support/resistance buffer.
+  BUY : make sure the chart still leaves realistic room toward resistance = {sr.get('resistance','?')}.
+  SELL: make sure the chart still leaves realistic room toward support = {sr.get('support','?')}.
 
-NOTE: Python will calculate and enforce R:R after your signal decision. Do NOT use R:R as a reason to WAIT.
+NOTE: Python will calculate and enforce the final stop loss, take profit, and R:R after your signal decision. Do NOT use R:R math as a reason to WAIT.
 
 DIRECTION CHECK only (enforce):
   BUY:  TP > entry > SL
