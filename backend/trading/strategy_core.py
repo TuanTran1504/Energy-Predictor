@@ -1257,7 +1257,14 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
             )
 
     final_risk_pct = abs(entry - sl) / entry
-    max_stop_pct = BREAKOUT_SL_MAX_PCT if setup_code in ("B", "C") else SL_MAX_PCT
+    base_max_stop = BREAKOUT_SL_MAX_PCT if setup_code in ("B", "C") else SL_MAX_PCT
+    # Dynamic cap: widens with volatility so elevated-ATR markets aren't always skipped.
+    # Cap = max(static_floor, ATR% × multiplier), capped at absolute ceiling.
+    # Tune via SL_ATR_DYNAMIC_MULT (default 3.0) and SL_MAX_PCT_CEILING (default 4%).
+    atr_pct = atr / entry if entry > 0 and atr > 0 else 0.0
+    dynamic_mult = max(1.0, _env_float("SL_ATR_DYNAMIC_MULT", 3.0))
+    ceiling = max(base_max_stop, _env_float("SL_MAX_PCT_CEILING", 0.04))
+    max_stop_pct = min(max(base_max_stop, atr_pct * dynamic_mult), ceiling)
     if final_risk_pct > max_stop_pct:
         return None, f"stop distance {final_risk_pct*100:.3f}% exceeds max {max_stop_pct*100:.2f}%"
 
