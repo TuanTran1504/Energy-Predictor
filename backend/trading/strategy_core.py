@@ -1115,7 +1115,12 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
             target_candidates.append(entry + atr * 6.5)
         target_levels = _dedupe_levels([x for x in target_candidates if x > entry])
         if tp_extension > 0:
-            target_levels = _dedupe_levels([x + tp_extension for x in target_levels if (x + tp_extension) > entry])
+            if is_range:
+                # Range: exit just BEFORE resistance (price bounces back, don't need breakout)
+                target_levels = _dedupe_levels([x - tp_extension for x in target_levels if (x - tp_extension) > entry])
+            else:
+                # Trend: push slightly past resistance (expect continuation)
+                target_levels = _dedupe_levels([x + tp_extension for x in target_levels if (x + tp_extension) > entry])
         if not target_levels:
             return None, "no valid bullish target above entry"
 
@@ -1195,7 +1200,14 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
             target_candidates.append(entry - atr * 6.5)
         target_levels = _dedupe_levels([x for x in target_candidates if x < entry], reverse=True)
         if tp_extension > 0:
-            target_levels = _dedupe_levels(
+            if is_range:
+                # Range: exit just BEFORE support (price bounces back up, don't need breakdown)
+                target_levels = _dedupe_levels(
+                    [x + tp_extension for x in target_levels if (x + tp_extension) < entry],
+                    reverse=True,
+                )
+            else:
+                target_levels = _dedupe_levels(
                 [x - tp_extension for x in target_levels if (x - tp_extension) < entry],
                 reverse=True,
             )
