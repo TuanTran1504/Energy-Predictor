@@ -130,19 +130,9 @@ def log_ai_response(decision: dict):
     entry  = decision.get("entry_price", "?")
     sl     = decision.get("stop_loss", "?")
     tp     = decision.get("take_profit", "?")
-    zone_lo = decision.get("seek_entry_low")
-    zone_hi = decision.get("seek_entry_high")
-    zone_basis = decision.get("seek_entry_basis", "")
-    zone_text = (
-        f"\n          seek_zone={zone_lo} -> {zone_hi}"
-        + (f"  basis={zone_basis}" if zone_basis else "")
-        if zone_lo is not None or zone_hi is not None or zone_basis
-        else ""
-    )
     _cycle_log.info(
         f"  [AI ◀] signal={sig}  setup={setup}\n"
         f"          entry={entry}  SL={sl}  TP={tp}\n"
-        f"{zone_text}"
         f"\n"
         f"          reason: {reason}"
     )
@@ -253,19 +243,9 @@ def log_cycle_summary(symbol: str, signal: str, executed: bool, balance: float,
     tp1   = dec.get("take_profit_1")
     tp2   = dec.get("take_profit_2")
     target_mode = dec.get("target_mode")
-    zone_lo = dec.get("seek_entry_low")
-    zone_hi = dec.get("seek_entry_high")
-    zone_basis = dec.get("seek_entry_basis", "")
     reason = dec.get("reason", ctx.get("skip_reason", "—"))
     setup  = dec.get("analysis", {}).get("setup_identified") or ctx.get("setup", "—")
     status = "EXECUTED" if executed else ("SIGNAL" if signal not in ("WAIT", "SKIP") else signal)
-    zone_line = (
-        f"  │  seek_zone={zone_lo} -> {zone_hi}"
-        + (f"  basis={zone_basis}" if zone_basis else "")
-        + "\n"
-        if zone_lo is not None or zone_hi is not None or zone_basis
-        else ""
-    )
     target_line = (
         f"  │  target_mode={target_mode}  TP1={tp1}  TP2={tp2}\n"
         if target_mode or tp1 is not None or tp2 is not None
@@ -277,8 +257,8 @@ def log_cycle_summary(symbol: str, signal: str, executed: bool, balance: float,
         f"  │  signal={signal}  setup={setup}  status={status}\n"
         f"  │  entry={entry}  SL={sl}  TP={tp}\n"
         f"{target_line}"
-        f"{zone_line}"
         f"  │  reason: {reason}\n"
         f"  │  balance={balance:.2f} USDT\n"
         f"  └{'─'*50}"
     )
+

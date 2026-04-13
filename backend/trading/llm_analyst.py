@@ -36,11 +36,11 @@ Context: EMA34 (green) is ABOVE EMA89 (orange). Gap is wide or stable.
 REQUIRED on M5 chart — ALL must be true:
 [1] PULLBACK: Price has retraced from higher levels and is touching or near EMA34 or EMA89.
     "Near" = candle body or lower wick within 1.5% of the EMA line.
-[2] SIGNAL CANDLE — one of:
-    Option A (Bullish Pinbar): lower wick ≥ 1.5× body, body closes in upper 50% of full candle range, short upper wick.
-        Candle color (red/green) does NOT matter — a red candle with a long lower wick and close in the upper half IS a valid bullish pinbar.
-    Option B (Bullish Engulfing): current green candle body fully engulfs previous red candle body.
-[3] VOLUME: signal candle volume > average of previous 5 candles (visually taller bar).
+[2] SIGNAL PRIORITY — rank these from strongest to weakest:
+    Highest priority: Bullish Engulfing or strong bullish rejection close from the EMA zone.
+    Medium priority: Bullish Pinbar with clear lower wick rejection.
+    Lower priority: Any other obvious bullish reaction candle that closes back upward from the EMA zone.
+[3] VOLUME: signal candle volume > average of previous 5 candles is preferred, but slightly-below-average volume can be forgiven if the reaction candle is very clear and the EMA pullback is clean.
 [4] ENTRY:
     If the signal candle is a bullish pinbar, do NOT enter immediately.
     Wait for the NEXT candle to break and CLOSE above the pinbar high before entry.
@@ -49,10 +49,10 @@ REQUIRED on M5 chart — ALL must be true:
     TP should still have room toward H1 resistance (red dashed line).
 
 FALSE SIGNALS — output WAIT if:
-  - Signal candle has small body, no clear shape (Doji / Spinning Top)
+  - Signal candle has small body, no clear rejection, and no decisive close back upward
   - Bullish pinbar forms inside chop / a tiny sideways cluster / a small consolidation box
   - EMAs are rapidly converging (gap closing more than 30% in the last 5 candles)
-  - Volume is notably lower than surrounding candles
+  - Volume is clearly weak AND the price reaction is also weak
   - Price has broken below EMA89 for more than 3 consecutive candles
 """,
 
@@ -63,11 +63,11 @@ Context: EMA34 (green) is BELOW EMA89 (orange). Gap is wide or stable.
 REQUIRED on M5 chart — ALL must be true:
 [1] RALLY PULLBACK: Price has rallied from lower levels and is touching or near EMA34 or EMA89.
     "Near" = candle body or upper wick within 1.5% of the EMA line.
-[2] SIGNAL CANDLE — one of:
-    Option A (Bearish Pinbar): upper wick ≥ 1.5× body, body closes in lower 50%, short lower wick.
-        Candle color (red/green) does NOT matter — a green candle with a long upper wick and close in the lower half IS a valid bearish pinbar.
-    Option B (Bearish Engulfing): current red candle body fully engulfs previous green candle body.
-[3] VOLUME: signal candle volume > average of previous 5 candles.
+[2] SIGNAL PRIORITY — rank these from strongest to weakest:
+    Highest priority: Bearish Engulfing or strong bearish rejection close from the EMA zone.
+    Medium priority: Bearish Pinbar with clear upper wick rejection.
+    Lower priority: Any other obvious bearish reaction candle that closes back downward from the EMA zone.
+[3] VOLUME: signal candle volume > average of previous 5 candles is preferred, but slightly-below-average volume can be forgiven if the reaction candle is very clear and the EMA pullback is clean.
 [4] ENTRY:
     If the signal candle is a bearish pinbar, do NOT enter immediately.
     Wait for the NEXT candle to break and CLOSE below the pinbar low before entry.
@@ -76,10 +76,10 @@ REQUIRED on M5 chart — ALL must be true:
     TP should still have room toward H1 support (green dashed line).
 
 FALSE SIGNALS — output WAIT if:
-  - No clear upper wick, body dominates candle (> 85%)
+  - Signal candle has small body, no clear rejection, and no decisive close back downward
   - Bearish pinbar forms inside chop / a tiny sideways cluster / a small consolidation box
   - EMAs are rapidly converging (gap closing more than 30% in the last 5 candles)
-  - Volume is notably lower than surrounding candles
+  - Volume is clearly weak AND the price reaction is also weak
   - Price broken above EMA89 for more than 3 consecutive candles
 """,
 
@@ -89,9 +89,12 @@ Context: Market is trending up and price is trying to start a fresh upward expan
 
 REQUIRED:
 [1] Price breaks ABOVE a recent local structure high / small consolidation high / minor resistance.
-[2] The breakout candle closes strongly near its highs.
-[3] Breakout candle body is decisive, not just a wick above resistance.
-[4] Breakout candle volume should be at or above recent average.
+[2] SIGNAL PRIORITY:
+    Highest priority: Breakout candle closes strongly near its highs with a clear body.
+    Medium priority: Breakout candle closes above the level with decent body but not perfect range expansion.
+    Lower priority: Breakout is acceptable even if volume is only average, as long as the close outside the level is obvious.
+[3] Breakout candle body matters more than wick shape. Prefer real closes through the level, not just a wick above resistance.
+[4] Breakout candle volume should be at or above recent average, but average volume can be forgiven if the close outside the level is very clear.
 [5] ENTRY: enter only if the breakout candle CLOSES above the broken level.
 
 FALSE SIGNALS — output WAIT if:
@@ -107,9 +110,12 @@ Context: Market is trending down and price is trying to start a fresh downward e
 
 REQUIRED:
 [1] Price breaks BELOW a recent local structure low / small consolidation low / minor support.
-[2] The breakdown candle closes strongly near its lows.
-[3] Breakdown candle body is decisive, not just a wick below support.
-[4] Breakdown candle volume should be at or above recent average.
+[2] SIGNAL PRIORITY:
+    Highest priority: Breakdown candle closes strongly near its lows with a clear body.
+    Medium priority: Breakdown candle closes below the level with decent body but not perfect expansion.
+    Lower priority: Breakdown is acceptable even if volume is only average, as long as the close outside the level is obvious.
+[3] Breakdown candle body matters more than wick shape. Prefer real closes through the level, not just a wick below support.
+[4] Breakdown candle volume should be at or above recent average, but average volume can be forgiven if the close outside the level is very clear.
 [5] ENTRY: enter only if the breakdown candle CLOSES below the broken level.
 
 FALSE SIGNALS — output WAIT if:
@@ -126,7 +132,10 @@ Context: Price already broke higher and is retesting the broken level from above
 REQUIRED:
 [1] A prior breakout above recent structure is visible.
 [2] Price revisits that broken resistance / breakout level.
-[3] The retest holds — price does NOT lose the level on a closing basis.
+[3] SIGNAL PRIORITY:
+    Highest priority: Retest holds and the confirmation candle closes bullish back above the level.
+    Medium priority: The retest is slightly messy, but price still clearly defends the level and closes back above it.
+    Lower priority: Exact candle shape is less important than a clean hold and a clear close back upward.
 [4] The confirmation candle closes bullish and back above the retest area.
 [5] ENTRY: enter only after the retest-hold candle CLOSES back above the broken level.
 
@@ -144,7 +153,10 @@ Context: Price already broke lower and is retesting the broken level from below.
 REQUIRED:
 [1] A prior breakdown below recent structure is visible.
 [2] Price revisits that broken support / breakdown level.
-[3] The retest fails — price does NOT reclaim the level on a closing basis.
+[3] SIGNAL PRIORITY:
+    Highest priority: Retest fails and the confirmation candle closes bearish back below the level.
+    Medium priority: The retest is slightly messy, but price still clearly rejects the level and closes back below it.
+    Lower priority: Exact candle shape is less important than a clean failure and a clear close back downward.
 [4] The confirmation candle closes bearish and back below the retest area.
 [5] ENTRY: enter only after the retest-fail candle CLOSES back below the broken level.
 
@@ -161,11 +173,11 @@ Context: EMA34 ≈ EMA89 (intertwined). Price oscillating between H1 S/R levels.
 
 REQUIRED:
 [1] Price is near H1 SUPPORT (green dashed line) — within 1.5% of it.
-[2] SIGNAL CANDLE at or near support:
-    Option A: Bullish Pinbar with lower wick piercing or touching the support level.
-    Option B: Bullish Engulfing at the support zone.
-    Option C: Second touch of support (double bottom) — price bouncing off same level twice.
-[3] VOLUME: Higher than the average of the 5 previous candles.
+[2] SIGNAL PRIORITY at or near support:
+    Highest priority: Bullish engulfing or strong bullish rejection close from support.
+    Medium priority: Double bottom / second touch of support with a bounce.
+    Lower priority: Bullish pinbar with clear lower wick rejection.
+[3] VOLUME: Higher than the average of the 5 previous candles is preferred, but slightly-below-average volume can be forgiven if the support reaction is very obvious.
 [4] ENTRY:
     If using a bullish pinbar, wait for the NEXT candle to break and CLOSE above the pinbar high before entry.
     Otherwise entry at signal candle close is acceptable.
@@ -175,9 +187,9 @@ REQUIRED:
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through support (more than 3 candles held below)
-  - Bullish pinbar appears in the middle of a tiny range instead of at a clear support reaction
-  - Signal candle has virtually no lower wick and body is bearish
-  - Volume is notably below surrounding candles
+  - Reaction happens in the middle of the range instead of at a clear support edge
+  - Signal candle has no clear bullish reaction close
+  - Volume is clearly weak AND the support reaction is also weak
 """,
 
     "setup_D_sell": """
@@ -186,11 +198,11 @@ Context: EMA34 ≈ EMA89 (intertwined). Price oscillating between H1 S/R levels.
 
 REQUIRED:
 [1] Price is near H1 RESISTANCE (red dashed line) — within 1.5%.
-[2] SIGNAL CANDLE at or near resistance:
-    Option A: Bearish Pinbar with upper wick piercing or touching the resistance level.
-    Option B: Bearish Engulfing at the resistance zone.
-    Option C: Second touch of resistance (double top).
-[3] VOLUME: Higher than the average of the 5 previous candles.
+[2] SIGNAL PRIORITY at or near resistance:
+    Highest priority: Bearish engulfing or strong bearish rejection close from resistance.
+    Medium priority: Double top / second touch of resistance with rejection.
+    Lower priority: Bearish pinbar with clear upper wick rejection.
+[3] VOLUME: Higher than the average of the 5 previous candles is preferred, but slightly-below-average volume can be forgiven if the resistance reaction is very obvious.
 [4] ENTRY:
     If using a bearish pinbar, wait for the NEXT candle to break and CLOSE below the pinbar low before entry.
     Otherwise entry at signal candle close is acceptable.
@@ -200,9 +212,9 @@ REQUIRED:
 
 FALSE SIGNALS — output WAIT if:
   - Price has broken clearly through resistance (more than 3 candles held above)
-  - Bearish pinbar appears in the middle of a tiny range instead of at a clear resistance reaction
-  - Signal candle has virtually no upper wick and body is bullish
-  - Volume is notably below surrounding candles
+  - Reaction happens in the middle of the range instead of at a clear resistance edge
+  - Signal candle has no clear bearish reaction close
+  - Volume is clearly weak AND the resistance reaction is also weak
 """,
 
     "wait": """
@@ -403,6 +415,36 @@ PATTERN LIBRARY — read carefully before analysing the chart
 {combined}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SIGN RANKING RULES — KEEP THIS SIMPLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Highest-priority signs:
+- Clear location at the correct edge: EMA pullback, breakout level, retest level, or H1 support/resistance.
+- Decisive close in the expected direction.
+- Clean structure: breakout accepted, retest held/failed, or obvious bounce/rejection.
+
+Medium-priority signs:
+- Engulfing candle.
+- Double touch / double top / double bottom.
+- Strong rejection candle.
+
+Lower-priority signs:
+- Textbook pinbar shape.
+- Slightly above-average volume.
+- Perfect candle color or perfect wick ratio.
+
+Forgivable misses:
+- Volume is only average, but the level reaction and close are very clear.
+- Candle is not a perfect textbook pinbar, but the rejection/engulfing/retest behavior is obvious.
+- Retest or range reaction is slightly messy, but the final close clearly confirms the direction.
+
+Do NOT forgive:
+- Wrong location.
+- No clear directional close.
+- Breakout that is only a wick.
+- Retest that closes back the wrong way.
+- Obvious chop with no edge.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 CHART LEGEND
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 EMA 34  = bright GREEN line
@@ -443,7 +485,7 @@ YOUR TASK
 3. Use RSI + volume panels to confirm timing quality and momentum/range context.
 4. You must identify potential entries based on the patterns above. If no clear pattern is visible, you can still call BUY or SELL if the chart structure and signal quality are good — you do not need to match every single condition perfectly to call a valid signal. Use your judgement to evaluate the overall quality of the setup.
 5. Match each condition in the Pattern Library against what you see.
-6. If setup is not ready yet, return WAIT but still provide a seek_entry zone near the relevant box edge with the exact trigger condition.
+6. If setup is not ready yet, return WAIT with a brief reason.
 7. Return ONLY valid JSON - no markdown, no explanation outside JSON.
 
 OUTPUT FORMAT:
@@ -458,9 +500,6 @@ OUTPUT FORMAT:
   }},
   "signal":       "BUY" | "SELL" | "WAIT",
   "reason":       "Brief explanation in English.",
-  "seek_entry_low":  number | null,
-  "seek_entry_high": number | null,
-  "seek_entry_basis": "Brief note describing the preferred buy/sell area or trigger.",
   "entry_price":  number,
   "stop_loss":    number,
   "take_profit":  number
@@ -515,8 +554,6 @@ IMPORTANT OVERRIDE:
 - Do not reject a valid setup because of stop loss, take profit, or R:R math.
 - Python will calculate entry, stop loss, take profit, and final R:R after your decision.
 - You should decide only whether the chart shows a valid BUY, SELL, or WAIT setup.
-- Recommend a seek-entry zone only as an advisory area to monitor, not as a hard executable order.
-- If BUY/SELL is valid, set seek_entry_low/high to a realistic pullback, retest, or trigger area visible on the execution timeframe.
 - If you mention rr_check, say that Python will calculate levels after the decision.
 - CRITICAL: A pinbar by itself is not enough. Prefer pinbars only when they happen at a meaningful edge and the next candle confirms the move.
 - CRITICAL: Reject pinbars that form inside chop or a tiny consolidation cluster, even if their volume is slightly above average.
@@ -558,24 +595,7 @@ IMPORTANT OVERRIDE:
                 print(f"    [AI] VOL  : {a.get('volume_check','')}")
                 print(f"    [AI] R:R  : {a.get('rr_check','')}")
                 print(f"    [AI] Match: {a.get('pattern_match','')}")
-                print(
-                    "    [AI] Zone : "
-                    f"{result.get('seek_entry_low')} - {result.get('seek_entry_high')} "
-                    f"({result.get('seek_entry_basis', '')})"
-                )
                 print(f"    [AI] Reason: {result.get('reason','')}")
-
-            result["seek_entry_low"] = _to_float_or_none(result.get("seek_entry_low"))
-            result["seek_entry_high"] = _to_float_or_none(result.get("seek_entry_high"))
-            if (
-                result["seek_entry_low"] is not None
-                and result["seek_entry_high"] is not None
-                and result["seek_entry_low"] > result["seek_entry_high"]
-            ):
-                result["seek_entry_low"], result["seek_entry_high"] = (
-                    result["seek_entry_high"],
-                    result["seek_entry_low"],
-                )
 
             return result
 
@@ -615,14 +635,6 @@ def _safe_parse(raw: str) -> dict:
         pass
     raise ValueError(f"Cannot parse Gemini JSON (len={len(raw)}): {raw[:300]!r}")
 
-
-def _to_float_or_none(value):
-    if value in (None, "", "null"):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
 
 
 
