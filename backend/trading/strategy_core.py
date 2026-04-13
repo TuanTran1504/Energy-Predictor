@@ -78,6 +78,15 @@ def _min_risk_distance(entry: float, atr: float, is_range: bool) -> float:
     return max(base_floor, atr_floor)
 
 
+def _tp_extension_distance(entry: float, atr: float, is_range: bool) -> float:
+    default_mult = 0.10 if is_range else 0.15
+    extension_mult = max(0.0, _env_float("TP_EXTENSION_ATR_MULT", default_mult))
+    min_pct = max(0.0, _env_float("TP_EXTENSION_MIN_PCT", 0.0))
+    atr_extension = atr * extension_mult if atr > 0 else 0.0
+    pct_extension = entry * min_pct if entry > 0 else 0.0
+    return max(atr_extension, pct_extension)
+
+
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
                    threshold: float, atr_pct: float = 0.0,
                    prev_gap_pct: float | None = None,
@@ -1046,10 +1055,12 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         min_rr = min_rr_range
         base_buffer = _sr_buffer_distance(entry, atr, is_range=True)
         min_risk = _min_risk_distance(entry, atr, is_range=True)
+        tp_extension = _tp_extension_distance(entry, atr, is_range=True)
     else:
         min_rr = min_rr_default
         base_buffer = _sr_buffer_distance(entry, atr, is_range=False)
         min_risk = _min_risk_distance(entry, atr, is_range=False)
+        tp_extension = _tp_extension_distance(entry, atr, is_range=False)
 
     if signal == "BUY":
         if setup_code == "A":
@@ -1084,6 +1095,8 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
             target_candidates.append(entry + atr * 5.0)
             target_candidates.append(entry + atr * 6.5)
         target_levels = _dedupe_levels([x for x in target_candidates if x > entry])
+        if tp_extension > 0:
+            target_levels = _dedupe_levels([x + tp_extension for x in target_levels if (x + tp_extension) > entry])
         if not target_levels:
             return None, "no valid bullish target above entry"
 
@@ -1162,6 +1175,11 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
             target_candidates.append(entry - atr * 5.0)
             target_candidates.append(entry - atr * 6.5)
         target_levels = _dedupe_levels([x for x in target_candidates if x < entry], reverse=True)
+        if tp_extension > 0:
+            target_levels = _dedupe_levels(
+                [x - tp_extension for x in target_levels if (x - tp_extension) < entry],
+                reverse=True,
+            )
         if not target_levels:
             return None, "no valid bearish target below entry"
 
@@ -1226,11 +1244,13 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         "min_rr": round(min_rr, 2),
         "stop_anchor": round(stop_anchor, 6),
         "target_anchor": round(best_target, 6),
+        "tp_extension": round(tp_extension, 6),
         "estimated_cost": round(fee_cost, 6),
     }
     reason = (
         f"stop@{plan['stop_anchor']} TP1@{plan['take_profit_1']} TP2@{plan['take_profit_2']} "
         f"selected={plan['target_mode']} RRnet={plan['rr']:.2f} RRgross={plan['gross_rr']:.2f} "
-        f"RR1={plan['tp1_rr']:.2f} RR2={plan['tp2_rr']:.2f} min={plan['min_rr']:.2f}"
+        f"RR1={plan['tp1_rr']:.2f} RR2={plan['tp2_rr']:.2f} min={plan['min_rr']:.2f} "
+        f"tp_ext={plan['tp_extension']:.6f}"
     )
     return plan, reason

@@ -98,6 +98,10 @@ try:
 except (TypeError, ValueError):
     RANGE_MIN_RR = TAKE_PROFIT_MIN_RR
 try:
+    TP_EXTENSION_ATR_MULT = max(0.0, float(os.getenv("TP_EXTENSION_ATR_MULT", "0.15")))
+except (TypeError, ValueError):
+    TP_EXTENSION_ATR_MULT = 0.15
+try:
     SETUP_E_MIN_RR = max(0.5, float(os.getenv("SETUP_E_MIN_RR", "1.0")))
 except (TypeError, ValueError):
     SETUP_E_MIN_RR = 1.0
@@ -1173,6 +1177,7 @@ def run_once(dry_run: bool = False):
         f"SL_SR_BUFFER_ATR_MULT={SL_SR_BUFFER_ATR_MULT:.2f} "
         f"TRADE_MIN_RR={TAKE_PROFIT_MIN_RR:.2f} "
         f"TRADE_MIN_RR_RANGE={RANGE_MIN_RR:.2f} "
+        f"TP_EXTENSION_ATR_MULT={TP_EXTENSION_ATR_MULT:.2f} "
         f"SETUP_E_MIN_RR={SETUP_E_MIN_RR:.2f}"
     )
     funding_str = "  ".join(
