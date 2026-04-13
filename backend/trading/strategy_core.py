@@ -9,7 +9,7 @@ Public API:
   check_macro_bias(ml_pred, fear_greed, funding_rate, symbol) -> (bool, str, str)
   check_technical_gates(context) -> (bool, str)
   find_sr_levels(df_h1, current_price, df_m15) -> dict
-  build_trade_plan(signal, setup_name, context, df_m5) -> (dict | None, str)
+  build_trade_plan(signal, setup_name, context, df_exec) -> (dict | None, str)
   validate_ai_trade_decision(decision, context, df_exec) -> (bool, str)
   compute_score(context) -> (int, list[str])
   classify_trend(gap_pct, ema34, ema89, threshold, atr_pct) -> str
@@ -85,6 +85,23 @@ def _tp_extension_distance(entry: float, atr: float, is_range: bool) -> float:
     atr_extension = atr * extension_mult if atr > 0 else 0.0
     pct_extension = entry * min_pct if entry > 0 else 0.0
     return max(atr_extension, pct_extension)
+
+
+def compute_max_stop_pct(setup_name: str, context: dict,
+                         entry: float | None = None,
+                         atr: float | None = None) -> float:
+    """Shared stop-distance cap so planning and execution use identical limits."""
+    setup_code = _setup_code(setup_name)
+    base_max_stop = BREAKOUT_SL_MAX_PCT if setup_code in ("B", "C") else SL_MAX_PCT
+
+    resolved_entry = float(entry if entry is not None else (context.get("current_price") or 0.0))
+    resolved_atr = float(
+        atr if atr is not None else (context.get("atr_m15") or context.get("atr") or 0.0)
+    )
+    atr_pct = resolved_atr / resolved_entry if resolved_entry > 0 and resolved_atr > 0 else 0.0
+    dynamic_mult = max(1.0, _env_float("SL_ATR_DYNAMIC_MULT", 3.0))
+    ceiling = max(base_max_stop, _env_float("SL_MAX_PCT_CEILING", 0.04))
+    return min(max(base_max_stop, atr_pct * dynamic_mult), ceiling)
 
 
 def classify_trend(gap_pct: float, ema34: float, ema89: float,
@@ -1030,21 +1047,25 @@ def _exec_entry_timing_ok(signal: str, context: dict,
 
 
 def build_trade_plan(signal: str, setup_name: str, context: dict,
-                     df_m5: pd.DataFrame) -> tuple[dict | None, str]:
+                     df_exec: pd.DataFrame) -> tuple[dict | None, str]:
     """
     Deterministically builds entry, stop loss, and take profit from structure.
     Gemini decides whether a setup is valid; Python owns the trade levels.
+    The caller chooses the execution frame used for structure.
     """
     signal = str(signal or "").upper()
     if signal not in ("BUY", "SELL"):
         return None, f"invalid signal {signal!r}"
 
-    entry = float(context.get("current_price") or float(df_m5["close"].iloc[-1]))
+    entry = float(context.get("current_price") or float(df_exec["close"].iloc[-1]))
     if entry <= 0:
         return None, "missing entry price"
 
     setup_code = _setup_code(setup_name)
-    is_range = setup_code == "D" or bool(context.get("is_range"))
+    # Only Setup D should inherit range-style RR/TP/SL economics.
+    # Other setups may appear during a sideways market, but they should still
+    # be planned with their own trend-style trade math.
+    is_range = setup_code == "D"
     if setup_code not in ("A", "B", "C", "D"):
         return None, f"unsupported setup {setup_code!r}; only Setup A/B/C/D allowed"
 
@@ -1060,12 +1081,12 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         list(sr.get("resistance_levels") or []) + ([resistance] if resistance is not None else []),
     )
 
-    m5_window = df_m5.tail(8).copy()
-    recent_low = float(m5_window["low"].min())
-    recent_high = float(m5_window["high"].max())
-    pullback_low, pullback_high = _pullback_cluster_levels(df_m5, signal)
-    deep_low, deep_high = _deep_structure_levels(df_m5, lookback=20)
-    ema89 = float(df_m5["close"].astype(float).ewm(span=89, adjust=False).mean().iloc[-1])
+    exec_window = df_exec.tail(8).copy()
+    recent_low = float(exec_window["low"].min())
+    recent_high = float(exec_window["high"].max())
+    pullback_low, pullback_high = _pullback_cluster_levels(df_exec, signal)
+    deep_low, deep_high = _deep_structure_levels(df_exec, lookback=20)
+    ema89 = float(df_exec["close"].astype(float).ewm(span=89, adjust=False).mean().iloc[-1])
 
     min_rr_default = max(0.5, _env_float("TRADE_MIN_RR", MIN_RR))
     min_rr_range = max(0.5, _env_float("TRADE_MIN_RR_RANGE", min_rr_default))
@@ -1257,14 +1278,7 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
             )
 
     final_risk_pct = abs(entry - sl) / entry
-    base_max_stop = BREAKOUT_SL_MAX_PCT if setup_code in ("B", "C") else SL_MAX_PCT
-    # Dynamic cap: widens with volatility so elevated-ATR markets aren't always skipped.
-    # Cap = max(static_floor, ATR% × multiplier), capped at absolute ceiling.
-    # Tune via SL_ATR_DYNAMIC_MULT (default 3.0) and SL_MAX_PCT_CEILING (default 4%).
-    atr_pct = atr / entry if entry > 0 and atr > 0 else 0.0
-    dynamic_mult = max(1.0, _env_float("SL_ATR_DYNAMIC_MULT", 3.0))
-    ceiling = max(base_max_stop, _env_float("SL_MAX_PCT_CEILING", 0.04))
-    max_stop_pct = min(max(base_max_stop, atr_pct * dynamic_mult), ceiling)
+    max_stop_pct = compute_max_stop_pct(setup_name, context, entry=entry, atr=atr)
     if final_risk_pct > max_stop_pct:
         return None, f"stop distance {final_risk_pct*100:.3f}% exceeds max {max_stop_pct*100:.2f}%"
 

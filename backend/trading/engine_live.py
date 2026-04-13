@@ -37,7 +37,7 @@ from llm_analyst    import ask_gemini
 from strategy_core  import (
     compute_indicators, compute_score, find_sr_levels,
     check_macro_bias, check_technical_gates, get_range_bias,
-    validate_ai_trade_decision, build_trade_plan,
+    validate_ai_trade_decision, build_trade_plan, compute_max_stop_pct,
 )
 from trade_logger   import (
     get_logger, log_cycle_start, log_gate_pass, log_gate_fail,
@@ -854,8 +854,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     if risk_pct < SL_MIN_PCT * 100:
         log_gate_fail("SL_MIN", f"SL {risk_pct:.3f}% < min {SL_MIN_PCT*100:.2f}%", symbol)
         return False
-    is_breakout_setup = any(tag in setup.lower() for tag in ("setup b", "setup c", "setup_b", "setup_c")) if setup else False
-    max_stop_pct = BREAKOUT_STOP_LOSS_PCT if is_breakout_setup else STOP_LOSS_PCT
+    max_stop_pct = compute_max_stop_pct(setup, context, entry=entry)
     if risk_pct > max_stop_pct * 100:
         log_gate_fail("SL_MAX", f"SL {risk_pct:.3f}% > max {max_stop_pct*100:.2f}%", symbol)
         return False
@@ -867,7 +866,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     is_range_setup = any(tag in setup.lower() for tag in ("setup d", "setup_d")) if setup else False
     if is_setup_e:
         min_rr = SETUP_E_MIN_RR
-    elif is_range_setup or bool(context.get("is_range", False)):
+    elif is_range_setup:
         min_rr = RANGE_MIN_RR
     else:
         min_rr = TAKE_PROFIT_MIN_RR
@@ -1122,7 +1121,8 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         return
 
     setup_name = decision.get("analysis", {}).get("setup_identified", "")
-    plan, plan_reason = build_trade_plan(signal, setup_name, ctx, df_m5)
+    # Keep planning on the same 15m execution frame the LLM used for setup detection.
+    plan, plan_reason = build_trade_plan(signal, setup_name, ctx, df_m15)
     if not plan:
         log_gate_fail("TRADE_PLAN", plan_reason, symbol, ctx)
         log_skip("TRADE_PLAN", plan_reason, ctx, decision)
