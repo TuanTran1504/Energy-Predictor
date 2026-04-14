@@ -647,16 +647,28 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
 
 
 def get_range_bias(context: dict) -> str:
-    """Returns 'NEAR_SUPPORT', 'NEAR_RESISTANCE', or 'MIDDLE'."""
+    """Returns 'NEAR_SUPPORT', 'NEAR_RESISTANCE', or 'MIDDLE'.
+
+    Price is split into thirds of the support→resistance range:
+      bottom 30% → NEAR_SUPPORT
+      top    30% → NEAR_RESISTANCE
+      middle 40% → MIDDLE (no edge, gate blocks trade)
+    """
     price = context["current_price"]
     sr = context.get("sr", {})
     if not sr:
         return "MIDDLE"
-    dist_r = abs(sr["resistance"] - price) / price * 100
-    dist_s = abs(price - sr["support"]) / price * 100
-    if dist_s <= dist_r:
+    resistance = float(sr["resistance"])
+    support = float(sr["support"])
+    range_size = resistance - support
+    if range_size <= 0:
+        return "MIDDLE"
+    position = (price - support) / range_size  # 0.0 = at support, 1.0 = at resistance
+    if position < 0.30:
         return "NEAR_SUPPORT"
-    return "NEAR_RESISTANCE"
+    if position > 0.70:
+        return "NEAR_RESISTANCE"
+    return "MIDDLE"
 
 
 def detect_candle_pattern(df: pd.DataFrame, idx: int) -> dict:
@@ -1117,7 +1129,7 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         if not stop_candidates:
             return None, "no valid bullish invalidation below entry"
 
-        if setup_code in ("B", "C"):
+        if setup_code in ("A", "B", "C"):
             stop_anchor = stop_candidates[0]
         else:
             stop_anchor = stop_candidates[-1] if len(stop_candidates) > 1 else stop_candidates[0]
@@ -1202,7 +1214,7 @@ def build_trade_plan(signal: str, setup_name: str, context: dict,
         if not stop_candidates:
             return None, "no valid bearish invalidation above entry"
 
-        if setup_code in ("B", "C"):
+        if setup_code in ("A", "B", "C"):
             stop_anchor = stop_candidates[0]
         else:
             stop_anchor = stop_candidates[-1] if len(stop_candidates) > 1 else stop_candidates[0]
