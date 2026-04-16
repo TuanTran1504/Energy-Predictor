@@ -1143,6 +1143,13 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         if ctx["range_bias"] == "MIDDLE":
             log_gate_fail("RANGE_POSITION", "price in middle of range — no edge", symbol, ctx)
             return
+        rsi = ctx["rsi"]
+        if ctx["range_bias"] == "NEAR_SUPPORT" and rsi > 55:
+            log_gate_fail("RANGE_POSITION", f"near support but RSI={rsi:.1f} — sellers not exhausted", symbol, ctx)
+            return
+        if ctx["range_bias"] == "NEAR_RESISTANCE" and rsi < 45:
+            log_gate_fail("RANGE_POSITION", f"near resistance but RSI={rsi:.1f} — buyers not exhausted", symbol, ctx)
+            return
 
     log.info("  All gates passed → generating chart...")
     chart_b64 = generate_chart(df_m15, ctx, df_h1=df_h1)

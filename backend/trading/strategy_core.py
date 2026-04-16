@@ -757,6 +757,12 @@ def validate_ai_trade_decision(decision: dict, context: dict,
     if setup_code not in ("A", "B", "C", "D"):
         return False, f"unsupported setup {setup_code!r}; only Setup A/B/C/D allowed"
 
+    if setup_code == "A":
+        h1 = context.get("h1_trend", "")
+        m15 = context.get("m15_trend", "")
+        if h1 != m15 or h1 in ("SIDEWAY", "VOLATILE_RANGE"):
+            return False, f"Setup A requires H1/M15 alignment — H1={h1} M15={m15}"
+
     timing_ok, timing_reason = _setup_timing_ok(setup_code, signal, context, df_exec)
     if not timing_ok:
         return False, timing_reason
