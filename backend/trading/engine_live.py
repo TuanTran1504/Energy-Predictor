@@ -188,6 +188,29 @@ def _algo_order(symbol: str, side: str, order_type: str, trigger_price: float) -
         return json.loads(r.read())
 
 
+def _list_open_algo_orders(symbol: str) -> list:
+    """Return open algo orders for a symbol from Binance."""
+    params = {"symbol": symbol, "timestamp": int(time.time() * 1000)}
+    query = urllib.parse.urlencode(params)
+    sig   = hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+    url   = f"https://fapi.binance.com/fapi/v1/openAlgoOrders?{query}&signature={sig}"
+    req   = urllib.request.Request(url, headers={"X-MBX-APIKEY": API_KEY})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        data = json.loads(r.read())
+    return data.get("orders", [])
+
+
+def _cancel_algo_order(algo_id: int) -> dict:
+    """Cancel an algo order by algoId."""
+    params = {"algoId": algo_id, "timestamp": int(time.time() * 1000)}
+    query = urllib.parse.urlencode(params)
+    sig   = hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+    url   = f"https://fapi.binance.com/fapi/v1/algoOrder?{query}&signature={sig}"
+    req   = urllib.request.Request(url, method="DELETE", headers={"X-MBX-APIKEY": API_KEY})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return json.loads(r.read())
+
+
 def _get_conn():
     return psycopg2.connect(
         DATABASE_URL,
@@ -305,6 +328,19 @@ def db_cancel_pending(trade_id: int):
     try:
         with conn.cursor() as cur:
             cur.execute(f"DELETE FROM {TRADES_TABLE} WHERE id=%s AND status='PENDING'", (trade_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def db_update_stop_loss(trade_id: int, new_sl: float):
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE {TRADES_TABLE} SET stop_loss=%s WHERE id=%s",
+                (new_sl, trade_id),
+            )
         conn.commit()
     finally:
         conn.close()
@@ -535,6 +571,37 @@ def _monitor_loop(client: UMFutures):
                     mark = float(ticker["price"])
                 except Exception:
                     continue
+
+                # --- Break-even: move SL to entry once price reaches 1:1 profit ---
+                entry = trade.get("entry_price") or 0
+                if entry and sl:
+                    be_applied = (
+                        (trade.get("side") == "BUY"  and sl >= entry * 0.9999) or
+                        (trade.get("side") == "SELL" and sl <= entry * 1.0001)
+                    )
+                    if not be_applied:
+                        risk = abs(entry - sl)
+                        be_trigger = (entry + risk) if trade.get("side") == "BUY" else (entry - risk)
+                        be_reached = (
+                            (trade.get("side") == "BUY"  and mark >= be_trigger) or
+                            (trade.get("side") == "SELL" and mark <= be_trigger)
+                        )
+                        if be_reached:
+                            log.info(f"[MONITOR] {sym} break-even triggered (mark={mark:.4f} >= be={be_trigger:.4f}) — moving SL to entry {entry}")
+                            close_side = "SELL" if trade.get("side") == "BUY" else "BUY"
+                            try:
+                                algo_orders = _list_open_algo_orders(f"{sym}USDT")
+                                for ao in algo_orders:
+                                    if "STOP" in str(ao.get("type", "")).upper() and ao.get("side") == close_side:
+                                        _cancel_algo_order(ao["algoId"])
+                                        log.info(f"[MONITOR] {sym} cancelled SL algo {ao['algoId']}")
+                                _algo_order(f"{sym}USDT", close_side, "STOP_MARKET", entry)
+                                log.info(f"[MONITOR] {sym} new SL placed at entry {entry}")
+                            except Exception as e:
+                                log.warning(f"[MONITOR] {sym} break-even SL replace failed ({e}) — DB updated, software will enforce")
+                            db_update_stop_loss(trade["id"], entry)
+                            trade["stop_loss"] = entry
+                            sl = entry
 
                 trade_side = trade["side"]
                 hit = None
