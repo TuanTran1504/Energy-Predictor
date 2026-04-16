@@ -866,7 +866,7 @@ def _breakout_acceptance_ok(signal: str, context: dict,
     latest_body = abs(latest_close - latest_open)
     atr = float(context.get("atr_m15") or context.get("atr") or 0.0)
     prev_vol_mean = float(df_exec.tail(7).iloc[:-1]["volume"].mean())
-    vol_ok = latest_volume >= prev_vol_mean * 1.05 if prev_vol_mean > 0 else True
+    vol_ok = latest_volume >= prev_vol_mean * 1.5 if prev_vol_mean > 0 else True
     box_low, box_high = _recent_box_levels(df_exec, window=6, exclude_last=1)
     closes = df_exec["close"].astype(float)
     ema34 = float(closes.ewm(span=34, adjust=False).mean().iloc[-1])
@@ -891,7 +891,7 @@ def _breakout_acceptance_ok(signal: str, context: dict,
     if not body_ok or not momentum_ok:
         return False, "breakout candle lacks decisive body expansion"
     if not vol_ok:
-        return False, "breakout volume not strong enough"
+        return False, f"breakout volume {latest_volume:.0f} < 1.5x average {prev_vol_mean:.0f}"
     return True, "OK"
 
 
@@ -952,8 +952,8 @@ def _retest_hold_ok(signal: str, context: dict,
         if latest_close > latest_low + max((latest_high - latest_low) * 0.45, 1e-9):
             return False, "SELL retest fail candle closed too weakly"
 
-    if prev_vol_mean > 0 and latest_volume < prev_vol_mean:
-        return False, "retest confirmation volume below recent average"
+    if prev_vol_mean > 0 and latest_volume < prev_vol_mean * 1.2:
+        return False, f"retest confirmation volume {latest_volume:.0f} < 1.2x average {prev_vol_mean:.0f}"
     return True, "OK"
 
 
