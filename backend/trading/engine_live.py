@@ -166,20 +166,29 @@ def get_client() -> UMFutures:
     return UMFutures(key=API_KEY, secret=API_SECRET)  # no base_url = live
 
 
-def _algo_order(symbol: str, side: str, order_type: str, trigger_price: float) -> dict:
-    """Place SL/TP via Binance Algo Order API (/fapi/v1/algoOrder)."""
+def _algo_order(symbol: str, side: str, order_type: str, trigger_price: float,
+                quantity: float | None = None) -> dict:
+    """Place SL/TP via Binance Algo Order API (/fapi/v1/algoOrder).
+
+    quantity=None  → closePosition=true (closes entire position — used for SL and single TP)
+    quantity=N     → partial close of N units (used for staged TP1 / TP2)
+    """
     base      = symbol.replace("USDT", "")
     precision = PRICE_PRECISION.get(base, 2)
+    qty_prec  = QTY_PRECISION.get(base, 3)
     params = {
-        "algoType":    "CONDITIONAL",
-        "symbol":      symbol,
-        "side":        side,
-        "type":        order_type,
+        "algoType":     "CONDITIONAL",
+        "symbol":       symbol,
+        "side":         side,
+        "type":         order_type,
         "triggerPrice": f"{trigger_price:.{precision}f}",
-        "workingType": "MARK_PRICE",
-        "closePosition": "true",
-        "timestamp":   int(time.time() * 1000),
+        "workingType":  "MARK_PRICE",
+        "timestamp":    int(time.time() * 1000),
     }
+    if quantity is not None:
+        params["quantity"] = f"{quantity:.{qty_prec}f}"
+    else:
+        params["closePosition"] = "true"
     query = urllib.parse.urlencode(params)
     sig   = hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
     url   = f"https://fapi.binance.com/fapi/v1/algoOrder?{query}&signature={sig}"
@@ -1019,32 +1028,16 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
         # --- Step 4: TP orders ---
         if staged:
-            # TP1 — close first half at nearer target
+            # TP1 — close first half at nearer target via Algo Order API
             try:
-                client.new_order(
-                    symbol=sym_pair,
-                    side=close_side,
-                    type="TAKE_PROFIT_MARKET",
-                    stopPrice=f"{tp1_price:.{price_prec}f}",
-                    quantity=half_qty,
-                    reduceOnly="true",
-                    workingType="MARK_PRICE",
-                )
-                log.info(f"  [EXEC] TP1 order placed @ {tp1_price} qty={half_qty}")
+                resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp1_price, quantity=half_qty)
+                log.info(f"  [EXEC] TP1 algo order placed @ {tp1_price} qty={half_qty} id={resp.get('algoId','?')}")
             except Exception as e:
                 log.warning(f"  [EXEC] TP1 order failed ({e}) — software monitor will enforce")
-            # TP2 — close remaining half at farther target
+            # TP2 — close remaining half at farther target via Algo Order API
             try:
-                client.new_order(
-                    symbol=sym_pair,
-                    side=close_side,
-                    type="TAKE_PROFIT_MARKET",
-                    stopPrice=f"{tp2_price:.{price_prec}f}",
-                    quantity=half_qty,
-                    reduceOnly="true",
-                    workingType="MARK_PRICE",
-                )
-                log.info(f"  [EXEC] TP2 order placed @ {tp2_price} qty={half_qty}")
+                resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp2_price, quantity=half_qty)
+                log.info(f"  [EXEC] TP2 algo order placed @ {tp2_price} qty={half_qty} id={resp.get('algoId','?')}")
             except Exception as e:
                 log.warning(f"  [EXEC] TP2 order failed ({e}) — software monitor will enforce")
         else:
