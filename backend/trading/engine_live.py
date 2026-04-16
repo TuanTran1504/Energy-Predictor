@@ -247,6 +247,7 @@ def db_ensure_trades_table():
                 ("binance_order_id", "TEXT"),
                 ("close_reason",     "TEXT"),
                 ("account_type",     "TEXT DEFAULT 'testnet'"),
+                ("take_profit_2",    "FLOAT"),
             ]:
                 cur.execute(f"""
                     ALTER TABLE {TRADES_TABLE} ADD COLUMN IF NOT EXISTS {col} {definition}
@@ -281,7 +282,7 @@ def db_create_pending(symbol: str, side: str, setup: str,
 
 
 def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
-                    stop_loss: float, take_profit: float,
+                    stop_loss: float, take_profit: float, take_profit_2: float,
                     order_id: str, notes: str):
     conn = _get_conn()
     try:
@@ -289,10 +290,10 @@ def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
             cur.execute(f"""
                 UPDATE {TRADES_TABLE} SET
                     status='OPEN', entry_price=%s, quantity=%s,
-                    stop_loss=%s, take_profit=%s,
+                    stop_loss=%s, take_profit=%s, take_profit_2=%s,
                     binance_order_id=%s, notes=%s
                 WHERE id=%s
-            """, (entry_price, quantity, stop_loss, take_profit,
+            """, (entry_price, quantity, stop_loss, take_profit, take_profit_2,
                   order_id, notes[:200], trade_id))
         conn.commit()
     finally:
@@ -347,7 +348,7 @@ def db_get_open_trades() -> list[dict]:
             with conn.cursor() as cur:
                 cur.execute(f"""
                     SELECT id, symbol, side, entry_price, quantity,
-                           stop_loss, take_profit, binance_order_id, opened_at
+                           stop_loss, take_profit, take_profit_2, binance_order_id, opened_at
                     FROM {TRADES_TABLE} WHERE status='OPEN' AND account_type=%s
                 """, (ACCOUNT_TYPE,))
                 cols = [d[0] for d in cur.description]
@@ -520,6 +521,11 @@ def _monitor_loop(client: UMFutures):
             for trade in list(open_trades):
                 sl = trade.get("stop_loss") or 0
                 tp = trade.get("take_profit") or 0
+                tp2 = trade.get("take_profit_2") or 0
+                # Staged exits (tp2 set and different from tp1) rely on exchange
+                # reduceOnly orders for TP. Software backup only enforces SL to
+                # avoid prematurely closing the remaining half at TP1 price.
+                is_staged = bool(tp2 and abs(tp2 - tp) / max(tp, 1) > 0.0005)
                 if not sl and not tp:
                     continue
 
@@ -535,12 +541,12 @@ def _monitor_loop(client: UMFutures):
                 if trade_side == "BUY":
                     if sl and mark <= sl:
                         hit = "stop_loss"
-                    elif tp and mark >= tp:
+                    elif not is_staged and tp and mark >= tp:
                         hit = "take_profit"
                 else:
                     if sl and mark >= sl:
                         hit = "stop_loss"
-                    elif tp and mark <= tp:
+                    elif not is_staged and tp and mark <= tp:
                         hit = "take_profit"
 
                 if hit:
@@ -889,14 +895,27 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         )
         return False
 
+    # --- Staged exit: split position in half for TP1 and TP2 ---
+    tp1_price = float(decision.get("take_profit_1") or ai_tp)
+    tp2_price = float(decision.get("take_profit_2") or ai_tp)
+    price_prec = PRICE_PRECISION.get(symbol, 2)
+    qty_prec_factor = 10 ** QTY_PRECISION.get(symbol, 2)
+    half_qty = math.floor((qty / 2) * qty_prec_factor) / qty_prec_factor
+    staged = (
+        half_qty > 0
+        and (half_qty * entry) >= min_notional
+        and abs(tp2_price - tp1_price) / entry > 0.0005  # TPs must differ by >0.05%
+    )
+
     log.info(
-        f"  [EXEC] {signal} {symbol} | entry≈{entry} SL={ai_sl} TP={ai_tp} "
-        f"qty={qty} R:R={rr:.2f} | dry_run={dry_run}"
+        f"  [EXEC] {signal} {symbol} | entry≈{entry} SL={ai_sl} "
+        f"TP1={tp1_price} TP2={tp2_price} qty={qty} half={half_qty} staged={staged} "
+        f"R:R={rr:.2f} | dry_run={dry_run}"
     )
 
     if dry_run:
-        log_trade_open(symbol, signal, entry, ai_sl, ai_tp, rr, setup, reason,
-                       trade_id="DRY_RUN", context=context)
+        log_trade_open(symbol, signal, entry, ai_sl, tp1_price if staged else ai_tp,
+                       rr, setup, reason, trade_id="DRY_RUN", context=context)
         return True
 
     side       = "BUY" if signal == "BUY" else "SELL"
@@ -924,23 +943,56 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
         time.sleep(0.5)
 
-        # --- Step 3: SL via Algo Order API ---
+        # --- Step 3: SL via Algo Order API (closePosition=true covers full remaining qty) ---
         try:
             resp = _algo_order(sym_pair, close_side, "STOP_MARKET", ai_sl)
             log.info(f"  [EXEC] SL algo order placed @ {ai_sl} id={resp.get('algoId','?')}")
         except Exception as e:
             log.warning(f"  [EXEC] SL algo order failed ({e}) — software monitor will enforce")
 
-        # --- Step 4: TP via Algo Order API ---
-        try:
-            resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", ai_tp)
-            log.info(f"  [EXEC] TP algo order placed @ {ai_tp} id={resp.get('algoId','?')}")
-        except Exception as e:
-            log.warning(f"  [EXEC] TP algo order failed ({e}) — software monitor will enforce")
+        # --- Step 4: TP orders ---
+        if staged:
+            # TP1 — close first half at nearer target
+            try:
+                client.new_order(
+                    symbol=sym_pair,
+                    side=close_side,
+                    type="TAKE_PROFIT_MARKET",
+                    stopPrice=f"{tp1_price:.{price_prec}f}",
+                    quantity=half_qty,
+                    reduceOnly="true",
+                    workingType="MARK_PRICE",
+                )
+                log.info(f"  [EXEC] TP1 order placed @ {tp1_price} qty={half_qty}")
+            except Exception as e:
+                log.warning(f"  [EXEC] TP1 order failed ({e}) — software monitor will enforce")
+            # TP2 — close remaining half at farther target
+            try:
+                client.new_order(
+                    symbol=sym_pair,
+                    side=close_side,
+                    type="TAKE_PROFIT_MARKET",
+                    stopPrice=f"{tp2_price:.{price_prec}f}",
+                    quantity=half_qty,
+                    reduceOnly="true",
+                    workingType="MARK_PRICE",
+                )
+                log.info(f"  [EXEC] TP2 order placed @ {tp2_price} qty={half_qty}")
+            except Exception as e:
+                log.warning(f"  [EXEC] TP2 order failed ({e}) — software monitor will enforce")
+        else:
+            # Fallback: single TP via Algo Order (position too small to split)
+            try:
+                resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", ai_tp)
+                log.info(f"  [EXEC] TP algo order placed @ {ai_tp} id={resp.get('algoId','?')}")
+            except Exception as e:
+                log.warning(f"  [EXEC] TP algo order failed ({e}) — software monitor will enforce")
 
         # --- Step 5: confirm OPEN ---
-        db_confirm_open(pending_id, actual_price, qty, ai_sl, ai_tp, order_id, reason)
-        log_trade_open(symbol, signal, actual_price, ai_sl, ai_tp, rr,
+        db_tp1  = tp1_price if staged else ai_tp
+        db_tp2  = tp2_price if staged else ai_tp
+        db_confirm_open(pending_id, actual_price, qty, ai_sl, db_tp1, db_tp2, order_id, reason)
+        log_trade_open(symbol, signal, actual_price, ai_sl, db_tp1, rr,
                        setup, reason, trade_id=order_id, context=context)
         return True
 
@@ -1186,9 +1238,11 @@ def run_once(dry_run: bool = False):
     )
     log.info(f"Fear&Greed={market_signals.get('fear_greed','?')}  {funding_str}")
 
+    latest_balance = balance
     for symbol in SYMBOLS:
         try:
-            run_symbol_cycle(client, symbol, ml_preds, market_signals, balance, dry_run)
+            latest_balance = get_account_balance(client)
+            run_symbol_cycle(client, symbol, ml_preds, market_signals, latest_balance, dry_run)
         except Exception as e:
             log_error(f"[{symbol}] Unhandled cycle error", e)
 
