@@ -1131,29 +1131,6 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
             return
         log_gate_pass("BTC_MACRO", f"BTC 4h macro={btc_macro} | {symbol} trend={primary} — no conflict")
 
-    # H1 opposition gate: block when H1 trend strongly opposes the M15 direction.
-    # Only applies in trending markets — in range markets both directions are valid.
-    # Does NOT require H1 to match M15 (that would miss the move). It only blocks
-    # the case where H1 is a hard confirmed trend in the opposite direction.
-    if not ctx["is_range"]:
-        h1  = ctx["h1_trend"]
-        m15 = ctx.get("primary_trend") or ctx["m15_trend"]
-        if h1 == "DOWNTREND" and m15 == "UPTREND":
-            log_gate_fail(
-                "H1_OPPOSE",
-                f"H1 strongly DOWNTREND — M15 UPTREND is counter-trend bounce, blocking LONG",
-                symbol, ctx,
-            )
-            return
-        if h1 == "UPTREND" and m15 == "DOWNTREND":
-            log_gate_fail(
-                "H1_OPPOSE",
-                f"H1 strongly UPTREND — M15 DOWNTREND is counter-trend pullback, blocking SHORT",
-                symbol, ctx,
-            )
-            return
-        log_gate_pass("H1_OPPOSE", f"H1={h1} M15={m15} — no strong opposition")
-
     tech_ok, tech_reason = check_technical_gates(ctx)
     if not tech_ok:
         log_gate_fail("TECHNICAL", tech_reason, symbol, ctx)
