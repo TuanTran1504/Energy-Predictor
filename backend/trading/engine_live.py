@@ -1284,6 +1284,11 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         f"netR:R={plan['rr']:.2f} grossR:R={plan['gross_rr']:.2f} | {plan_reason}"
     )
 
+    # Guard: skip if Binance already has an open position for this symbol
+    if not dry_run and get_open_position(client, symbol) is not None:
+        log.info(f"  [{symbol}] Binance position already open — skipping to avoid double entry")
+        return
+
     executed = execute_trade(client, symbol, decision, balance, ctx, dry_run=dry_run)
     log_cycle_summary(symbol, signal, executed, balance, ctx, decision)
 
