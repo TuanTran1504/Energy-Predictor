@@ -324,18 +324,32 @@ def db_create_pending(symbol: str, side: str, setup: str,
 
 def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
                     stop_loss: float, take_profit: float, take_profit_2: float,
-                    order_id: str, notes: str):
+                    order_id: str, notes: str, opened_at_ms: int | None = None):
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(f"""
-                UPDATE {TRADES_TABLE} SET
-                    status='OPEN', entry_price=%s, quantity=%s,
-                    stop_loss=%s, take_profit=%s, take_profit_2=%s,
-                    binance_order_id=%s, notes=%s
-                WHERE id=%s
-            """, (entry_price, quantity, stop_loss, take_profit, take_profit_2,
-                  order_id, notes[:200], trade_id))
+            opened_at = (
+                datetime.fromtimestamp(opened_at_ms / 1000, tz=UTC)
+                if opened_at_ms else None
+            )
+            if opened_at:
+                cur.execute(f"""
+                    UPDATE {TRADES_TABLE} SET
+                        status='OPEN', entry_price=%s, quantity=%s,
+                        stop_loss=%s, take_profit=%s, take_profit_2=%s,
+                        binance_order_id=%s, notes=%s, opened_at=%s
+                    WHERE id=%s
+                """, (entry_price, quantity, stop_loss, take_profit, take_profit_2,
+                      order_id, notes[:200], opened_at, trade_id))
+            else:
+                cur.execute(f"""
+                    UPDATE {TRADES_TABLE} SET
+                        status='OPEN', entry_price=%s, quantity=%s,
+                        stop_loss=%s, take_profit=%s, take_profit_2=%s,
+                        binance_order_id=%s, notes=%s
+                    WHERE id=%s
+                """, (entry_price, quantity, stop_loss, take_profit, take_profit_2,
+                      order_id, notes[:200], trade_id))
         conn.commit()
     finally:
         conn.close()
@@ -364,7 +378,8 @@ def db_update_stop_loss(trade_id: int, new_sl: float):
         conn.close()
 
 
-def db_close_trade(trade_id: int, exit_price: float, reason: str):
+def db_close_trade(trade_id: int, exit_price: float, reason: str,
+                   closed_at_ms: int | None = None):
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -381,12 +396,25 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str):
                 pnl_pct = (entry - exit_price) / entry * LEVERAGE
             margin   = qty * entry / LEVERAGE
             pnl_usdt = pnl_pct * margin
-            cur.execute(f"""
-                UPDATE {TRADES_TABLE} SET
-                    status='CLOSED', exit_price=%s, pnl_usdt=%s,
-                    pnl_pct=%s, close_reason=%s, closed_at=NOW()
-                WHERE id=%s
-            """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason, trade_id))
+            closed_at = (
+                datetime.fromtimestamp(closed_at_ms / 1000, tz=UTC)
+                if closed_at_ms else None
+            )
+            if closed_at:
+                cur.execute(f"""
+                    UPDATE {TRADES_TABLE} SET
+                        status='CLOSED', exit_price=%s, pnl_usdt=%s,
+                        pnl_pct=%s, close_reason=%s, closed_at=%s
+                    WHERE id=%s
+                """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason,
+                      closed_at, trade_id))
+            else:
+                cur.execute(f"""
+                    UPDATE {TRADES_TABLE} SET
+                        status='CLOSED', exit_price=%s, pnl_usdt=%s,
+                        pnl_pct=%s, close_reason=%s, closed_at=NOW()
+                    WHERE id=%s
+                """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason, trade_id))
         conn.commit()
     finally:
         conn.close()
@@ -639,14 +667,17 @@ def _monitor_loop(client: UMFutures):
                     qty = trade["quantity"]
                     log.warning(f"[MONITOR] {sym} {hit} hit (mark={mark}) - closing position")
                     try:
-                        client.new_order(
+                        close_resp = client.new_order(
                             symbol=f"{sym}USDT",
                             side=close_side,
                             type="MARKET",
                             quantity=qty,
                             reduceOnly="true",
                         )
-                        db_close_trade(trade["id"], mark, hit)
+                        close_time_ms = int(
+                            close_resp.get("transactTime") or close_resp.get("updateTime") or 0
+                        ) or None
+                        db_close_trade(trade["id"], mark, hit, closed_at_ms=close_time_ms)
                         open_trades = [t for t in open_trades if t["id"] != trade["id"]]
                     except Exception as e:
                         log.warning(f"[MONITOR] Failed to close {sym} on {hit}: {e}")
@@ -672,11 +703,14 @@ def _monitor_loop(client: UMFutures):
                     continue
 
                 exit_fill = _get_exit_fill_from_binance(client, sym, trade["side"])
+                exit_time_ms = None
                 if exit_fill is not None:
                     exit_price = float(exit_fill["exit_price"])
+                    exit_time_ms = exit_fill.get("time") or None
                     log.info(
                         f"[MONITOR] {sym} exit fills={exit_fill['fills']} "
-                        f"qty={exit_fill['qty']:.6f} pnl={exit_fill['realized_pnl']:.4f}"
+                        f"qty={exit_fill['qty']:.6f} pnl={exit_fill['realized_pnl']:.4f} "
+                        f"time={exit_time_ms}"
                     )
                 else:
                     try:
@@ -696,7 +730,7 @@ def _monitor_loop(client: UMFutures):
                               else "stop_loss" if exit_price >= sl
                               else "native_close")
                 log.info(f"[MONITOR] {sym} closed → reason={reason} exit={exit_price}")
-                db_close_trade(trade["id"], exit_price, reason)
+                db_close_trade(trade["id"], exit_price, reason, closed_at_ms=exit_time_ms)
                 _POSITION_MISS_COUNTS.pop(trade_id, None)
 
         except Exception as e:
@@ -1023,6 +1057,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         # --- Step 2: entry order ---
         order    = client.new_order(symbol=sym_pair, side=side, type="MARKET", quantity=qty)
         order_id = str(order.get("orderId", ""))
+        fill_time_ms = int(order.get("transactTime") or order.get("updateTime") or 0)
         actual_price = float(order.get("avgPrice") or 0)
         if not actual_price:
             # avgPrice can be "0" in the immediate response — query for the real fill
@@ -1030,9 +1065,11 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             try:
                 filled = client.query_order(symbol=sym_pair, orderId=order_id)
                 actual_price = float(filled.get("avgPrice") or 0) or entry
+                if not fill_time_ms:
+                    fill_time_ms = int(filled.get("updateTime") or 0)
             except Exception:
                 actual_price = entry
-        log.info(f"  [EXEC] Entry filled @ {actual_price} orderId={order_id}")
+        log.info(f"  [EXEC] Entry filled @ {actual_price} orderId={order_id} time={fill_time_ms}")
 
         time.sleep(0.5)
 
@@ -1068,7 +1105,8 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         # --- Step 5: confirm OPEN ---
         db_tp1  = tp1_price if staged else ai_tp
         db_tp2  = tp2_price if staged else ai_tp
-        db_confirm_open(pending_id, actual_price, qty, ai_sl, db_tp1, db_tp2, order_id, reason)
+        db_confirm_open(pending_id, actual_price, qty, ai_sl, db_tp1, db_tp2, order_id, reason,
+                        opened_at_ms=fill_time_ms or None)
         log_trade_open(symbol, signal, actual_price, ai_sl, db_tp1, rr,
                        setup, reason, trade_id=order_id, context=context)
         return True
