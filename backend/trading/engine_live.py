@@ -289,6 +289,11 @@ def db_ensure_trades_table():
                 ON {TRADES_TABLE} (account_type, symbol)
                 WHERE status = 'OPEN'
             """)
+            cur.execute(f"""
+                CREATE UNIQUE INDEX IF NOT EXISTS {TRADES_TABLE}_one_pending_per_account_symbol_idx
+                ON {TRADES_TABLE} (account_type, symbol)
+                WHERE status = 'PENDING'
+            """)
         conn.commit()
     finally:
         conn.close()
@@ -299,13 +304,17 @@ def db_create_pending(symbol: str, side: str, setup: str,
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute(f"""
-                INSERT INTO {TRADES_TABLE}
-                  (symbol, side, status, entry_price, quantity, leverage,
-                   stop_loss, take_profit, confidence, setup, horizon, account_type)
-                VALUES (%s,%s,'PENDING', 0, 0, %s, 0, 0, %s,%s, 1, %s)
-                RETURNING id
-            """, (symbol, side, LEVERAGE, confidence, setup, ACCOUNT_TYPE))
+            try:
+                cur.execute(f"""
+                    INSERT INTO {TRADES_TABLE}
+                      (symbol, side, status, entry_price, quantity, leverage,
+                       stop_loss, take_profit, confidence, setup, horizon, account_type)
+                    VALUES (%s,%s,'PENDING', 0, 0, %s, 0, 0, %s,%s, 1, %s)
+                    RETURNING id
+                """, (symbol, side, LEVERAGE, confidence, setup, ACCOUNT_TYPE))
+            except errors.UniqueViolation:
+                conn.rollback()
+                raise RuntimeError(f"[{symbol}] Duplicate PENDING — another instance already entering")
             tid = cur.fetchone()[0]
         conn.commit()
     finally:
