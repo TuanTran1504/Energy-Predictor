@@ -590,13 +590,13 @@ def _monitor_loop(client: UMFutures):
                     )
                     if not be_applied:
                         risk = abs(entry - sl)
-                        be_trigger = (entry + risk) if trade.get("side") == "BUY" else (entry - risk)
+                        be_trigger = (entry + risk * 0.5) if trade.get("side") == "BUY" else (entry - risk * 0.5)
                         be_reached = (
                             (trade.get("side") == "BUY"  and mark >= be_trigger) or
                             (trade.get("side") == "SELL" and mark <= be_trigger)
                         )
                         if be_reached:
-                            log.info(f"[MONITOR] {sym} break-even triggered (mark={mark:.4f} >= be={be_trigger:.4f}) — moving SL to entry {entry}")
+                            log.info(f"[MONITOR] {sym} break-even triggered (mark={mark:.4f} be={be_trigger:.4f}) — moving SL to entry {entry}")
                             close_side = "SELL" if trade.get("side") == "BUY" else "BUY"
                             try:
                                 algo_orders = _list_open_algo_orders(f"{sym}USDT")
