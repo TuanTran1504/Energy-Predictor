@@ -1012,9 +1012,17 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         client.change_leverage(symbol=sym_pair, leverage=LEVERAGE)
 
         # --- Step 2: entry order ---
-        order = client.new_order(symbol=sym_pair, side=side, type="MARKET", quantity=qty)
-        order_id     = str(order.get("orderId", ""))
-        actual_price = float(order.get("avgPrice", entry)) or entry
+        order    = client.new_order(symbol=sym_pair, side=side, type="MARKET", quantity=qty)
+        order_id = str(order.get("orderId", ""))
+        actual_price = float(order.get("avgPrice") or 0)
+        if not actual_price:
+            # avgPrice can be "0" in the immediate response — query for the real fill
+            time.sleep(0.3)
+            try:
+                filled = client.query_order(symbol=sym_pair, orderId=order_id)
+                actual_price = float(filled.get("avgPrice") or 0) or entry
+            except Exception:
+                actual_price = entry
         log.info(f"  [EXEC] Entry filled @ {actual_price} orderId={order_id}")
 
         time.sleep(0.5)
