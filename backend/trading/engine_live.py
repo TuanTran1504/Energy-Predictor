@@ -1248,6 +1248,15 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         return
 
     setup_name = decision.get("analysis", {}).get("setup_identified", "")
+    # Refresh price after Gemini delay so SL/TP/RR are calculated from actual entry price.
+    try:
+        ticker = client.ticker_price(symbol=f"{symbol}USDT")
+        fresh_price = float(ticker["price"])
+        if fresh_price and fresh_price > 0:
+            log.info(f"  [PLAN] Price refresh: {ctx['current_price']} → {fresh_price}")
+            ctx["current_price"] = fresh_price
+    except Exception as e:
+        log.warning(f"  [PLAN] Price refresh failed ({e}) — using original price")
     # Keep planning on the same 15m execution frame the LLM used for setup detection.
     plan, plan_reason = build_trade_plan(signal, setup_name, ctx, df_m15)
     if not plan:
