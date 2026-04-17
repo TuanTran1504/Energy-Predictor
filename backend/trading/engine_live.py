@@ -280,6 +280,7 @@ def db_ensure_trades_table():
                 ("close_reason",     "TEXT"),
                 ("account_type",     "TEXT DEFAULT 'testnet'"),
                 ("take_profit_2",    "FLOAT"),
+                ("close_order_id",   "TEXT"),
             ]:
                 cur.execute(f"""
                     ALTER TABLE {TRADES_TABLE} ADD COLUMN IF NOT EXISTS {col} {definition}
@@ -379,7 +380,8 @@ def db_update_stop_loss(trade_id: int, new_sl: float):
 
 
 def db_close_trade(trade_id: int, exit_price: float, reason: str,
-                   closed_at_ms: int | None = None):
+                   closed_at_ms: int | None = None,
+                   close_order_id: str | None = None):
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -404,17 +406,18 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str,
                 cur.execute(f"""
                     UPDATE {TRADES_TABLE} SET
                         status='CLOSED', exit_price=%s, pnl_usdt=%s,
-                        pnl_pct=%s, close_reason=%s, closed_at=%s
+                        pnl_pct=%s, close_reason=%s, closed_at=%s, close_order_id=%s
                     WHERE id=%s
                 """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason,
-                      closed_at, trade_id))
+                      closed_at, close_order_id, trade_id))
             else:
                 cur.execute(f"""
                     UPDATE {TRADES_TABLE} SET
                         status='CLOSED', exit_price=%s, pnl_usdt=%s,
-                        pnl_pct=%s, close_reason=%s, closed_at=NOW()
+                        pnl_pct=%s, close_reason=%s, closed_at=NOW(), close_order_id=%s
                     WHERE id=%s
-                """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason, trade_id))
+                """, (exit_price, round(pnl_usdt, 4), round(pnl_pct * 100, 4), reason,
+                      close_order_id, trade_id))
         conn.commit()
     finally:
         conn.close()
@@ -516,12 +519,14 @@ def _get_exit_fill_from_binance(client: UMFutures, symbol: str, trade_side: str)
         ) / total_qty
         realized_pnl = sum(float(t.get("realizedPnl", 0) or 0) for t in closing_fills)
         latest_time = max(int(t.get("time", 0) or 0) for t in closing_fills)
+        close_order_id = str(closing_fills[0].get("orderId", "")) if closing_fills else ""
         return {
             "exit_price": weighted_exit,
             "qty": total_qty,
             "realized_pnl": realized_pnl,
             "time": latest_time,
             "fills": len(closing_fills),
+            "order_id": close_order_id,
         }
     except Exception as e:
         log.warning(f"[MONITOR] Could not fetch exit fills for {symbol}: {e}")
@@ -677,7 +682,9 @@ def _monitor_loop(client: UMFutures):
                         close_time_ms = int(
                             close_resp.get("transactTime") or close_resp.get("updateTime") or 0
                         ) or None
-                        db_close_trade(trade["id"], mark, hit, closed_at_ms=close_time_ms)
+                        close_oid = str(close_resp.get("orderId", "")) or None
+                        db_close_trade(trade["id"], mark, hit,
+                                       closed_at_ms=close_time_ms, close_order_id=close_oid)
                         open_trades = [t for t in open_trades if t["id"] != trade["id"]]
                     except Exception as e:
                         log.warning(f"[MONITOR] Failed to close {sym} on {hit}: {e}")
@@ -704,13 +711,15 @@ def _monitor_loop(client: UMFutures):
 
                 exit_fill = _get_exit_fill_from_binance(client, sym, trade["side"])
                 exit_time_ms = None
+                exit_order_id = None
                 if exit_fill is not None:
                     exit_price = float(exit_fill["exit_price"])
                     exit_time_ms = exit_fill.get("time") or None
+                    exit_order_id = exit_fill.get("order_id") or None
                     log.info(
                         f"[MONITOR] {sym} exit fills={exit_fill['fills']} "
                         f"qty={exit_fill['qty']:.6f} pnl={exit_fill['realized_pnl']:.4f} "
-                        f"time={exit_time_ms}"
+                        f"orderId={exit_order_id} time={exit_time_ms}"
                     )
                 else:
                     try:
@@ -729,8 +738,9 @@ def _monitor_loop(client: UMFutures):
                     reason = ("take_profit" if exit_price <= tp
                               else "stop_loss" if exit_price >= sl
                               else "native_close")
-                log.info(f"[MONITOR] {sym} closed → reason={reason} exit={exit_price}")
-                db_close_trade(trade["id"], exit_price, reason, closed_at_ms=exit_time_ms)
+                log.info(f"[MONITOR] {sym} closed → reason={reason} exit={exit_price} orderId={exit_order_id}")
+                db_close_trade(trade["id"], exit_price, reason,
+                               closed_at_ms=exit_time_ms, close_order_id=exit_order_id)
                 _POSITION_MISS_COUNTS.pop(trade_id, None)
 
         except Exception as e:
