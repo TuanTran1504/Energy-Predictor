@@ -655,16 +655,19 @@ def _monitor_loop(client: UMFutures):
                             sl = entry
 
                 trade_side = trade["side"]
+                # For staged trades use tp2 as software fallback so we still
+                # take profit even if the TP algo orders failed to place.
+                tp_check = tp2 if is_staged and tp2 else tp
                 hit = None
                 if trade_side == "BUY":
                     if sl and mark <= sl:
                         hit = "stop_loss"
-                    elif not is_staged and tp and mark >= tp:
+                    elif tp_check and mark >= tp_check:
                         hit = "take_profit"
                 else:
                     if sl and mark >= sl:
                         hit = "stop_loss"
-                    elif not is_staged and tp and mark <= tp:
+                    elif tp_check and mark <= tp_check:
                         hit = "take_profit"
 
                 if hit:
