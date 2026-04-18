@@ -650,13 +650,21 @@ def _monitor_loop(client: UMFutures):
                             try:
                                 algo_orders = _list_open_algo_orders(f"{sym}USDT")
                                 for ao in algo_orders:
-                                    if "STOP" in str(ao.get("type", "")).upper() and ao.get("side") == close_side:
+                                    ao_trigger = float(ao.get("triggerPrice") or 0)
+                                    ao_side    = ao.get("side", "")
+                                    # Identify SL by side + trigger being on the loss side of entry
+                                    # (type field is null in API response so cannot be used)
+                                    is_sl = ao_side == close_side and (
+                                        (trade.get("side") == "BUY"  and ao_trigger < entry) or
+                                        (trade.get("side") == "SELL" and ao_trigger > entry)
+                                    )
+                                    if is_sl:
                                         _cancel_algo_order(ao["algoId"])
-                                        log.info(f"[MONITOR] {sym} cancelled SL algo {ao['algoId']}")
+                                        log.info(f"[MONITOR] {sym} cancelled SL algo {ao['algoId']} @ {ao_trigger}")
                                 _algo_order(f"{sym}USDT", close_side, "STOP_MARKET", entry)
-                                log.info(f"[MONITOR] {sym} new SL placed at entry {entry}")
+                                log.info(f"[MONITOR] {sym} new break-even SL placed at entry {entry}")
                             except Exception as e:
-                                log.warning(f"[MONITOR] {sym} break-even SL replace failed ({e}) — DB updated, software will enforce")
+                                log.warning(f"[MONITOR] {sym} break-even SL replace failed ({e}) — software monitor will enforce via DB")
                             db_update_stop_loss(trade["id"], entry)
                             trade["stop_loss"] = entry
                             sl = entry
