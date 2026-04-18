@@ -404,7 +404,10 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str,
             else:
                 pnl_pct = (entry - exit_price) / entry * LEVERAGE
             margin   = qty * entry / LEVERAGE
-            pnl_usdt = pnl_pct * margin
+            raw_pnl  = pnl_pct * margin
+            # Deduct taker fees (0.04% each side on notional)
+            fees     = (entry + exit_price) * qty * 0.0004
+            pnl_usdt = raw_pnl - fees
             closed_at = (
                 datetime.fromtimestamp(closed_at_ms / 1000, tz=UTC)
                 if closed_at_ms else None
@@ -428,7 +431,7 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str,
         conn.commit()
     finally:
         conn.close()
-    log.info(f"[DB] Trade {trade_id} closed — {reason} @ {exit_price} pnl={pnl_pct*100:.2f}%")
+    log.info(f"[DB] Trade {trade_id} closed — {reason} @ {exit_price} pnl={pnl_usdt:+.4f} USDT ({pnl_pct*100:.2f}% raw, fees={fees:.4f})")
 
 
 def db_get_open_trades() -> list[dict]:
