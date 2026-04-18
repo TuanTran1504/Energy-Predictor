@@ -207,6 +207,8 @@ def _list_open_algo_orders(symbol: str) -> list:
     req   = urllib.request.Request(url, headers={"X-MBX-APIKEY": API_KEY})
     with urllib.request.urlopen(req, timeout=10) as r:
         data = json.loads(r.read())
+    if isinstance(data, list):
+        return data
     return data.get("orders", [])
 
 
