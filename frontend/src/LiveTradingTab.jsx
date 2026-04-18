@@ -39,12 +39,54 @@ function calcUnrealizedPnl(trade, currentPrice) {
   return { pnl_pct: pnl_pct * 100, pnl_usdt, currentPrice };
 }
 
+const FILL_COLOR = { ENTRY: "#aeaeb2", TP: "#30d158", TP1: "#30d158", TP2: "#34c759", SL: "#ff3b30", CLOSE: "#aeaeb2" };
+
+function FillsRow({ tradeId }) {
+  const [fills, setFills] = useState(null);
+  useEffect(() => {
+    fetch(`${API_URL}/trading/live/fills?trade_id=${tradeId}`)
+      .then(r => r.json())
+      .then(d => setFills(d.fills || []))
+      .catch(() => setFills([]));
+  }, [tradeId]);
+  if (!fills) return <tr><td colSpan={10} style={{ padding: "6px 24px", color: "var(--muted)", fontSize: 10 }}>Loading fills…</td></tr>;
+  if (!fills.length) return <tr><td colSpan={10} style={{ padding: "6px 24px", color: "var(--muted)", fontSize: 10 }}>No fills recorded</td></tr>;
+  return (
+    <tr>
+      <td colSpan={10} style={{ padding: "0 0 4px 24px", background: "#1c1c1e" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--mono)", fontSize: 10 }}>
+          <thead>
+            <tr style={{ color: "var(--muted2)" }}>
+              {["TYPE","PRICE","QTY","FEE","P&L","TIME"].map(h => (
+                <th key={h} style={{ padding: "3px 8px", textAlign: "left", fontWeight: 400 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {fills.map((f, i) => (
+              <tr key={i} style={{ borderTop: "1px solid var(--border)" }}>
+                <td style={{ padding: "3px 8px", color: FILL_COLOR[f.fill_type] || "#aeaeb2", fontWeight: 600 }}>{f.fill_type}</td>
+                <td style={{ padding: "3px 8px" }}>${fmt(f.price, 2)}</td>
+                <td style={{ padding: "3px 8px" }}>{f.quantity}</td>
+                <td style={{ padding: "3px 8px", color: "#ff3b30" }}>-${fmt(f.fee_usdt, 4)}</td>
+                <td style={{ padding: "3px 8px", color: clr(f.pnl_usdt) }}>{f.pnl_usdt >= 0 ? "+" : ""}{fmt(f.pnl_usdt, 4)}</td>
+                <td style={{ padding: "3px 8px", color: "var(--muted)" }}>{new Date(f.filled_at).toLocaleTimeString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </td>
+    </tr>
+  );
+}
+
 export default function LiveTradingTab({ livePrices = {} }) {
   const [status,      setStatus]      = useState(null);
   const [history,     setHistory]     = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
   const [liveMarkPrices, setLiveMarkPrices] = useState({});
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   const fetchData = async () => {
     try {
@@ -195,28 +237,38 @@ export default function LiveTradingTab({ livePrices = {} }) {
                 </tr>
               </thead>
               <tbody>
-                {history.map(t => (
-                  <tr key={t.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <td style={{ padding: "6px 8px", color: "var(--muted)" }}>{t.id}</td>
-                    <td style={{ padding: "6px 8px" }}>{t.symbol}</td>
-                    <td style={{ padding: "6px 8px" }}>
-                      <Badge text={t.side === "BUY" ? "LONG" : "SHORT"} color={side_color(t.side)} />
-                    </td>
-                    <td style={{ padding: "6px 8px" }}>${fmt(t.entry_price)}</td>
-                    <td style={{ padding: "6px 8px" }}>{t.exit_price ? `$${fmt(t.exit_price)}` : "OPEN"}</td>
-                    <td style={{ padding: "6px 8px" }}>{t.quantity}</td>
-                    <td style={{ padding: "6px 8px", color: clr(t.pnl_usdt) }}>
-                      {t.pnl_usdt != null ? `${t.pnl_usdt >= 0 ? "+" : ""}${fmt(t.pnl_usdt)}` : "—"}
-                    </td>
-                    <td style={{ padding: "6px 8px", color: clr(t.pnl_pct) }}>
-                      {t.pnl_pct != null ? `${t.pnl_pct >= 0 ? "+" : ""}${fmt(t.pnl_pct)}%` : "—"}
-                    </td>
-                    <td style={{ padding: "6px 8px", color: "var(--muted)" }}>{t.close_reason || "open"}</td>
-                    <td style={{ padding: "6px 8px", color: "var(--muted)" }}>
-                      {new Date(t.opened_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
+                {history.map(t => {
+                  const expanded = expandedRows.has(t.id);
+                  const toggle = () => setExpandedRows(prev => {
+                    const next = new Set(prev);
+                    expanded ? next.delete(t.id) : next.add(t.id);
+                    return next;
+                  });
+                  return [
+                    <tr key={t.id} onClick={toggle}
+                      style={{ borderBottom: expanded ? "none" : "1px solid var(--border)", cursor: "pointer" }}>
+                      <td style={{ padding: "6px 8px", color: "var(--muted)" }}>{expanded ? "▾" : "▸"} {t.id}</td>
+                      <td style={{ padding: "6px 8px" }}>{t.symbol}</td>
+                      <td style={{ padding: "6px 8px" }}>
+                        <Badge text={t.side === "BUY" ? "LONG" : "SHORT"} color={side_color(t.side)} />
+                      </td>
+                      <td style={{ padding: "6px 8px" }}>${fmt(t.entry_price)}</td>
+                      <td style={{ padding: "6px 8px" }}>{t.exit_price ? `$${fmt(t.exit_price)}` : "OPEN"}</td>
+                      <td style={{ padding: "6px 8px" }}>{t.quantity}</td>
+                      <td style={{ padding: "6px 8px", color: clr(t.pnl_usdt) }}>
+                        {t.pnl_usdt != null ? `${t.pnl_usdt >= 0 ? "+" : ""}${fmt(t.pnl_usdt)}` : "—"}
+                      </td>
+                      <td style={{ padding: "6px 8px", color: clr(t.pnl_pct) }}>
+                        {t.pnl_pct != null ? `${t.pnl_pct >= 0 ? "+" : ""}${fmt(t.pnl_pct)}%` : "—"}
+                      </td>
+                      <td style={{ padding: "6px 8px", color: "var(--muted)" }}>{t.close_reason || "open"}</td>
+                      <td style={{ padding: "6px 8px", color: "var(--muted)" }}>
+                        {new Date(t.opened_at).toLocaleDateString()}
+                      </td>
+                    </tr>,
+                    expanded && <FillsRow key={`fills-${t.id}`} tradeId={t.id} />,
+                  ];
+                })}
               </tbody>
             </table>
           </div>

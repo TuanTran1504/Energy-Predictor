@@ -46,6 +46,7 @@ func main() {
 	r.GET("/trading/positions/sync", handlers.TradingPositionsSync)
 	r.GET("/trading/live/status", handlers.LiveTradingStatus)
 	r.GET("/trading/live/history", handlers.LiveTradingHistory)
+	r.GET("/trading/live/fills", handlers.LiveTradeFills)
 	r.GET("/ws/live", handlers.LiveFeed)
 
 	port := os.Getenv("PORT")

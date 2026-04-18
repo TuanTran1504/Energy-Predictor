@@ -58,6 +58,7 @@ REDIS_URL    = os.getenv("REDIS_URL", "")
 
 ACCOUNT_TYPE   = "live"
 TRADES_TABLE   = "trades_live"
+FILLS_TABLE    = "trade_fills_live"
 SYMBOLS        = ["BTC", "ETH", "SOL"]
 LEVERAGE       = 5
 try:
@@ -288,10 +289,24 @@ def db_ensure_trades_table():
                 ("account_type",     "TEXT DEFAULT 'testnet'"),
                 ("take_profit_2",    "FLOAT"),
                 ("close_order_id",   "TEXT"),
+                ("tp1_recorded",     "BOOLEAN DEFAULT FALSE"),
             ]:
                 cur.execute(f"""
                     ALTER TABLE {TRADES_TABLE} ADD COLUMN IF NOT EXISTS {col} {definition}
                 """)
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {FILLS_TABLE} (
+                    id          BIGSERIAL   PRIMARY KEY,
+                    trade_id    BIGINT      NOT NULL,
+                    fill_type   TEXT        NOT NULL,
+                    price       FLOAT       NOT NULL,
+                    quantity    FLOAT       NOT NULL,
+                    fee_usdt    FLOAT       NOT NULL DEFAULT 0,
+                    pnl_usdt    FLOAT       NOT NULL DEFAULT 0,
+                    order_id    TEXT,
+                    filled_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """)
             cur.execute(f"""
                 CREATE UNIQUE INDEX IF NOT EXISTS {TRADES_TABLE}_one_open_position_per_account_symbol_idx
                 ON {TRADES_TABLE} (account_type, symbol)
@@ -303,6 +318,64 @@ def db_ensure_trades_table():
                 WHERE status = 'PENDING'
             """)
         conn.commit()
+    finally:
+        conn.close()
+
+
+def _classify_fill_type(price: float, entry: float, sl: float, tp: float,
+                         tp2: float, side: str) -> str:
+    if not price or not entry:
+        return "CLOSE"
+    tol = max(entry * 0.003, 1.0)
+    if sl and abs(price - sl) <= tol:
+        return "SL"
+    if tp2 and abs(price - tp2) <= tol:
+        return "TP2"
+    if tp and abs(price - tp) <= tol:
+        return "TP1" if tp2 else "TP"
+    if side == "BUY":
+        return "TP" if price > entry else "SL"
+    return "TP" if price < entry else "SL"
+
+
+def db_record_fill(trade_id: int, fill_type: str, price: float, qty: float,
+                   order_id: str | None, entry_price: float, trade_side: str,
+                   filled_at_ms: int | None = None):
+    fee_usdt = price * qty * 0.0004
+    if fill_type == "ENTRY":
+        pnl_usdt = -fee_usdt
+    else:
+        gross = (price - entry_price) * qty if trade_side == "BUY" else (entry_price - price) * qty
+        pnl_usdt = gross - fee_usdt
+    filled_at = datetime.fromtimestamp(filled_at_ms / 1000, tz=UTC) if filled_at_ms else None
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                INSERT INTO {FILLS_TABLE}
+                  (trade_id, fill_type, price, quantity, fee_usdt, pnl_usdt, order_id, filled_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (trade_id, fill_type, round(price, 8), round(qty, 8),
+                  round(fee_usdt, 6), round(pnl_usdt, 6),
+                  order_id, filled_at or datetime.now(UTC)))
+        conn.commit()
+        log.info(f"[DB] Fill trade={trade_id} type={fill_type} price={price} qty={qty} pnl={pnl_usdt:+.4f}")
+    except Exception as e:
+        log.warning(f"[DB] Record fill failed trade={trade_id} type={fill_type}: {e}")
+    finally:
+        conn.close()
+
+
+def db_mark_tp1_recorded(trade_id: int):
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE {TRADES_TABLE} SET tp1_recorded=TRUE WHERE id=%s", (trade_id,)
+            )
+        conn.commit()
+    except Exception as e:
+        log.warning(f"[DB] Mark tp1_recorded failed trade={trade_id}: {e}")
     finally:
         conn.close()
 
@@ -358,9 +431,15 @@ def db_confirm_open(trade_id: int, entry_price: float, quantity: float,
                     WHERE id=%s
                 """, (entry_price, quantity, stop_loss, take_profit, take_profit_2,
                       order_id, notes[:200], trade_id))
+            cur.execute(f"SELECT side FROM {TRADES_TABLE} WHERE id=%s", (trade_id,))
+            side_row = cur.fetchone()
+            trade_side = side_row[0] if side_row else None
         conn.commit()
     finally:
         conn.close()
+    if trade_side:
+        db_record_fill(trade_id, "ENTRY", entry_price, quantity, order_id,
+                       entry_price, trade_side, opened_at_ms)
 
 
 def db_cancel_pending(trade_id: int):
@@ -405,9 +484,17 @@ def db_close_trade(trade_id: int, exit_price: float, reason: str,
                 pnl_pct = (entry - exit_price) / entry * LEVERAGE
             margin   = qty * entry / LEVERAGE
             raw_pnl  = pnl_pct * margin
-            # Deduct taker fees (0.04% each side on notional)
             fees     = (entry + exit_price) * qty * 0.0004
             pnl_usdt = raw_pnl - fees
+            # Override with fills-based PnL if fills are recorded (more accurate for staged trades)
+            cur.execute(
+                f"SELECT SUM(pnl_usdt), COUNT(*) FROM {FILLS_TABLE} WHERE trade_id=%s",
+                (trade_id,)
+            )
+            fills_row = cur.fetchone()
+            if fills_row and fills_row[1] and fills_row[1] > 0 and fills_row[0] is not None:
+                pnl_usdt = float(fills_row[0])
+                pnl_pct  = pnl_usdt / margin if margin else pnl_pct
             closed_at = (
                 datetime.fromtimestamp(closed_at_ms / 1000, tz=UTC)
                 if closed_at_ms else None
@@ -443,7 +530,8 @@ def db_get_open_trades() -> list[dict]:
             with conn.cursor() as cur:
                 cur.execute(f"""
                     SELECT id, symbol, side, entry_price, quantity,
-                           stop_loss, take_profit, take_profit_2, binance_order_id, opened_at
+                           stop_loss, take_profit, take_profit_2, binance_order_id, opened_at,
+                           COALESCE(tp1_recorded, FALSE) AS tp1_recorded
                     FROM {TRADES_TABLE} WHERE status='OPEN' AND account_type=%s
                 """, (ACCOUNT_TYPE,))
                 cols = [d[0] for d in cur.description]
@@ -492,29 +580,39 @@ def db_cleanup_stale_pending(max_age_seconds: int = 120):
         conn.close()
 
 
-def _get_exit_fill_from_binance(client: UMFutures, symbol: str, trade_side: str) -> dict | None:
+def _get_exit_fill_from_binance(client: UMFutures, symbol: str, trade_side: str,
+                                after_ms: int | None = None) -> dict | None:
     try:
-        trades = client.get_account_trades(symbol=f"{symbol}USDT", limit=10)
+        closing_side = "SELL" if trade_side == "BUY" else "BUY"
+        kwargs: dict = {"symbol": f"{symbol}USDT", "limit": 20 if after_ms else 10}
+        if after_ms:
+            kwargs["startTime"] = after_ms
+        trades = client.get_account_trades(**kwargs)
         if not trades:
             return None
 
-        closing_side = "SELL" if trade_side == "BUY" else "BUY"
-        closing_fills = []
-        for trade in reversed(trades):
-            if trade.get("side") != closing_side:
-                continue
-            qty = abs(float(trade.get("qty", 0) or 0))
-            price = float(trade.get("price", 0) or 0)
-            if qty <= 0 or price <= 0:
-                continue
-            closing_fills.append(trade)
-            # Stop once the fill set changes timestamp significantly.
-            if len(closing_fills) >= 1:
-                first_time = int(closing_fills[0].get("time", 0) or 0)
-                current_time = int(trade.get("time", 0) or 0)
+        all_closing = [
+            t for t in trades
+            if t.get("side") == closing_side
+            and abs(float(t.get("qty", 0) or 0)) > 0
+            and float(t.get("price", 0) or 0) > 0
+        ]
+
+        if after_ms:
+            # Return all closing fills since trade opened, chronological order
+            closing_fills = all_closing
+        else:
+            # Group only the most recent fill cluster (within 5s of each other)
+            closing_fills = []
+            for t in reversed(all_closing):
+                if not closing_fills:
+                    closing_fills.append(t)
+                    continue
+                first_time   = int(closing_fills[0].get("time", 0) or 0)
+                current_time = int(t.get("time", 0) or 0)
                 if first_time and current_time and abs(first_time - current_time) > 5000:
-                    closing_fills.pop()
                     break
+                closing_fills.append(t)
 
         if not closing_fills:
             return None
@@ -527,16 +625,18 @@ def _get_exit_fill_from_binance(client: UMFutures, symbol: str, trade_side: str)
             float(t.get("price", 0) or 0) * abs(float(t.get("qty", 0) or 0))
             for t in closing_fills
         ) / total_qty
-        realized_pnl = sum(float(t.get("realizedPnl", 0) or 0) for t in closing_fills)
-        latest_time = max(int(t.get("time", 0) or 0) for t in closing_fills)
-        close_order_id = str(closing_fills[0].get("orderId", "")) if closing_fills else ""
+        realized_pnl  = sum(float(t.get("realizedPnl", 0) or 0) for t in closing_fills)
+        latest_time   = max(int(t.get("time", 0) or 0) for t in closing_fills)
+        most_recent   = max(closing_fills, key=lambda t: int(t.get("time", 0) or 0))
+        close_order_id = str(most_recent.get("orderId", ""))
         return {
-            "exit_price": weighted_exit,
-            "qty": total_qty,
+            "exit_price":   weighted_exit,
+            "qty":          total_qty,
             "realized_pnl": realized_pnl,
-            "time": latest_time,
-            "fills": len(closing_fills),
-            "order_id": close_order_id,
+            "time":         latest_time,
+            "fills":        len(closing_fills),
+            "order_id":     close_order_id,
+            "fills_list":   closing_fills,
         }
     except Exception as e:
         log.warning(f"[MONITOR] Could not fetch exit fills for {symbol}: {e}")
@@ -672,6 +772,25 @@ def _monitor_loop(client: UMFutures):
                             trade["stop_loss"] = entry
                             sl = entry
 
+                # --- TP1 detection: check if position halved for staged trades ---
+                if is_staged and not trade.get("tp1_recorded"):
+                    tp1_price = tp or 0
+                    tp1_reached = (
+                        (trade.get("side") == "BUY"  and tp1_price and mark >= tp1_price) or
+                        (trade.get("side") == "SELL" and tp1_price and mark <= tp1_price)
+                    )
+                    if tp1_reached:
+                        try:
+                            pos_check = get_open_position(client, sym)
+                            if pos_check is not None:
+                                half_qty = trade["quantity"] / 2
+                                if pos_check["amount"] <= half_qty * 1.1:
+                                    db_mark_tp1_recorded(trade["id"])
+                                    trade["tp1_recorded"] = True
+                                    log.info(f"[MONITOR] {sym} TP1 confirmed: position={pos_check['amount']:.6f} (half={half_qty:.6f})")
+                        except Exception as e:
+                            log.warning(f"[MONITOR] {sym} TP1 position check failed: {e}")
+
                 trade_side = trade["side"]
                 # For staged trades use tp2 as software fallback so we still
                 # take profit even if the TP algo orders failed to place.
@@ -713,6 +832,27 @@ def _monitor_loop(client: UMFutures):
                             except Exception:
                                 pass
                         fill_price = fill_price or mark
+                        # Record individual fills (captures TP1 + this close for staged trades)
+                        try:
+                            opened_at_ms = int(trade["opened_at"].timestamp() * 1000) if trade.get("opened_at") else None
+                            time.sleep(0.2)  # ensure fill registered in Binance history
+                            all_exit = _get_exit_fill_from_binance(client, sym, trade_side, after_ms=opened_at_ms)
+                            if all_exit:
+                                entry_px = trade.get("entry_price") or 0
+                                for f in all_exit.get("fills_list", []):
+                                    f_price = float(f.get("price", 0) or 0)
+                                    f_qty   = abs(float(f.get("qty", 0) or 0))
+                                    f_time  = int(f.get("time", 0) or 0) or None
+                                    f_oid   = str(f.get("orderId", "")) or None
+                                    ftype   = _classify_fill_type(f_price, entry_px,
+                                                                   trade.get("stop_loss") or 0,
+                                                                   trade.get("take_profit") or 0,
+                                                                   trade.get("take_profit_2") or 0,
+                                                                   trade_side)
+                                    db_record_fill(trade["id"], ftype, f_price, f_qty, f_oid,
+                                                   entry_px, trade_side, f_time)
+                        except Exception as e:
+                            log.warning(f"[MONITOR] {sym} fills recording failed (Phase 1): {e}")
                         db_close_trade(trade["id"], fill_price, hit,
                                        closed_at_ms=close_time_ms, close_order_id=close_oid)
                         open_trades = [t for t in open_trades if t["id"] != trade["id"]]
@@ -739,7 +879,8 @@ def _monitor_loop(client: UMFutures):
                     )
                     continue
 
-                exit_fill = _get_exit_fill_from_binance(client, sym, trade["side"])
+                opened_at_ms = int(trade["opened_at"].timestamp() * 1000) if trade.get("opened_at") else None
+                exit_fill = _get_exit_fill_from_binance(client, sym, trade["side"], after_ms=opened_at_ms)
                 exit_time_ms = None
                 exit_order_id = None
                 if exit_fill is not None:
@@ -751,6 +892,21 @@ def _monitor_loop(client: UMFutures):
                         f"qty={exit_fill['qty']:.6f} pnl={exit_fill['realized_pnl']:.4f} "
                         f"orderId={exit_order_id} time={exit_time_ms}"
                     )
+                    # Record individual fills
+                    entry_px = trade.get("entry_price") or 0
+                    side_t   = trade["side"]
+                    for f in exit_fill.get("fills_list", []):
+                        f_price = float(f.get("price", 0) or 0)
+                        f_qty   = abs(float(f.get("qty", 0) or 0))
+                        f_time  = int(f.get("time", 0) or 0) or None
+                        f_oid   = str(f.get("orderId", "")) or None
+                        ftype   = _classify_fill_type(f_price, entry_px,
+                                                       trade.get("stop_loss") or 0,
+                                                       trade.get("take_profit") or 0,
+                                                       trade.get("take_profit_2") or 0,
+                                                       side_t)
+                        db_record_fill(trade_id, ftype, f_price, f_qty, f_oid,
+                                       entry_px, side_t, f_time)
                 else:
                     try:
                         ticker = client.ticker_price(symbol=f"{sym}USDT")

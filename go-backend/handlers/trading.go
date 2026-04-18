@@ -222,3 +222,57 @@ func TradingHistory(c *gin.Context) {
 func LiveTradingHistory(c *gin.Context) {
 	tradingHistoryByAccount(c, "live")
 }
+
+// LiveTradeFills handles GET /trading/live/fills?trade_id=N
+func LiveTradeFills(c *gin.Context) {
+	tradeIDStr := c.Query("trade_id")
+	if tradeIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "trade_id required"})
+		return
+	}
+
+	db, err := getDB()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer db.Close()
+
+	rows, err := db.Query(`
+		SELECT fill_type, price, quantity, fee_usdt, pnl_usdt, order_id, filled_at
+		FROM trade_fills_live
+		WHERE trade_id = $1
+		ORDER BY filled_at ASC`, tradeIDStr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type Fill struct {
+		FillType string   `json:"fill_type"`
+		Price    float64  `json:"price"`
+		Quantity float64  `json:"quantity"`
+		FeeUsdt  float64  `json:"fee_usdt"`
+		PnlUsdt  float64  `json:"pnl_usdt"`
+		OrderID  *string  `json:"order_id"`
+		FilledAt string   `json:"filled_at"`
+	}
+
+	var fills []Fill
+	for rows.Next() {
+		var f Fill
+		var orderID sql.NullString
+		var filledAt sql.NullTime
+		if err := rows.Scan(&f.FillType, &f.Price, &f.Quantity, &f.FeeUsdt, &f.PnlUsdt, &orderID, &filledAt); err != nil {
+			continue
+		}
+		if orderID.Valid  { f.OrderID  = &orderID.String }
+		if filledAt.Valid { f.FilledAt = filledAt.Time.UTC().Format("2006-01-02T15:04:05Z") }
+		fills = append(fills, f)
+	}
+	if fills == nil {
+		fills = []Fill{}
+	}
+	c.JSON(http.StatusOK, gin.H{"fills": fills})
+}
