@@ -40,10 +40,11 @@ function calcUnrealizedPnl(trade, currentPrice) {
 }
 
 export default function LiveTradingTab({ livePrices = {} }) {
-  const [status,  setStatus]  = useState(null);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const [status,      setStatus]      = useState(null);
+  const [history,     setHistory]     = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(null);
+  const [liveMarkPrices, setLiveMarkPrices] = useState({});
 
   const fetchData = async () => {
     try {
@@ -61,10 +62,19 @@ export default function LiveTradingTab({ livePrices = {} }) {
     }
   };
 
+  const fetchPrices = async () => {
+    try {
+      const prices = await fetch(`${API_URL}/crypto/prices`).then(r => r.json());
+      setLiveMarkPrices(prices);
+    } catch (_) {}
+  };
+
   useEffect(() => {
     fetchData();
-    const id = setInterval(fetchData, 30_000);
-    return () => clearInterval(id);
+    fetchPrices();
+    const dataId  = setInterval(fetchData,   30_000);
+    const priceId = setInterval(fetchPrices,  5_000);
+    return () => { clearInterval(dataId); clearInterval(priceId); };
   }, []);
 
   if (loading) return <div className="tab-content"><div className="loading">Loading live trading data...</div></div>;
@@ -110,7 +120,7 @@ export default function LiveTradingTab({ livePrices = {} }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {status.open_trades.map(t => {
-              const mark = livePrices[t.symbol] ?? null;
+              const mark = liveMarkPrices[t.symbol] ?? livePrices[t.symbol] ?? null;
               const upnl = calcUnrealizedPnl(t, mark);
               return (
                 <div key={t.id} className="card" style={{ padding: "12px 16px" }}>

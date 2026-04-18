@@ -33,6 +33,7 @@ func main() {
 	r.GET("/signals", handlers.Signals)
 	r.GET("/shock/status", handlers.ShockStatus)
 	r.GET("/crypto/status", handlers.CryptoStatus)
+	r.GET("/crypto/prices", handlers.CryptoPrices)
 	r.GET("/crypto/history", handlers.CryptoHistory)
 	r.GET("/ml/backtest", handlers.MLBacktest)
 	r.GET("/ml/market-signals", handlers.MLMarketSignals)

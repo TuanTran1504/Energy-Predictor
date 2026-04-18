@@ -272,6 +272,34 @@ func CryptoStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, signals)
 }
 
+// CryptoPrices handles GET /crypto/prices — returns live BTC/ETH/SOL prices only.
+// Lightweight endpoint for polling uPnL in the frontend every few seconds.
+func CryptoPrices(c *gin.Context) {
+	symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
+	type result struct {
+		sym   string
+		price float64
+	}
+	ch := make(chan result, len(symbols))
+	for _, sym := range symbols {
+		sym := sym
+		go func() {
+			p, err := fetchCryptoPrice(sym)
+			if err != nil || p == nil {
+				ch <- result{sym[:len(sym)-4], 0}
+				return
+			}
+			ch <- result{sym[:len(sym)-4], p.PriceUSD}
+		}()
+	}
+	prices := make(map[string]float64, len(symbols))
+	for range symbols {
+		r := <-ch
+		prices[r.sym] = r.price
+	}
+	c.JSON(http.StatusOK, prices)
+}
+
 // CryptoHistory handles GET /crypto/history?symbol=BTC&interval=1H&days=30
 // Fetches directly from Binance klines — no DB dependency.
 func CryptoHistory(c *gin.Context) {
