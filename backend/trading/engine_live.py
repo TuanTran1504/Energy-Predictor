@@ -691,7 +691,16 @@ def _monitor_loop(client: UMFutures):
                             close_resp.get("transactTime") or close_resp.get("updateTime") or 0
                         ) or None
                         close_oid = str(close_resp.get("orderId", "")) or None
-                        db_close_trade(trade["id"], mark, hit,
+                        fill_price = float(close_resp.get("avgPrice") or 0)
+                        if not fill_price and close_oid:
+                            time.sleep(0.3)
+                            try:
+                                filled = client.query_order(symbol=f"{sym}USDT", orderId=close_oid)
+                                fill_price = float(filled.get("avgPrice") or 0)
+                            except Exception:
+                                pass
+                        fill_price = fill_price or mark
+                        db_close_trade(trade["id"], fill_price, hit,
                                        closed_at_ms=close_time_ms, close_order_id=close_oid)
                         open_trades = [t for t in open_trades if t["id"] != trade["id"]]
                     except Exception as e:
