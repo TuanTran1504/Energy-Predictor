@@ -221,7 +221,7 @@ def _cancel_algo_order(algo_id: int) -> dict:
 
 
 def _get_conn():
-    return psycopg2.connect(
+    conn = psycopg2.connect(
         DATABASE_URL,
         sslmode="require",
         connect_timeout=8,
@@ -230,6 +230,10 @@ def _get_conn():
         keepalives_interval=10,
         keepalives_count=3,
     )
+    with conn.cursor() as cur:
+        cur.execute("SET TIME ZONE 'Asia/Ho_Chi_Minh'")
+    conn.commit()
+    return conn
 
 
 def _is_transient_db_error(exc: Exception) -> bool:
