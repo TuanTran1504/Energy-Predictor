@@ -1093,22 +1093,22 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         except Exception as e:
             log.warning(f"  [EXEC] SL algo order failed ({e}) — software monitor will enforce")
 
-        # --- Step 4: TP orders ---
+        # --- Step 4: TP orders via Algo Order API ---
         if staged:
-            # TP1 — close first half at nearer target via Algo Order API
+            # TP1 — close first half at nearer target
             try:
                 resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp1_price, quantity=half_qty)
                 log.info(f"  [EXEC] TP1 algo order placed @ {tp1_price} qty={half_qty} id={resp.get('algoId','?')}")
             except Exception as e:
                 log.warning(f"  [EXEC] TP1 order failed ({e}) — software monitor will enforce")
-            # TP2 — close remaining half at farther target via Algo Order API
+            # TP2 — close remaining half at farther target
             try:
                 resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp2_price, quantity=half_qty)
                 log.info(f"  [EXEC] TP2 algo order placed @ {tp2_price} qty={half_qty} id={resp.get('algoId','?')}")
             except Exception as e:
                 log.warning(f"  [EXEC] TP2 order failed ({e}) — software monitor will enforce")
         else:
-            # Fallback: single TP via Algo Order (position too small to split)
+            # Fallback: single TP via Algo Order (closePosition=true — position too small to split)
             try:
                 resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", ai_tp)
                 log.info(f"  [EXEC] TP algo order placed @ {ai_tp} id={resp.get('algoId','?')}")
