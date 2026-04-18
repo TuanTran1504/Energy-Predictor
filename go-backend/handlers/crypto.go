@@ -272,8 +272,31 @@ func CryptoStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, signals)
 }
 
-// CryptoPrices handles GET /crypto/prices — returns live BTC/ETH/SOL prices only.
-// Lightweight endpoint for polling uPnL in the frontend every few seconds.
+// fetchFuturesMarkPrice fetches the mark price from Binance Futures API.
+// Mark price is used for uPnL calculation, unlike spot last price.
+func fetchFuturesMarkPrice(symbol string) (float64, error) {
+	url := fmt.Sprintf("https://fapi.binance.com/fapi/v1/premiumIndex?symbol=%s", symbol)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+	var data struct {
+		MarkPrice string `json:"markPrice"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return 0, err
+	}
+	return strconv.ParseFloat(data.MarkPrice, 64)
+}
+
+// CryptoPrices handles GET /crypto/prices — returns live futures mark prices for BTC/ETH/SOL.
+// Used for polling uPnL in the frontend every few seconds.
 func CryptoPrices(c *gin.Context) {
 	symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT"}
 	type result struct {
@@ -284,12 +307,11 @@ func CryptoPrices(c *gin.Context) {
 	for _, sym := range symbols {
 		sym := sym
 		go func() {
-			p, err := fetchCryptoPrice(sym)
-			if err != nil || p == nil {
-				ch <- result{sym[:len(sym)-4], 0}
-				return
+			price, err := fetchFuturesMarkPrice(sym)
+			if err != nil {
+				price = 0
 			}
-			ch <- result{sym[:len(sym)-4], p.PriceUSD}
+			ch <- result{sym[:len(sym)-4], price}
 		}()
 	}
 	prices := make(map[string]float64, len(symbols))
