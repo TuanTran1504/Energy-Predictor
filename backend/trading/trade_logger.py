@@ -18,8 +18,9 @@ import logging
 import os
 import threading
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 UTC = timezone.utc
+VN_TZ = timezone(timedelta(hours=7))
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
@@ -44,11 +45,18 @@ def _tg_send(text: str):
 LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
-_DETAIL_FMT = logging.Formatter(
+
+class _VNFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, tz=VN_TZ)
+        return dt.strftime(datefmt or "%Y-%m-%d %H:%M:%S")
+
+
+_DETAIL_FMT = _VNFormatter(
     "%(asctime)s | %(levelname)-7s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-_SIMPLE_FMT = logging.Formatter("%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+_SIMPLE_FMT = _VNFormatter("%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
 
 def _make_handler(filename: str, fmt: logging.Formatter,
@@ -143,7 +151,7 @@ def log_trade_open(symbol: str, side: str, entry: float, sl: float, tp: float,
                    context: dict = None):
     record = {
         "event":    "OPEN",
-        "ts":       datetime.now(UTC).isoformat(),
+        "ts":       datetime.now(VN_TZ).isoformat(),
         "id":       trade_id,
         "symbol":   symbol,
         "side":     side,
@@ -180,7 +188,7 @@ def log_trade_close(symbol: str, side: str, entry: float, exit_price: float,
     outcome = "WIN" if pnl_usdt > 0 else "LOSS"
     record = {
         "event":        "CLOSE",
-        "ts":           datetime.now(UTC).isoformat(),
+        "ts":           datetime.now(VN_TZ).isoformat(),
         "id":           trade_id,
         "symbol":       symbol,
         "side":         side,

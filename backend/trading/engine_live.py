@@ -21,8 +21,9 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 UTC = timezone.utc
+VN_TZ = timezone(timedelta(hours=7))
 from pathlib import Path
 
 import psycopg2
@@ -1139,7 +1140,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
                      balance: float, dry_run: bool = False):
 
     log.info(f"\n{'─'*50}")
-    log.info(f"  CYCLE  {symbol}  {datetime.now(UTC).strftime('%H:%M:%S UTC')}")
+    log.info(f"  CYCLE  {symbol}  {datetime.now(VN_TZ).strftime('%H:%M:%S ICT')}")
 
     pos = get_open_position(client, symbol)
     if pos:
@@ -1359,7 +1360,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
 
 def run_once(dry_run: bool = False):
     log.info("=" * 60)
-    log.info(f"ENGINE LIVE  {'DRY RUN' if dry_run else 'LIVE'}  {datetime.now(UTC).isoformat()}")
+    log.info(f"ENGINE LIVE  {'DRY RUN' if dry_run else 'LIVE'}  {datetime.now(VN_TZ).isoformat()}")
     log.info("=" * 60)
 
     client         = get_client()
