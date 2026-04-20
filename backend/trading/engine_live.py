@@ -326,13 +326,18 @@ def _classify_fill_type(price: float, entry: float, sl: float, tp: float,
                          tp2: float, side: str) -> str:
     if not price or not entry:
         return "CLOSE"
-    tol = max(entry * 0.003, 1.0)
-    if sl and abs(price - sl) <= tol:
-        return "SL"
-    if tp2 and abs(price - tp2) <= tol:
-        return "TP2"
-    if tp and abs(price - tp) <= tol:
-        return "TP1" if tp2 else "TP"
+    # Pick the closest stored price level within a reasonable tolerance.
+    # Using closest-wins avoids mislabeling when SL and TP are near each other
+    # (e.g. break-even SL = entry, TP1 just below for a SHORT).
+    tol = entry * 0.005  # 0.5% of entry price
+    candidates = []
+    if sl:  candidates.append(("SL",  abs(price - sl)))
+    if tp2: candidates.append(("TP2", abs(price - tp2)))
+    if tp:  candidates.append(("TP1" if tp2 else "TP", abs(price - tp)))
+    if candidates:
+        closest_type, closest_dist = min(candidates, key=lambda x: x[1])
+        if closest_dist <= tol:
+            return closest_type
     if side == "BUY":
         return "TP" if price > entry else "SL"
     return "TP" if price < entry else "SL"
