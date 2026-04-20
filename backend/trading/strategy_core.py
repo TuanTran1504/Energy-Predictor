@@ -334,6 +334,20 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
     )
     m15_trend = raw_m15_trend
 
+    # ADX(14) on m15 using Wilder smoothing (span = 2*14-1 = 27)
+    _w = {"span": 27, "adjust": False}
+    _prev_h = df_m15["high"].shift(1)
+    _prev_l = df_m15["low"].shift(1)
+    _dm_p   = (df_m15["high"] - _prev_h).clip(lower=0)
+    _dm_m   = (_prev_l - df_m15["low"]).clip(lower=0)
+    _dm_p_w = _dm_p.where(_dm_p > _dm_m, 0.0)
+    _dm_m_w = _dm_m.where(_dm_m > _dm_p, 0.0)
+    _tr_s   = df_m15["tr"].ewm(**_w).mean()
+    _di_p   = _dm_p_w.ewm(**_w).mean() / _tr_s * 100
+    _di_m   = _dm_m_w.ewm(**_w).mean() / _tr_s * 100
+    _dx     = (abs(_di_p - _di_m) / (_di_p + _di_m).replace(0, np.nan) * 100)
+    adx_m15 = float(_dx.ewm(**_w).mean().iloc[-1])
+
     vol_ma = df_m15["volume"].rolling(20).mean().iloc[-1]
     vol_spike = df_m15["volume"].iloc[-1] > vol_ma * 1.5
 
@@ -370,6 +384,7 @@ def compute_indicators(df_h1: pd.DataFrame, df_m15: pd.DataFrame,
         "h1_atr_pct": round(h1_atr_pct, 4),
         "m15_atr_pct": round(m15_atr_pct, 4),
         "atr_m15": round(atr_m15, 4),
+        "adx_m15": round(adx_m15, 2),
         "rsi": round(float(rsi), 2),
         "vol_spike": bool(vol_spike),
         "vol_ma": round(float(vol_ma), 2),

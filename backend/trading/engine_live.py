@@ -1379,7 +1379,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         f"bars_since={ctx['sr'].get('bars_since_breakout')}"
     )
     log.info(f"  Score {score}/5: {', '.join(score_details) or 'none'}")
-    log.info(f"  RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f}")
+    log.info(f"  RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f} ADX={ctx.get('adx_m15', 0):.1f} EMA_gap={ctx.get('m15_gap', 0):.3f}%")
 
     ml_primary_token = ML_PRIMARY_HORIZON
     ml_pred = {}
@@ -1452,6 +1452,18 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         log_gate_fail("TECHNICAL", tech_reason, symbol, ctx)
         return
     log_gate_pass("TECHNICAL", tech_reason)
+
+    # --- Choppy/ranging market gate ---
+    adx  = ctx.get("adx_m15", 30.0)
+    gap  = ctx.get("m15_gap", 1.0)
+    if adx < 22 and gap < 0.3:
+        log_gate_fail(
+            "CHOPPY",
+            f"ADX={adx:.1f}<22 and EMA_gap={gap:.3f}%<0.3% — no trend strength, skipping",
+            symbol, ctx,
+        )
+        return
+    log_gate_pass("CHOPPY", f"ADX={adx:.1f} EMA_gap={gap:.3f}%")
 
     if ctx["is_range"]:
         ctx["range_bias"] = get_range_bias(ctx)
