@@ -135,10 +135,6 @@ func tradingStatusByAccount(c *gin.Context, accountType string) {
 	})
 }
 
-func TradingStatus(c *gin.Context) {
-	tradingStatusByAccount(c, "testnet")
-}
-
 func LiveTradingStatus(c *gin.Context) {
 	tradingStatusByAccount(c, "live")
 }
@@ -213,10 +209,6 @@ func tradingHistoryByAccount(c *gin.Context, accountType string) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"trades": trades})
-}
-
-func TradingHistory(c *gin.Context) {
-	tradingHistoryByAccount(c, "testnet")
 }
 
 func LiveTradingHistory(c *gin.Context) {

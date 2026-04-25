@@ -216,48 +216,6 @@ func MLTradeExecute(c *gin.Context) {
 	c.Data(resp.StatusCode, "application/json", body2)
 }
 
-// TradingPositionsSync returns open testnet positions from the DB
-func TradingPositionsSync(c *gin.Context) {
-	db, err := getDB()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer db.Close()
-
-	rows, err := db.Query(`SELECT symbol, side, entry_price, quantity, stop_loss, take_profit
-		FROM trades WHERE status = 'OPEN'
-		  AND COALESCE(account_type, 'testnet') = 'testnet'
-		ORDER BY opened_at DESC`)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer rows.Close()
-
-	type PositionInfo struct {
-		Side        string  `json:"side"`
-		EntryPrice  float64 `json:"entry_price"`
-		PositionAmt float64 `json:"position_amt"`
-		StopLoss    float64 `json:"stop_loss"`
-		TakeProfit  float64 `json:"take_profit"`
-	}
-
-	result := map[string]PositionInfo{}
-	for rows.Next() {
-		var symbol, side string
-		var entry, qty, sl, tp float64
-		if err := rows.Scan(&symbol, &side, &entry, &qty, &sl, &tp); err != nil {
-			continue
-		}
-		result[symbol] = PositionInfo{
-			Side: side, EntryPrice: entry,
-			PositionAmt: qty, StopLoss: sl, TakeProfit: tp,
-		}
-	}
-	c.JSON(http.StatusOK, result)
-}
-
 // MLMarketSignals proxies GET /ml/market-signals → Python GET /market-signals
 func MLMarketSignals(c *gin.Context) {
 	url := pythonMLURL() + "/market-signals"

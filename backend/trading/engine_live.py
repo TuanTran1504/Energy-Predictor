@@ -116,6 +116,9 @@ CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
 ALLOWED_ML_HORIZONS = {"4h", "1d"}
 _SYMBOL_MIN_NOTIONAL_CACHE: dict[str, float] = {}
+# ML predictions are intentionally disabled in live trading for now.
+# Keep the plumbing for later experiments, but do not let ML influence entries.
+ML_EXPERIMENTAL_ENABLED = False
 
 
 def _normalize_horizon_token(token: str) -> str:
@@ -1239,21 +1242,22 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
         )
         return False
 
-    # --- Staged exit: split position in half for TP1 and TP2 ---
+    # --- Staged exit: partial TP1 + TP2 closePosition to avoid residual dust ---
     tp1_price = float(decision.get("take_profit_1") or ai_tp)
     tp2_price = float(decision.get("take_profit_2") or ai_tp)
     price_prec = PRICE_PRECISION.get(symbol, 2)
     qty_prec_factor = 10 ** QTY_PRECISION.get(symbol, 2)
-    half_qty = math.floor((qty / 2) * qty_prec_factor) / qty_prec_factor
+    tp1_qty = math.floor((qty / 2) * qty_prec_factor) / qty_prec_factor
     staged = (
-        half_qty > 0
-        and (half_qty * entry) >= min_notional
+        tp1_qty > 0
+        and tp1_qty < qty
+        and (tp1_qty * entry) >= min_notional
         and abs(tp2_price - tp1_price) / entry > 0.0005  # TPs must differ by >0.05%
     )
 
     log.info(
         f"  [EXEC] {signal} {symbol} | entry≈{entry} SL={ai_sl} "
-        f"TP1={tp1_price} TP2={tp2_price} qty={qty} half={half_qty} staged={staged} "
+        f"TP1={tp1_price} TP2={tp2_price} qty={qty} tp1_qty={tp1_qty} staged={staged} "
         f"R:R={rr:.2f} | dry_run={dry_run}"
     )
 
@@ -1307,16 +1311,16 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
         # --- Step 4: TP orders via Algo Order API ---
         if staged:
-            # TP1 — close first half at nearer target
+            # TP1 — close a partial quantity at nearer target
             try:
-                resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp1_price, quantity=half_qty)
-                log.info(f"  [EXEC] TP1 algo order placed @ {tp1_price} qty={half_qty} id={resp.get('algoId','?')}")
+                resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp1_price, quantity=tp1_qty)
+                log.info(f"  [EXEC] TP1 algo order placed @ {tp1_price} qty={tp1_qty} id={resp.get('algoId','?')}")
             except Exception as e:
                 log.warning(f"  [EXEC] TP1 order failed ({e}) — software monitor will enforce")
-            # TP2 — close remaining half at farther target
+            # TP2 — close whatever remains at farther target (prevents rounding residue)
             try:
-                resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp2_price, quantity=half_qty)
-                log.info(f"  [EXEC] TP2 algo order placed @ {tp2_price} qty={half_qty} id={resp.get('algoId','?')}")
+                resp = _algo_order(sym_pair, close_side, "TAKE_PROFIT_MARKET", tp2_price)
+                log.info(f"  [EXEC] TP2 algo order placed @ {tp2_price} closePosition=true id={resp.get('algoId','?')}")
             except Exception as e:
                 log.warning(f"  [EXEC] TP2 order failed ({e}) — software monitor will enforce")
         else:
@@ -1343,7 +1347,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
 
 
 def run_symbol_cycle(client: UMFutures, symbol: str,
-                     ml_preds: dict, market_signals: dict,
+                     market_signals: dict,
                      balance: float, dry_run: bool = False):
 
     log.info(f"\n{'─'*50}")
@@ -1406,33 +1410,23 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     log.info(f"  Score {score}/5: {', '.join(score_details) or 'none'}")
     log.info(f"  RSI={ctx['rsi']:.1f} ATR={ctx['atr_m15']:.4f} ADX={ctx.get('adx_m15', 0):.1f} EMA_gap={ctx.get('m15_gap', 0):.3f}%")
 
-    ml_primary_token = ML_PRIMARY_HORIZON
-    ml_pred = {}
-    for horizon_token in [ML_PRIMARY_HORIZON] + [h for h in ML_HORIZONS if h != ML_PRIMARY_HORIZON]:
-        candidate_key = f"{symbol}_{horizon_token}"
-        candidate = ml_preds.get(candidate_key, {})
-        if candidate:
-            ml_pred = candidate
-            ml_primary_token = horizon_token
-            break
-
-    ml_dir = ml_pred.get("direction", "")
-    ml_conf = float(ml_pred.get("confidence", 0))
-
-    trend_key = f"{symbol}_{ML_TREND_HORIZON}"
-    trend_pred = ml_preds.get(trend_key, {})
-    trend_dir = trend_pred.get("direction", "")
-    trend_conf = float(trend_pred.get("confidence", 0))
+    # ML is experimental and intentionally disabled for live trading.
+    # Keep context keys explicit so logs and prompts remain deterministic.
+    ml_dir = ""
+    ml_conf = 0.0
+    trend_dir = ""
+    trend_conf = 0.0
+    trend_pred = {}
     fear_greed = market_signals.get("fear_greed")
     funding    = market_signals.get(f"{symbol.lower()}_funding", 0)
 
     ctx["ml_direction"]  = ml_dir
     ctx["ml_confidence"] = ml_conf
-    ctx["ml_entry_horizon"] = ml_primary_token
-    ctx["ml_trend_horizon"] = ML_TREND_HORIZON
+    ctx["ml_entry_horizon"] = "disabled"
+    ctx["ml_trend_horizon"] = "disabled"
     ctx["ml_trend_direction"] = trend_dir
     ctx["ml_trend_confidence"] = trend_conf
-    ctx["ml_conflict_resolved"] = bool(ml_dir and trend_dir and ml_dir != trend_dir)
+    ctx["ml_conflict_resolved"] = False
     ctx["ml_conflict_min_rr"] = 0.0
     ctx["fear_greed"]    = fear_greed
     ctx["funding_rate"]  = funding
@@ -1446,11 +1440,10 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     if not macro_ok:
         log_gate_fail("MACRO", macro_reason, symbol, ctx)
         return
-    trend_str = f" trend={ML_TREND_HORIZON}:{trend_dir}({trend_conf:.0%})" if trend_pred else " trend=n/a"
-    conflict_str = " conflict=advisory_only" if ctx["ml_conflict_resolved"] else ""
+    trend_str = " trend=disabled(experimental)"
     log_gate_pass(
         "MACRO",
-        f"allowed={allowed_dir} ML={ml_primary_token}:{ml_dir}({ml_conf:.0%}){trend_str} F&G={fear_greed}{conflict_str}",
+        f"allowed={allowed_dir} ML=disabled(experimental){trend_str} F&G={fear_greed}",
     )
 
     if symbol != "BTC":
@@ -1584,15 +1577,12 @@ def run_once(dry_run: bool = False):
     log.info("=" * 60)
 
     client         = get_client()
-    ml_preds       = get_ml_predictions()
     market_signals = get_market_signals()
     balance        = get_account_balance(client)
 
-    log.info(f"Balance: {balance:.2f} USDT | ML preds loaded: {list(ml_preds.keys())}")
-    log.info(
-        f"ML mode: entry={ML_PRIMARY_HORIZON} trend={ML_TREND_HORIZON} "
-        f"require_alignment={ML_REQUIRE_TREND_ALIGNMENT}"
-    )
+    log.info(f"Balance: {balance:.2f} USDT")
+    ml_status = "enabled (experimental)" if ML_EXPERIMENTAL_ENABLED else "disabled (experimental)"
+    log.info(f"ML mode: {ml_status}")
     log.info(
         "Filter mode: "
         f"TECH_ALLOW_SIDEWAY={os.getenv('TECH_ALLOW_SIDEWAY', '0')} "
@@ -1616,7 +1606,7 @@ def run_once(dry_run: bool = False):
     for symbol in SYMBOLS:
         try:
             latest_balance = get_account_balance(client)
-            run_symbol_cycle(client, symbol, ml_preds, market_signals, latest_balance, dry_run)
+            run_symbol_cycle(client, symbol, market_signals, latest_balance, dry_run)
         except Exception as e:
             log_error(f"[{symbol}] Unhandled cycle error", e)
 
