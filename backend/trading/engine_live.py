@@ -732,10 +732,8 @@ def _monitor_loop(client: UMFutures):
                     continue
 
                 sym = trade["symbol"]
-                try:
-                    ticker = client.ticker_price(symbol=f"{sym}USDT")
-                    mark = float(ticker["price"])
-                except Exception:
+                mark = get_symbol_mark_price(client, sym)
+                if mark is None:
                     continue
 
                 # --- Break-even: move SL to entry once price reaches 1:1 profit ---
@@ -814,9 +812,16 @@ def _monitor_loop(client: UMFutures):
 
                 if hit:
                     close_side = "SELL" if trade_side == "BUY" else "BUY"
-                    qty = trade["quantity"]
                     log.warning(f"[MONITOR] {sym} {hit} hit (mark={mark}) - closing position")
                     try:
+                        live_pos = get_open_position(client, sym)
+                        if live_pos is None:
+                            log.info(f"[MONITOR] {sym} fallback close skipped - no live position remains")
+                            continue
+                        qty = live_pos["amount"]
+                        if qty <= 0:
+                            log.info(f"[MONITOR] {sym} fallback close skipped - live position size is zero")
+                            continue
                         close_resp = client.new_order(
                             symbol=f"{sym}USDT",
                             side=close_side,
@@ -913,10 +918,8 @@ def _monitor_loop(client: UMFutures):
                         db_record_fill(trade_id, ftype, f_price, f_qty, f_oid,
                                        entry_px, side_t, f_time)
                 else:
-                    try:
-                        ticker = client.ticker_price(symbol=f"{sym}USDT")
-                        exit_price = float(ticker["price"])
-                    except Exception:
+                    exit_price = get_symbol_mark_price(client, sym)
+                    if exit_price is None:
                         continue
                 sl   = trade["stop_loss"]
                 tp   = trade["take_profit"]
@@ -1064,6 +1067,24 @@ def get_open_position(client: UMFutures, symbol: str) -> dict | None:
     except Exception as e:
         log.warning(f"Position fetch failed for {symbol}: {e}")
     return None
+
+
+def get_symbol_mark_price(client: UMFutures, symbol: str) -> float | None:
+    try:
+        risk = client.get_position_risk(symbol=f"{symbol}USDT")
+        positions = risk if isinstance(risk, list) else [risk]
+        for pos in positions:
+            mark_price = float(pos.get("markPrice", 0) or 0)
+            if mark_price > 0:
+                return mark_price
+    except Exception as e:
+        log.warning(f"Mark price fetch failed for {symbol}: {e}")
+
+    try:
+        ticker = client.ticker_price(symbol=f"{symbol}USDT")
+        return float(ticker["price"])
+    except Exception:
+        return None
 
 
 def get_symbol_min_notional(client: UMFutures, symbol: str) -> float:
@@ -1344,6 +1365,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         df_m5  = fetch_ohlcv(client, symbol, "5m",  100)
         df_btc_h1  = fetch_ohlcv(client, "BTC", "1h",  100) if symbol != "BTC" else df_h1
         df_btc_m15 = fetch_ohlcv(client, "BTC", "15m", 100) if symbol != "BTC" else df_m15
+        df_btc_m5  = fetch_ohlcv(client, "BTC", "5m",  100) if symbol != "BTC" else df_m5
         df_btc_4h  = fetch_ohlcv(client, "BTC", "4h",  100) if symbol != "BTC" else None
     except Exception as e:
         log_error(f"[{symbol}] OHLCV fetch failed", e)
@@ -1353,7 +1375,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
     ctx["symbol"] = f"{symbol}/USDT"
 
     if symbol != "BTC":
-        btc_ctx        = compute_indicators(df_btc_h1, df_btc_m15, df_m5)
+        btc_ctx        = compute_indicators(df_btc_h1, df_btc_m15, df_btc_m5)
         btc_trend      = btc_ctx["m15_trend"]
         btc_macro      = _btc_macro_trend(df_btc_4h)
         ctx["btc_trend"]       = btc_trend
