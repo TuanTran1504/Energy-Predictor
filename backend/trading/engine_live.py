@@ -331,9 +331,12 @@ def _classify_fill_type(price: float, entry: float, sl: float, tp: float,
     # (e.g. break-even SL = entry, TP1 just below for a SHORT).
     tol = entry * 0.005  # 0.5% of entry price
     candidates = []
-    if sl:  candidates.append(("SL",  abs(price - sl)))
-    if tp2: candidates.append(("TP2", abs(price - tp2)))
-    if tp:  candidates.append(("TP1" if tp2 else "TP", abs(price - tp)))
+    if sl:
+        candidates.append(("SL", abs(price - sl)))
+    if tp2:
+        candidates.append(("TP2", abs(price - tp2)))
+    if tp:
+        candidates.append(("TP1" if tp2 else "TP", abs(price - tp)))
     if candidates:
         closest_type, closest_dist = min(candidates, key=lambda x: x[1])
         if closest_dist <= tol:
