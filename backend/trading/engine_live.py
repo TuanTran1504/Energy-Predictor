@@ -107,11 +107,53 @@ try:
     SETUP_E_MIN_RR = max(0.5, float(os.getenv("SETUP_E_MIN_RR", "1.0")))
 except (TypeError, ValueError):
     SETUP_E_MIN_RR = 1.0
-POSITION_RISK_PCT     = 0.01
-MAX_POSITION_FRACTION = 0.10  # default cap: 10% of balance * leverage
-MAX_POSITION_FRACTION_BY_SYMBOL = {
-    "BTC": 0.35,  # higher cap so small balances can still reach Binance min notional
+try:
+    POSITION_RISK_PCT = max(0.0, float(os.getenv("POSITION_RISK_PCT", "0.01")))
+except (TypeError, ValueError):
+    POSITION_RISK_PCT = 0.01
+try:
+    BTC_POSITION_RISK_PCT = max(0.0, float(os.getenv("BTC_POSITION_RISK_PCT", "0.005")))
+except (TypeError, ValueError):
+    BTC_POSITION_RISK_PCT = 0.005
+POSITION_RISK_PCT_BY_SYMBOL = {
+    "BTC": BTC_POSITION_RISK_PCT,
 }
+try:
+    MAX_POSITION_FRACTION = max(0.0, float(os.getenv("MAX_POSITION_FRACTION", "0.10")))
+except (TypeError, ValueError):
+    MAX_POSITION_FRACTION = 0.10
+try:
+    BTC_MAX_POSITION_FRACTION = max(0.0, float(os.getenv("BTC_MAX_POSITION_FRACTION", "0.15")))
+except (TypeError, ValueError):
+    BTC_MAX_POSITION_FRACTION = 0.15
+MAX_POSITION_FRACTION_BY_SYMBOL = {
+    "BTC": BTC_MAX_POSITION_FRACTION,
+}
+try:
+    BREAK_EVEN_TRIGGER_R_MULT = max(0.0, float(os.getenv("BREAK_EVEN_TRIGGER_R_MULT", "0.5")))
+except (TypeError, ValueError):
+    BREAK_EVEN_TRIGGER_R_MULT = 0.5
+try:
+    BTC_BREAK_EVEN_TRIGGER_R_MULT = max(
+        0.0, float(os.getenv("BTC_BREAK_EVEN_TRIGGER_R_MULT", "1.0"))
+    )
+except (TypeError, ValueError):
+    BTC_BREAK_EVEN_TRIGGER_R_MULT = 1.0
+BREAK_EVEN_TRIGGER_R_MULT_BY_SYMBOL = {
+    "BTC": BTC_BREAK_EVEN_TRIGGER_R_MULT,
+}
+try:
+    BTC_TRAIL_LOOKBACK_BARS = max(2, int(os.getenv("BTC_TRAIL_LOOKBACK_BARS", "2")))
+except (TypeError, ValueError):
+    BTC_TRAIL_LOOKBACK_BARS = 2
+try:
+    BTC_TRAIL_STOP_ATR_MULT = max(0.0, float(os.getenv("BTC_TRAIL_STOP_ATR_MULT", "0.35")))
+except (TypeError, ValueError):
+    BTC_TRAIL_STOP_ATR_MULT = 0.35
+try:
+    BTC_TRAIL_MARK_BUFFER_PCT = max(0.0, float(os.getenv("BTC_TRAIL_MARK_BUFFER_PCT", "0.0015")))
+except (TypeError, ValueError):
+    BTC_TRAIL_MARK_BUFFER_PCT = 0.0015
 CYCLE_INTERVAL        = 5 * 60
 MONITOR_INTERVAL      = 5
 ALLOWED_ML_HORIZONS = {"4h", "1d"}
@@ -225,6 +267,48 @@ def _cancel_algo_order(algo_id: int) -> dict:
     req   = urllib.request.Request(url, method="DELETE", headers={"X-MBX-APIKEY": API_KEY})
     with urllib.request.urlopen(req, timeout=10) as r:
         return json.loads(r.read())
+
+
+def _get_position_risk_pct(symbol: str) -> float:
+    return POSITION_RISK_PCT_BY_SYMBOL.get(symbol, POSITION_RISK_PCT)
+
+
+def _get_max_position_fraction(symbol: str) -> float:
+    return MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
+
+
+def _get_break_even_trigger_r_mult(symbol: str) -> float:
+    return BREAK_EVEN_TRIGGER_R_MULT_BY_SYMBOL.get(symbol, BREAK_EVEN_TRIGGER_R_MULT)
+
+
+def _round_price(symbol: str, price: float) -> float:
+    base = symbol.replace("USDT", "")
+    return round(price, PRICE_PRECISION.get(base, 2))
+
+
+def _replace_stop_loss_algo(symbol: str, trade_side: str, mark: float, new_sl: float):
+    """
+    Replace the active protective stop.
+
+    We identify the stop as the close-side trigger that still sits on the loss
+    side of the current mark price; TP orders remain on the profit side.
+    """
+    close_side = "SELL" if trade_side == "BUY" else "BUY"
+    algo_orders = _list_open_algo_orders(f"{symbol}USDT")
+    for ao in algo_orders:
+        ao_trigger = float(ao.get("triggerPrice") or 0)
+        ao_side = ao.get("side", "")
+        if not ao_trigger or ao_side != close_side:
+            continue
+        is_stop = (
+            (trade_side == "BUY" and ao_trigger < mark)
+            or (trade_side == "SELL" and ao_trigger > mark)
+        )
+        if not is_stop:
+            continue
+        _cancel_algo_order(ao["algoId"])
+        log.info(f"[MONITOR] {symbol} cancelled stop algo {ao['algoId']} @ {ao_trigger}")
+    _algo_order(f"{symbol}USDT", close_side, "STOP_MARKET", new_sl)
 
 
 def _get_conn():
@@ -742,38 +826,35 @@ def _monitor_loop(client: UMFutures):
                 if mark is None:
                     continue
 
-                # --- Break-even: move SL to entry once price reaches 1:1 profit ---
+                trade_side = trade["side"]
+
+                # --- Break-even: move SL to entry after the configured R-multiple is reached ---
                 entry = trade.get("entry_price") or 0
                 if entry and sl:
                     be_applied = (
-                        (trade.get("side") == "BUY"  and sl >= entry * 0.9999) or
-                        (trade.get("side") == "SELL" and sl <= entry * 1.0001)
+                        (trade_side == "BUY"  and sl >= entry * 0.9999) or
+                        (trade_side == "SELL" and sl <= entry * 1.0001)
                     )
                     if not be_applied:
                         risk = abs(entry - sl)
-                        be_trigger = (entry + risk * 0.5) if trade.get("side") == "BUY" else (entry - risk * 0.5)
+                        be_trigger_r = _get_break_even_trigger_r_mult(sym)
+                        be_trigger = (
+                            entry + risk * be_trigger_r
+                            if trade_side == "BUY"
+                            else entry - risk * be_trigger_r
+                        )
                         be_reached = (
-                            (trade.get("side") == "BUY"  and mark >= be_trigger) or
-                            (trade.get("side") == "SELL" and mark <= be_trigger)
+                            (trade_side == "BUY"  and mark >= be_trigger) or
+                            (trade_side == "SELL" and mark <= be_trigger)
                         )
                         if be_reached:
-                            log.info(f"[MONITOR] {sym} break-even triggered (mark={mark:.4f} be={be_trigger:.4f}) — moving SL to entry {entry}")
-                            close_side = "SELL" if trade.get("side") == "BUY" else "BUY"
+                            log.info(
+                                f"[MONITOR] {sym} break-even triggered "
+                                f"(mark={mark:.4f} trigger={be_trigger:.4f} r_mult={be_trigger_r:.2f}) "
+                                f"— moving SL to entry {entry}"
+                            )
                             try:
-                                algo_orders = _list_open_algo_orders(f"{sym}USDT")
-                                for ao in algo_orders:
-                                    ao_trigger = float(ao.get("triggerPrice") or 0)
-                                    ao_side    = ao.get("side", "")
-                                    # Identify SL by side + trigger being on the loss side of entry
-                                    # (type field is null in API response so cannot be used)
-                                    is_sl = ao_side == close_side and (
-                                        (trade.get("side") == "BUY"  and ao_trigger < entry) or
-                                        (trade.get("side") == "SELL" and ao_trigger > entry)
-                                    )
-                                    if is_sl:
-                                        _cancel_algo_order(ao["algoId"])
-                                        log.info(f"[MONITOR] {sym} cancelled SL algo {ao['algoId']} @ {ao_trigger}")
-                                _algo_order(f"{sym}USDT", close_side, "STOP_MARKET", entry)
+                                _replace_stop_loss_algo(sym, trade_side, mark, entry)
                                 log.info(f"[MONITOR] {sym} new break-even SL placed at entry {entry}")
                             except Exception as e:
                                 log.warning(f"[MONITOR] {sym} break-even SL replace failed ({e}) — software monitor will enforce via DB")
@@ -800,7 +881,24 @@ def _monitor_loop(client: UMFutures):
                         except Exception as e:
                             log.warning(f"[MONITOR] {sym} TP1 position check failed: {e}")
 
-                trade_side = trade["side"]
+                if sym == "BTC" and is_staged and trade.get("tp1_recorded"):
+                    btc_trail_sl = _btc_tp1_trailing_stop(client, trade, mark)
+                    if btc_trail_sl is not None:
+                        try:
+                            _replace_stop_loss_algo(sym, trade_side, mark, btc_trail_sl)
+                            log.info(
+                                f"[MONITOR] {sym} TP1 trail updated stop "
+                                f"{trade.get('stop_loss')} → {btc_trail_sl}"
+                            )
+                        except Exception as e:
+                            log.warning(
+                                f"[MONITOR] {sym} TP1 trail stop replace failed ({e}) "
+                                "— software monitor will enforce via DB"
+                            )
+                        db_update_stop_loss(trade["id"], btc_trail_sl)
+                        trade["stop_loss"] = btc_trail_sl
+                        sl = btc_trail_sl
+
                 # For staged trades use tp2 as software fallback so we still
                 # take profit even if the TP algo orders failed to place.
                 tp_check = tp2 if is_staged and tp2 else tp
@@ -1021,6 +1119,66 @@ def fetch_ohlcv(client: UMFutures, symbol: str, interval: str,
     return df.iloc[:-1].reset_index(drop=True)
 
 
+def _compute_m15_atr(df_m15: pd.DataFrame) -> float:
+    if df_m15 is None or len(df_m15) < 2:
+        return 0.0
+    prev_close = df_m15["close"].shift(1)
+    tr = pd.concat(
+        [
+            (df_m15["high"] - df_m15["low"]).abs(),
+            (df_m15["high"] - prev_close).abs(),
+            (df_m15["low"] - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    atr = tr.ewm(span=14, adjust=False).mean().iloc[-1]
+    return float(atr) if pd.notna(atr) else 0.0
+
+
+def _btc_tp1_trailing_stop(client: UMFutures, trade: dict, mark: float) -> float | None:
+    if trade.get("symbol") != "BTC" or not trade.get("tp1_recorded"):
+        return None
+
+    entry = float(trade.get("entry_price") or 0.0)
+    current_sl = float(trade.get("stop_loss") or 0.0)
+    if entry <= 0 or current_sl <= 0 or mark <= 0:
+        return None
+
+    try:
+        df_m15 = fetch_ohlcv(client, "BTC", "15m", 40)
+    except Exception as e:
+        log.warning(f"[MONITOR] BTC trailing fetch failed: {e}")
+        return None
+
+    if len(df_m15) < BTC_TRAIL_LOOKBACK_BARS + 14:
+        return None
+
+    atr = _compute_m15_atr(df_m15)
+    if atr <= 0:
+        return None
+
+    side = trade.get("side")
+    if side == "BUY":
+        structure = float(df_m15["low"].tail(BTC_TRAIL_LOOKBACK_BARS).min())
+        candidate = max(entry, structure - atr * BTC_TRAIL_STOP_ATR_MULT)
+        candidate = _round_price("BTC", candidate)
+        max_safe_stop = mark * (1 - BTC_TRAIL_MARK_BUFFER_PCT)
+        if candidate <= current_sl or candidate >= max_safe_stop:
+            return None
+        return candidate
+
+    if side == "SELL":
+        structure = float(df_m15["high"].tail(BTC_TRAIL_LOOKBACK_BARS).max())
+        candidate = min(entry, structure + atr * BTC_TRAIL_STOP_ATR_MULT)
+        candidate = _round_price("BTC", candidate)
+        min_safe_stop = mark * (1 + BTC_TRAIL_MARK_BUFFER_PCT)
+        if candidate >= current_sl or candidate <= min_safe_stop:
+            return None
+        return candidate
+
+    return None
+
+
 def _btc_macro_trend(df_4h: pd.DataFrame) -> str:
     """
     Returns 'BULL', 'BEAR', or 'NEUTRAL' based on BTC 4h EMA50.
@@ -1129,12 +1287,12 @@ def get_symbol_min_notional(client: UMFutures, symbol: str) -> float:
 
 def calc_quantity(balance: float, entry: float, sl: float, symbol: str,
                   min_notional: float) -> float:
-    risk_usdt     = balance * POSITION_RISK_PCT
+    risk_usdt     = balance * _get_position_risk_pct(symbol)
     sl_distance   = abs(entry - sl)
     if sl_distance == 0:
         return 0.0
     position_value = (risk_usdt / sl_distance) * entry
-    max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
+    max_fraction = _get_max_position_fraction(symbol)
     position_value = min(position_value, balance * max_fraction * LEVERAGE)
     # Binance rejects orders below its minimum order notional.
     if position_value < min_notional:
@@ -1152,7 +1310,7 @@ def min_balance_required_for_symbol(symbol: str, entry_price: float, min_notiona
     precision = QTY_PRECISION.get(symbol, 2)
     min_qty_step = 10 ** (-precision)
     min_notional_for_step = entry_price * min_qty_step
-    max_fraction = MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION)
+    max_fraction = _get_max_position_fraction(symbol)
     denom = max_fraction * LEVERAGE
     if denom <= 0:
         return float("inf")
@@ -1236,7 +1394,7 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
             (
                 f"Quantity too small or below min notional ${min_notional:.2f}. "
                 f"balance={balance:.2f} requires>={min_balance:.2f} with leverage={LEVERAGE} "
-                f"and cap={MAX_POSITION_FRACTION_BY_SYMBOL.get(symbol, MAX_POSITION_FRACTION):.2f}"
+                f"and cap={_get_max_position_fraction(symbol):.2f}"
             ),
             symbol,
         )
@@ -1373,7 +1531,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         df_btc_h1  = fetch_ohlcv(client, "BTC", "1h",  100) if symbol != "BTC" else df_h1
         df_btc_m15 = fetch_ohlcv(client, "BTC", "15m", 100) if symbol != "BTC" else df_m15
         df_btc_m5  = fetch_ohlcv(client, "BTC", "5m",  100) if symbol != "BTC" else df_m5
-        df_btc_4h  = fetch_ohlcv(client, "BTC", "4h",  100) if symbol != "BTC" else None
+        df_btc_4h  = fetch_ohlcv(client, "BTC", "4h",  100)
     except Exception as e:
         log_error(f"[{symbol}] OHLCV fetch failed", e)
         return
@@ -1389,7 +1547,7 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         ctx["btc_macro_trend"] = btc_macro
     else:
         ctx["btc_trend"]       = ctx["m15_trend"]
-        ctx["btc_macro_trend"] = "NEUTRAL"  # BTC is not filtered against itself
+        ctx["btc_macro_trend"] = _btc_macro_trend(df_btc_4h)
 
     ctx["sr"] = find_sr_levels(df_h1, ctx["current_price"], df_m15)
 
@@ -1594,7 +1752,13 @@ def run_once(dry_run: bool = False):
         f"TRADE_MIN_RR={TAKE_PROFIT_MIN_RR:.2f} "
         f"TRADE_MIN_RR_RANGE={RANGE_MIN_RR:.2f} "
         f"TP_EXTENSION_ATR_MULT={TP_EXTENSION_ATR_MULT:.2f} "
-        f"SETUP_E_MIN_RR={SETUP_E_MIN_RR:.2f}"
+        f"SETUP_E_MIN_RR={SETUP_E_MIN_RR:.2f} "
+        f"BTC_POSITION_RISK_PCT={BTC_POSITION_RISK_PCT:.4f} "
+        f"BTC_MAX_POSITION_FRACTION={BTC_MAX_POSITION_FRACTION:.2f} "
+        f"BTC_BREAK_EVEN_TRIGGER_R_MULT={BTC_BREAK_EVEN_TRIGGER_R_MULT:.2f} "
+        f"BTC_HIGH_ATR_PCT={os.getenv('BTC_HIGH_ATR_PCT', '1.1')} "
+        f"BTC_HIGH_ATR_MIN_ADX={os.getenv('BTC_HIGH_ATR_MIN_ADX', '25')} "
+        f"BTC_RANGE_DISABLE_ATR_PCT={os.getenv('BTC_RANGE_DISABLE_ATR_PCT', '0.9')}"
     )
     funding_str = "  ".join(
         f"{s} funding={market_signals.get(f'{s.lower()}_funding', 0):+.4f}%"

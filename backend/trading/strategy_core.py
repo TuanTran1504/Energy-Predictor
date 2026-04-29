@@ -624,6 +624,8 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     """
     Runs all technical gates in order.
     """
+    symbol_text = str(context.get("symbol", ""))
+    symbol_base = symbol_text.split("/", 1)[0].upper() if symbol_text else ""
     primary = context.get("primary_trend") or context["m15_trend"]
     score = context["score"]
     is_range = context["is_range"]
@@ -631,6 +633,8 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
     price = float(context.get("current_price") or 0.0)
     sr = context.get("sr", {}) or {}
     rsi = float(context.get("rsi") or 50.0)
+    adx = float(context.get("adx_m15") or 0.0)
+    atr_pct = float(context.get("m15_atr_pct") or 0.0)
     edge = max(0.35, float(context.get("h1_atr_pct") or 0.8))
     near_edge = False
     if price > 0 and sr:
@@ -638,6 +642,15 @@ def check_technical_gates(context: dict) -> tuple[bool, str]:
         dist_s = abs(price - float(sr["support"])) / price * 100
         near_edge = dist_r <= edge or dist_s <= edge
     rsi_extreme = rsi <= 42 or rsi >= 58
+
+    if symbol_base == "BTC":
+        btc_high_atr_pct = max(0.0, _env_float("BTC_HIGH_ATR_PCT", 1.1))
+        btc_min_adx = max(0.0, _env_float("BTC_HIGH_ATR_MIN_ADX", 25.0))
+        if atr_pct >= btc_high_atr_pct and adx < btc_min_adx:
+            return False, (
+                f"GATE0: BTC unstable volatility "
+                f"(ATR%={atr_pct:.2f} >= {btc_high_atr_pct:.2f}, ADX={adx:.1f} < {btc_min_adx:.1f})"
+            )
 
     if primary == "SIDEWAY" and not allow_sideway and not (near_edge or rsi_extreme):
         return False, "GATE1: M15 SIDEWAY"
@@ -771,6 +784,23 @@ def validate_ai_trade_decision(decision: dict, context: dict,
     setup_code = _setup_code(decision.get("analysis", {}).get("setup_identified", ""))
     if setup_code not in ("A", "B", "C", "D"):
         return False, f"unsupported setup {setup_code!r}; only Setup A/B/C/D allowed"
+
+    symbol_text = str(context.get("symbol", ""))
+    symbol_base = symbol_text.split("/", 1)[0].upper() if symbol_text else ""
+    if symbol_base == "BTC":
+        btc_macro = str(context.get("btc_macro_trend", "NEUTRAL")).upper()
+        if btc_macro == "BULL" and signal != "BUY":
+            return False, "BTC 4h macro is BULL — blocking countertrend SELL"
+        if btc_macro == "BEAR" and signal != "SELL":
+            return False, "BTC 4h macro is BEAR — blocking countertrend BUY"
+
+        atr_pct = float(context.get("m15_atr_pct") or 0.0)
+        btc_range_disable_atr = max(0.0, _env_float("BTC_RANGE_DISABLE_ATR_PCT", 0.9))
+        if setup_code == "D" and atr_pct >= btc_range_disable_atr:
+            return False, (
+                f"BTC Setup D disabled when M15 ATR%={atr_pct:.2f} "
+                f">= {btc_range_disable_atr:.2f}"
+            )
 
     if setup_code == "A":
         h1 = context.get("h1_trend", "")
