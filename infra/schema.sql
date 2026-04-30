@@ -197,3 +197,80 @@ CREATE INDEX IF NOT EXISTS idx_etf_flows_date
     ON etf_flows (flow_date DESC);
 CREATE INDEX IF NOT EXISTS idx_etf_flows_ticker_date
     ON etf_flows (ticker, flow_date DESC);
+
+-- -----------------------------------------------------------------------------
+-- Runtime strategy policies (versioned, hot-reloadable trading config)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS strategy_policies (
+    id                BIGSERIAL PRIMARY KEY,
+    policy_name       TEXT        NOT NULL DEFAULT 'default',
+    engine_name       TEXT        NOT NULL,  -- e.g. scalp_live, llm_live
+    account_type      TEXT        NOT NULL,  -- e.g. live, testnet
+    version           INTEGER     NOT NULL,
+    status            TEXT        NOT NULL DEFAULT 'draft'
+                                  CHECK (status IN ('draft', 'validated', 'active', 'rejected', 'retired')),
+    policy_json       JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    validation_report JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    reason            TEXT,
+    source            TEXT        NOT NULL DEFAULT 'manual',
+    created_by        TEXT,
+    base_policy_id    BIGINT REFERENCES strategy_policies(id) ON DELETE SET NULL,
+    effective_from    TIMESTAMPTZ,
+    activated_at      TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT strategy_policies_version_unique
+        UNIQUE (policy_name, engine_name, account_type, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_strategy_policies_lookup
+    ON strategy_policies (engine_name, account_type, status, effective_from DESC, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_strategy_policies_created_at
+    ON strategy_policies (created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_strategy_policies_policy_json
+    ON strategy_policies USING GIN (policy_json);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_strategy_policies_one_active_per_scope
+    ON strategy_policies (engine_name, account_type)
+    WHERE status = 'active';
+
+-- -----------------------------------------------------------------------------
+-- Policy review run history
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS policy_review_runs (
+    id                         BIGSERIAL PRIMARY KEY,
+    run_at                     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    engine_name                TEXT        NOT NULL,
+    account_type               TEXT        NOT NULL,
+    reviewer_model             TEXT,
+    guard_decision             TEXT        NOT NULL CHECK (guard_decision IN ('HOLD', 'ALLOW_REVIEW')),
+    guard_reason               TEXT        NOT NULL,
+    llm_called                 BOOLEAN     NOT NULL DEFAULT FALSE,
+    llm_decision               TEXT,
+    llm_reason                 TEXT,
+    proposed_patch             JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    guard_payload              JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    llm_payload                JSONB       NOT NULL DEFAULT '{}'::jsonb,
+    active_policy_id           BIGINT,
+    active_policy_version      INTEGER,
+    hours_since_policy_update  FLOAT,
+    closed_trades_since_update INTEGER,
+    created_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_policy_review_runs_scope_time
+    ON policy_review_runs (engine_name, account_type, run_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_policy_review_runs_guard_decision
+    ON policy_review_runs (guard_decision, run_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_policy_review_runs_llm_decision
+    ON policy_review_runs (llm_decision, run_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_policy_review_runs_guard_payload
+    ON policy_review_runs USING GIN (guard_payload);
+
+CREATE INDEX IF NOT EXISTS idx_policy_review_runs_llm_payload
+    ON policy_review_runs USING GIN (llm_payload);

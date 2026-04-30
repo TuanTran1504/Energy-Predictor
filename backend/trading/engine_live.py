@@ -40,6 +40,17 @@ from strategy_core  import (
     check_macro_bias, check_technical_gates, get_range_bias,
     validate_ai_trade_decision, build_trade_plan, compute_max_stop_pct,
 )
+from strategy_policy import (
+    ActiveStrategyPolicy,
+    apply_policy_to_environment,
+    capture_managed_environment,
+    guard_risk_increase_overrides,
+    load_active_strategy_policy,
+    policy_allows_risk_increase,
+    reset_managed_environment,
+    setup_enabled_in_policy,
+    symbol_enabled_in_policy,
+)
 from trade_logger   import (
     get_logger, log_cycle_start, log_gate_pass, log_gate_fail,
     log_ai_request, log_ai_response, log_trade_open, log_trade_close,
@@ -60,6 +71,7 @@ ACCOUNT_TYPE   = "live"
 TRADES_TABLE   = "trades_live"
 FILLS_TABLE    = "trade_fills_live"
 SYMBOLS        = ["BTC", "ETH", "SOL"]
+STRATEGY_POLICY_ENGINE_NAME = os.getenv("STRATEGY_POLICY_ENGINE_NAME", "llm_live")
 LEVERAGE       = 5
 try:
     DEFAULT_MIN_NOTIONAL = max(
@@ -161,6 +173,90 @@ _SYMBOL_MIN_NOTIONAL_CACHE: dict[str, float] = {}
 # ML predictions are intentionally disabled in live trading for now.
 # Keep the plumbing for later experiments, but do not let ML influence entries.
 ML_EXPERIMENTAL_ENABLED = False
+_BASE_MANAGED_ENV = capture_managed_environment()
+_ACTIVE_STRATEGY_POLICY: ActiveStrategyPolicy | None = None
+
+
+def _runtime_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return float(default)
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _runtime_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return int(default)
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def _refresh_runtime_config_from_env():
+    global SL_ATR_MULTIPLIER
+    global SL_SR_BUFFER_ATR_MULT
+    global TAKE_PROFIT_MIN_RR
+    global RANGE_MIN_RR
+    global TP_EXTENSION_ATR_MULT
+    global SETUP_E_MIN_RR
+    global POSITION_RISK_PCT
+    global BTC_POSITION_RISK_PCT
+    global POSITION_RISK_PCT_BY_SYMBOL
+    global MAX_POSITION_FRACTION
+    global BTC_MAX_POSITION_FRACTION
+    global MAX_POSITION_FRACTION_BY_SYMBOL
+    global BREAK_EVEN_TRIGGER_R_MULT
+    global BTC_BREAK_EVEN_TRIGGER_R_MULT
+    global BREAK_EVEN_TRIGGER_R_MULT_BY_SYMBOL
+    global BTC_TRAIL_LOOKBACK_BARS
+    global BTC_TRAIL_STOP_ATR_MULT
+    global BTC_TRAIL_MARK_BUFFER_PCT
+
+    SL_ATR_MULTIPLIER = max(0.0, _runtime_float("SL_ATR_MULTIPLIER", 1.8))
+    SL_SR_BUFFER_ATR_MULT = max(0.0, _runtime_float("SL_SR_BUFFER_ATR_MULT", 0.25))
+    TAKE_PROFIT_MIN_RR = max(0.5, _runtime_float("TRADE_MIN_RR", 1.5))
+    RANGE_MIN_RR = max(0.5, _runtime_float("TRADE_MIN_RR_RANGE", TAKE_PROFIT_MIN_RR))
+    TP_EXTENSION_ATR_MULT = max(0.0, _runtime_float("TP_EXTENSION_ATR_MULT", 0.15))
+    SETUP_E_MIN_RR = max(0.5, _runtime_float("SETUP_E_MIN_RR", 1.0))
+    POSITION_RISK_PCT = max(0.0, _runtime_float("POSITION_RISK_PCT", 0.01))
+    BTC_POSITION_RISK_PCT = max(0.0, _runtime_float("BTC_POSITION_RISK_PCT", 0.005))
+    POSITION_RISK_PCT_BY_SYMBOL = {"BTC": BTC_POSITION_RISK_PCT}
+    MAX_POSITION_FRACTION = max(0.0, _runtime_float("MAX_POSITION_FRACTION", 0.10))
+    BTC_MAX_POSITION_FRACTION = max(0.0, _runtime_float("BTC_MAX_POSITION_FRACTION", 0.15))
+    MAX_POSITION_FRACTION_BY_SYMBOL = {"BTC": BTC_MAX_POSITION_FRACTION}
+    BREAK_EVEN_TRIGGER_R_MULT = max(0.0, _runtime_float("BREAK_EVEN_TRIGGER_R_MULT", 0.5))
+    BTC_BREAK_EVEN_TRIGGER_R_MULT = max(
+        0.0, _runtime_float("BTC_BREAK_EVEN_TRIGGER_R_MULT", 1.0)
+    )
+    BREAK_EVEN_TRIGGER_R_MULT_BY_SYMBOL = {"BTC": BTC_BREAK_EVEN_TRIGGER_R_MULT}
+    BTC_TRAIL_LOOKBACK_BARS = max(2, _runtime_int("BTC_TRAIL_LOOKBACK_BARS", 2))
+    BTC_TRAIL_STOP_ATR_MULT = max(0.0, _runtime_float("BTC_TRAIL_STOP_ATR_MULT", 0.35))
+    BTC_TRAIL_MARK_BUFFER_PCT = max(0.0, _runtime_float("BTC_TRAIL_MARK_BUFFER_PCT", 0.0015))
+
+
+def _refresh_runtime_strategy_policy() -> tuple[ActiveStrategyPolicy | None, dict[str, str], list[str], str]:
+    global _ACTIVE_STRATEGY_POLICY
+    reset_managed_environment(_BASE_MANAGED_ENV)
+    policy = load_active_strategy_policy(STRATEGY_POLICY_ENGINE_NAME, ACCOUNT_TYPE)
+    applied: dict[str, str] = {}
+    blocked: list[str] = []
+    guard_reason = "risk governor not needed"
+    if policy:
+        applied = apply_policy_to_environment(policy.policy_json)
+        allow_risk_increase, guard_reason = policy_allows_risk_increase(policy)
+        applied, blocked = guard_risk_increase_overrides(
+            applied,
+            _BASE_MANAGED_ENV,
+            allow_risk_increase=allow_risk_increase,
+        )
+    _refresh_runtime_config_from_env()
+    _ACTIVE_STRATEGY_POLICY = policy
+    return policy, applied, blocked, guard_reason
 
 
 def _normalize_horizon_token(token: str) -> str:
@@ -377,6 +473,8 @@ def db_ensure_trades_table():
                 ("take_profit_2",    "FLOAT"),
                 ("close_order_id",   "TEXT"),
                 ("tp1_recorded",     "BOOLEAN DEFAULT FALSE"),
+                ("strategy_policy_id", "BIGINT"),
+                ("strategy_policy_version", "INTEGER"),
             ]:
                 cur.execute(f"""
                     ALTER TABLE {TRADES_TABLE} ADD COLUMN IF NOT EXISTS {col} {definition}
@@ -476,7 +574,9 @@ def db_mark_tp1_recorded(trade_id: int):
 
 
 def db_create_pending(symbol: str, side: str, setup: str,
-                      confidence: float = 0.0) -> int:
+                      confidence: float = 0.0,
+                      strategy_policy_id: int | None = None,
+                      strategy_policy_version: int | None = None) -> int:
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -484,10 +584,14 @@ def db_create_pending(symbol: str, side: str, setup: str,
                 cur.execute(f"""
                     INSERT INTO {TRADES_TABLE}
                       (symbol, side, status, entry_price, quantity, leverage,
-                       stop_loss, take_profit, confidence, setup, horizon, account_type)
-                    VALUES (%s,%s,'PENDING', 0, 0, %s, 0, 0, %s,%s, 1, %s)
+                       stop_loss, take_profit, confidence, setup, horizon, account_type,
+                       strategy_policy_id, strategy_policy_version)
+                    VALUES (%s,%s,'PENDING', 0, 0, %s, 0, 0, %s,%s, 1, %s, %s, %s)
                     RETURNING id
-                """, (symbol, side, LEVERAGE, confidence, setup, ACCOUNT_TYPE))
+                """, (
+                    symbol, side, LEVERAGE, confidence, setup, ACCOUNT_TYPE,
+                    strategy_policy_id, strategy_policy_version,
+                ))
             except errors.UniqueViolation:
                 conn.rollback()
                 raise RuntimeError(f"[{symbol}] Duplicate PENDING — another instance already entering")
@@ -1432,7 +1536,16 @@ def execute_trade(client: UMFutures, symbol: str, decision: dict,
     # --- Step 1: reserve DB slot ---
     pending_id = None
     try:
-        pending_id = db_create_pending(symbol, signal, setup, confidence)
+        policy_id = _ACTIVE_STRATEGY_POLICY.id if _ACTIVE_STRATEGY_POLICY else None
+        policy_version = _ACTIVE_STRATEGY_POLICY.version if _ACTIVE_STRATEGY_POLICY else None
+        pending_id = db_create_pending(
+            symbol,
+            signal,
+            setup,
+            confidence,
+            strategy_policy_id=policy_id,
+            strategy_policy_version=policy_version,
+        )
         log.info(f"  [EXEC] PENDING record created id={pending_id}")
     except Exception as e:
         log_error(f"[{symbol}] Could not create PENDING record — aborting", e)
@@ -1684,6 +1797,15 @@ def run_symbol_cycle(client: UMFutures, symbol: str,
         return
 
     setup_name = decision.get("analysis", {}).get("setup_identified", "")
+    if not setup_enabled_in_policy(
+        _ACTIVE_STRATEGY_POLICY.policy_json if _ACTIVE_STRATEGY_POLICY else {},
+        setup_name,
+    ):
+        policy_reason = f"{setup_name or 'unknown setup'} disabled by active strategy policy"
+        log_gate_fail("POLICY_SETUP", policy_reason, symbol, ctx)
+        log_skip("POLICY_SETUP", policy_reason, ctx, decision)
+        log_cycle_summary(symbol, "WAIT", False, balance, ctx, decision)
+        return
     # Refresh price after Gemini delay so SL/TP/RR are calculated from actual entry price.
     try:
         ticker = client.ticker_price(symbol=f"{symbol}USDT")
@@ -1734,11 +1856,28 @@ def run_once(dry_run: bool = False):
     log.info(f"ENGINE LIVE  {'DRY RUN' if dry_run else 'LIVE'}  {datetime.now(VN_TZ).isoformat()}")
     log.info("=" * 60)
 
+    policy, applied_overrides, blocked_risk_overrides, guard_reason = _refresh_runtime_strategy_policy()
     client         = get_client()
     market_signals = get_market_signals()
     balance        = get_account_balance(client)
 
     log.info(f"Balance: {balance:.2f} USDT")
+    if policy:
+        log.info(
+            f"Strategy policy: {policy.policy_name} v{policy.version} "
+            f"(id={policy.id}, engine={policy.engine_name}, source={policy.source})"
+        )
+        if applied_overrides:
+            summary = " ".join(f"{k}={v}" for k, v in sorted(applied_overrides.items()))
+            log.info(f"Policy overrides: {summary}")
+        log.info(f"Policy risk-governor: {guard_reason}")
+        if blocked_risk_overrides:
+            log.warning(
+                "Blocked risk-increasing overrides without clear signal: "
+                + " | ".join(blocked_risk_overrides)
+            )
+    else:
+        log.info("Strategy policy: none active — using .env defaults")
     ml_status = "enabled (experimental)" if ML_EXPERIMENTAL_ENABLED else "disabled (experimental)"
     log.info(f"ML mode: {ml_status}")
     log.info(
@@ -1768,6 +1907,9 @@ def run_once(dry_run: bool = False):
 
     latest_balance = balance
     for symbol in SYMBOLS:
+        if not symbol_enabled_in_policy(policy.policy_json if policy else {}, symbol):
+            log.info(f"[{symbol}] Disabled by active strategy policy — skipping symbol")
+            continue
         try:
             latest_balance = get_account_balance(client)
             run_symbol_cycle(client, symbol, market_signals, latest_balance, dry_run)

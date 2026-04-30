@@ -1,13 +1,6 @@
 #!/bin/sh
-# Launch both scheduler processes.
-# run_scheduler.py  → fear_greed_index, funding_rates, macro_events
-# run_macro_etf_ingestor.py → macro_releases, etf_flows
+# Launch VPS policy-review loop only.
+# Data ingestion schedules remain on Modal.
 set -e
 
-python run_scheduler.py &
-PID1=$!
-python run_macro_etf_ingestor.py &
-PID2=$!
-
-# Wait for either process to exit; if one dies the container restarts.
-wait $PID1 $PID2
+python run_scheduler.py
